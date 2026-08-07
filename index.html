@@ -10,10 +10,11 @@
          max-width: 860px; margin: 0 auto; padding: 24px 16px; color: #24292f; line-height: 1.6; }
   h1 { font-size: 1.6em; border-bottom: 2px solid #0969da; padding-bottom: 8px; }
   h2 { font-size: 1.15em; margin-top: 32px; }
+  h3 { font-size: 0.95em; color: #57606a; margin-top: 20px; }
   .meta { color: #57606a; font-size: 0.9em; }
-  .src { color: #8b949e; font-size: 0.8em; }
   ul { padding-left: 1.4em; }
   li { margin: 3px 0; font-size: 0.93em; }
+  p { margin: 6px 0; }
   code { background: #f6f8fa; border-radius: 4px; padding: 1px 5px; font-size: 0.9em; }
   a { color: #0969da; }
   footer { margin-top: 40px; color: #8b949e; font-size: 0.85em; }
@@ -25,11 +26,25 @@
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
     <section id="2026-08-07" class="day">
-      <h2>2026-08-07 日报</h2>
-      <p class="meta">2026-08-07 · 45 个提交（feat 4 · fix 27 · perf 2 · docs 0 · merge 0）</p>
-      <p class="src">数据源: tip 9ea0197 → 0957277，
-      采集于 2026-08-07 06:30</p>
-      <ul><li><code>0957277f2</code> 2026-08-06 teknium1 — refactor(skills): move polymarket to optional-skills/finance</li>
+      <h2>Hermes 日报 2026-08-07：新增 /refine 和 /heartbeat 命令，委托控制权强化</h2>
+      <p><strong>本期覆盖 8 月 5 日 ~ 8 月 6 日合入 main 的提交，共 45 个 commit，其中 merge 0 个。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>三个新命令：/refine（按需自改进审查）、/heartbeat（空闲定时唤醒）、goal 质量门禁</li>
+<li>委托与生命周期加固：子任务 steer 控制权绑定会话代际，cron 生命周期守卫全面化</li>
+<li>性能与可靠性：read_file 支持 PDF/Office 文档提取，测试 52s→10s，CI 门禁缩短 33%</li>
+</ul>
+<p>重点条目：</p>
+<ul>
+<li>feat: /refine — 按需运行记忆/技能自改进审查（8f2712725）</li>
+<li>feat: /heartbeat — 空闲时定时重新进入会话（6518aa184）</li>
+<li>feat(goals): 质量门禁 — /goal 完成前必须通过的确定性命令（6e041d524）</li>
+<li>feat(read_file): PDF/Office/ODF/RTF/EPUB 文档提取（b2598b41e）</li>
+<li>fix(delegation): 子任务 steer 控制权绑定会话代际（9d4ef04ed）</li>
+<li>perf(tests): test_hermes_state.py 52s → 10s（169758d42）</li>
+</ul>
+<h3 class="collapsed">完整 commit 列表（45 条）</h3>
+<ul><li><code>0957277f2</code> 2026-08-06 teknium1 — refactor(skills): move polymarket to optional-skills/finance</li>
 <li><code>9d4ef04ed</code> 2026-08-06 SmokeDev — fix(delegation): bind steering to session generation</li>
 <li><code>a94ebf5f5</code> 2026-08-06 SmokeDev — fix(delegation): harden steer lifecycle ownership</li>
 <li><code>60e1f7517</code> 2026-08-06 SmokeDev — fix(delegation): surface a child&#x27;s undelivered steer instead of dropping it</li>
@@ -76,13 +91,12 @@
 <li><code>1d2dabce5</code> 2026-08-06 Drexuxux — fix(sessions): escape LIKE wildcards in prune/archive substring filters</li></ul>
     </section>
     
-
     <section id="2026-08-05" class="day">
-      <h2>2026-08-05 日报</h2>
-      <p class="meta">2026-08-05 · 83 个提交（feat 12 · fix 35 · perf 1 · docs 13 · merge 22）</p>
-      <p class="src">数据源: tip 36cb5ae → 9ea0197，
-      采集于 2026-08-06 06:30</p>
-      <ul><li><code>9ea01979d</code> 2026-08-06 kshitij — chore: map contributor email for @sylbae</li>
+      <h2>Hermes 日报 2026-08-05（83 个提交）</h2>
+      <p><strong>本期覆盖 2026-07-29 ~ 2026-08-06 合入 main 的提交，共 83 个 commit，其中 merge 22 个</strong></p>
+<p>共 83 个提交合入 main（feat 12 · fix 35 · perf 1 · docs 13 · merge 22）</p>
+<h3 class="collapsed">完整 commit 列表（83 条）</h3>
+<ul><li><code>9ea01979d</code> 2026-08-06 kshitij — chore: map contributor email for @sylbae</li>
 <li><code>042a2cf3d</code> 2026-08-06 kshitij — fix(agent): keep the start-order gate under the batch deadline and abort abandoned workers</li>
 <li><code>5d83400f8</code> 2026-08-06 Sylvain Baeriswyl — fix(agent): bound the concurrent start-order gate wait</li>
 <li><code>7112fbcbc</code> 2026-08-05 ethernet — fix(nix): update electron sha</li>
@@ -167,13 +181,12 @@
 <li><code>f1fd678e4</code> 2026-07-29 Alex Fournier — feat(observability): add Relay skill metrics</li></ul>
     </section>
     
-
     <section id="2026-08-04" class="day">
-      <h2>2026-08-04 日报</h2>
-      <p class="meta">2026-08-04 · 99 个提交（feat 16 · fix 43 · perf 7 · docs 0 · merge 22）</p>
-      <p class="src">数据源: tip a991dfc → 36cb5ae，
-      采集于 2026-08-05 06:30</p>
-      <ul><li><code>36cb5ae55</code> 2026-08-04 ethernet — ci: test updating from sampled release tags, on tag + every 12h</li>
+      <h2>Hermes 日报 2026-08-04（99 个提交）</h2>
+      <p><strong>本期覆盖 2026-07-29 ~ 2026-08-04 合入 main 的提交，共 99 个 commit，其中 merge 22 个</strong></p>
+<p>共 99 个提交合入 main（feat 16 · fix 43 · perf 7 · docs 0 · merge 22）</p>
+<h3 class="collapsed">完整 commit 列表（99 条）</h3>
+<ul><li><code>36cb5ae55</code> 2026-08-04 ethernet — ci: test updating from sampled release tags, on tag + every 12h</li>
 <li><code>3d9ec4d62</code> 2026-08-04 ethernet — test(install): prove updating from a release reaches this commit</li>
 <li><code>84874c58a</code> 2026-08-04 ethernet — feat(dev-sandbox): support fake installer / fake main / git clones</li>
 <li><code>fdc342c08</code> 2026-08-04 brooklyn! — fix(models): a model id missing its vendor prefix says so instead of 404ing (#78909)</li>
@@ -274,13 +287,12 @@
 <li><code>dc4714b1e</code> 2026-07-29 Alex Fournier — feat(observability): report model and provider usage</li></ul>
     </section>
     
-
     <section id="2026-08-03" class="day">
-      <h2>2026-08-03 日报</h2>
-      <p class="meta">2026-08-03 · 289 个提交（feat 12 · fix 140 · perf 39 · docs 6 · merge 27）</p>
-      <p class="src">数据源: tip 1c39f1c → a991dfc，
-      采集于 2026-08-04 06:30</p>
-      <ul><li><code>a991dfc25</code> 2026-08-03 Teknium — docs: document /personality none|default|neutral reset across personality docs</li>
+      <h2>Hermes 日报 2026-08-03（289 个提交）</h2>
+      <p><strong>本期覆盖 2026-08-02 ~ 2026-08-04 合入 main 的提交，共 289 个 commit，其中 merge 27 个</strong></p>
+<p>共 289 个提交合入 main（feat 12 · fix 140 · perf 39 · docs 6 · merge 27）</p>
+<h3 class="collapsed">完整 commit 列表（289 条）</h3>
+<ul><li><code>a991dfc25</code> 2026-08-03 Teknium — docs: document /personality none|default|neutral reset across personality docs</li>
 <li><code>0845232d7</code> 2026-08-04 kshitij — fix: prefer explicit anthropic api key</li>
 <li><code>aad8f7412</code> 2026-08-03 Hao Wang — fix(backup): serialize and atomically publish snapshots</li>
 <li><code>f40d63d5d</code> 2026-08-03 kshitijk4poor — chore: add contributor email mapping for HAOWANG116</li>
@@ -483,13 +495,12 @@
 <p>…共 289 条，其余见原文存档。</p>
     </section>
     
-
     <section id="2026-08-02" class="day">
-      <h2>2026-08-02 日报</h2>
-      <p class="meta">2026-08-02 · 245 个提交（feat 21 · fix 169 · perf 5 · docs 4 · merge 28）</p>
-      <p class="src">数据源: tip e444d16 → cc0af6b，
-      采集于 2026-08-02 06:30</p>
-      <ul><li><code>cc0af6b9e</code> 2026-08-01 Teknium — ci: skip Desktop E2E + Docker build on tests-only PRs (python_prod lane)</li>
+      <h2>Hermes 日报 2026-08-02（245 个提交）</h2>
+      <p><strong>本期覆盖 2026-07-29 ~ 2026-08-01 合入 main 的提交，共 245 个 commit，其中 merge 28 个</strong></p>
+<p>共 245 个提交合入 main（feat 21 · fix 169 · perf 5 · docs 4 · merge 28）</p>
+<h3 class="collapsed">完整 commit 列表（245 条）</h3>
+<ul><li><code>cc0af6b9e</code> 2026-08-01 Teknium — ci: skip Desktop E2E + Docker build on tests-only PRs (python_prod lane)</li>
 <li><code>a5f94e93a</code> 2026-08-01 dsad — fix(acp): bind session_id in session context for subprocess isolation</li>
 <li><code>ff6ed7c49</code> 2026-08-01 Teknium — fix(update): detect EOL-only churn via numstat, not name-only</li>
 <li><code>9772e3b18</code> 2026-08-01 Teknium — perf(model-picker): serve stale model caches instantly, refresh in background</li>
@@ -692,13 +703,12 @@
 <p>…共 245 条，其余见原文存档。</p>
     </section>
     
-
     <section id="2026-07-31" class="day">
-      <h2>2026-07-31 日报</h2>
-      <p class="meta">2026-07-31 · 109 个提交（feat 18 · fix 66 · perf 3 · docs 5 · merge 11）</p>
-      <p class="src">数据源: tip 524ab53 → e444d16，
-      采集于 2026-08-01 06:30</p>
-      <ul><li><code>e444d1658</code> 2026-07-31 Austin Pickett — fix(vision): make desktop image uploads reachable from profile Docker sandboxes (#69575) (#75671)</li>
+      <h2>Hermes 日报 2026-07-31（109 个提交）</h2>
+      <p><strong>本期覆盖 2026-07-30 ~ 2026-07-31 合入 main 的提交，共 109 个 commit，其中 merge 11 个</strong></p>
+<p>共 109 个提交合入 main（feat 18 · fix 66 · perf 3 · docs 5 · merge 11）</p>
+<h3 class="collapsed">完整 commit 列表（109 条）</h3>
+<ul><li><code>e444d1658</code> 2026-07-31 Austin Pickett — fix(vision): make desktop image uploads reachable from profile Docker sandboxes (#69575) (#75671)</li>
 <li><code>c2872cf53</code> 2026-07-31 Brooklyn Nicholson — fix(kanban): key the worker-session retag per board, not per database</li>
 <li><code>4a8eeb5d1</code> 2026-07-31 Ben Barclay — fix(gateway): relay semantic thread rename — register eagerly, poll send-result feedback at fire time (#75581)</li>
 <li><code>17e5f7244</code> 2026-07-31 hermes-seaeye[bot] — fmt(js): `npm run fix` on merge (#75582)</li>
@@ -809,13 +819,12 @@
 <li><code>79e7adae2</code> 2026-07-30 Brooklyn Nicholson — feat(desktop): Kanban — dashboard-parity board plugin on the SDK</li></ul>
     </section>
     
-
     <section id="2026-07-30" class="day">
-      <h2>2026-07-30 日报</h2>
-      <p class="meta">2026-07-30 · 212 个提交（feat 29 · fix 106 · perf 4 · docs 3 · merge 49）</p>
-      <p class="src">数据源: tip 7142dc4 → 524ab53，
-      采集于 2026-07-31 06:30</p>
-      <ul><li><code>524ab5399</code> 2026-07-30 Teknium — fix(telegram): apply media read_timeout to all upload send paths, not just video</li>
+      <h2>Hermes 日报 2026-07-30（212 个提交）</h2>
+      <p><strong>本期覆盖 2026-07-29 ~ 2026-07-30 合入 main 的提交，共 212 个 commit，其中 merge 49 个</strong></p>
+<p>共 212 个提交合入 main（feat 29 · fix 106 · perf 4 · docs 3 · merge 49）</p>
+<h3 class="collapsed">完整 commit 列表（212 条）</h3>
+<ul><li><code>524ab5399</code> 2026-07-30 Teknium — fix(telegram): apply media read_timeout to all upload send paths, not just video</li>
 <li><code>0a2859cf9</code> 2026-07-30 rob-maron — drop env var</li>
 <li><code>88f694909</code> 2026-07-30 rob-maron — more conservative</li>
 <li><code>061b04ebb</code> 2026-07-30 rob-maron — fix video delivery</li>
@@ -1018,13 +1027,12 @@
 <p>…共 212 条，其余见原文存档。</p>
     </section>
     
-
     <section id="2026-07-29" class="day">
-      <h2>2026-07-29 日报</h2>
-      <p class="meta">2026-07-29 · 427 个提交（feat 62 · fix 194 · perf 15 · docs 26 · merge 36）</p>
-      <p class="src">数据源: tip 43ddefd → 7142dc4，
-      采集于 2026-07-30 06:30</p>
-      <ul><li><code>7142dc458</code> 2026-07-29 teknium1 — test: complete the readonly-stub pairing sweep (6 more files)</li>
+      <h2>Hermes 日报 2026-07-29（427 个提交）</h2>
+      <p><strong>本期覆盖 2026-07-18 ~ 2026-07-30 合入 main 的提交，共 427 个 commit，其中 merge 36 个</strong></p>
+<p>共 427 个提交合入 main（feat 62 · fix 194 · perf 15 · docs 26 · merge 36）</p>
+<h3 class="collapsed">完整 commit 列表（427 条）</h3>
+<ul><li><code>7142dc458</code> 2026-07-29 teknium1 — test: complete the readonly-stub pairing sweep (6 more files)</li>
 <li><code>a16fd675d</code> 2026-07-29 teknium1 — test: pair attribute-form load_config stubs with readonly siblings</li>
 <li><code>243c9182b</code> 2026-07-29 teknium1 — test: patch load_config_readonly alongside load_config across affected suites</li>
 <li><code>97aba0140</code> 2026-07-29 teknium1 — test: patch load_config_readonly alongside load_config in run_agent init tests</li>

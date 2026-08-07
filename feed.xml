@@ -5,14 +5,30 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 07 Aug 2026 12:57:19 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 07 Aug 2026 23:43:06 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
-      <title>Hermes 日报 2026-08-07（45 个提交）</title>
+      <title>Hermes 日报 2026-08-07：新增 /refine 和 /heartbeat 命令，委托控制权强化</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-07</link>
       <guid isPermaLink="false">hermes-daily-2026-08-07</guid>
       <pubDate>Fri, 07 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 45 个提交合入 main（feat 4 · fix 27 · perf 2 · docs 0 · merge 0）</p>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 5 日 ~ 8 月 6 日合入 main 的提交，共 45 个 commit，其中 merge 0 个。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>三个新命令：/refine（按需自改进审查）、/heartbeat（空闲定时唤醒）、goal 质量门禁</li>
+<li>委托与生命周期加固：子任务 steer 控制权绑定会话代际，cron 生命周期守卫全面化</li>
+<li>性能与可靠性：read_file 支持 PDF/Office 文档提取，测试 52s→10s，CI 门禁缩短 33%</li>
+</ul>
+<p>重点条目：</p>
+<ul>
+<li>feat: /refine — 按需运行记忆/技能自改进审查（8f2712725）</li>
+<li>feat: /heartbeat — 空闲时定时重新进入会话（6518aa184）</li>
+<li>feat(goals): 质量门禁 — /goal 完成前必须通过的确定性命令（6e041d524）</li>
+<li>feat(read_file): PDF/Office/ODF/RTF/EPUB 文档提取（b2598b41e）</li>
+<li>fix(delegation): 子任务 steer 控制权绑定会话代际（9d4ef04ed）</li>
+<li>perf(tests): test_hermes_state.py 52s → 10s（169758d42）</li>
+</ul>
+<h3>完整 commit 列表（45 条）</h3>
 <ul><li><code>0957277f2</code> 2026-08-06 teknium1 — refactor(skills): move polymarket to optional-skills/finance</li>
 <li><code>9d4ef04ed</code> 2026-08-06 SmokeDev — fix(delegation): bind steering to session generation</li>
 <li><code>a94ebf5f5</code> 2026-08-06 SmokeDev — fix(delegation): harden steer lifecycle ownership</li>
@@ -64,7 +80,9 @@
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-05</link>
       <guid isPermaLink="false">hermes-daily-2026-08-05</guid>
       <pubDate>Thu, 06 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 83 个提交合入 main（feat 12 · fix 35 · perf 1 · docs 13 · merge 22）</p>
+      <description><![CDATA[<p><strong>本期覆盖 2026-07-29 ~ 2026-08-06 合入 main 的提交，共 83 个 commit，其中 merge 22 个</strong></p>
+<p>共 83 个提交合入 main（feat 12 · fix 35 · perf 1 · docs 13 · merge 22）</p>
+<h3>完整 commit 列表（83 条）</h3>
 <ul><li><code>9ea01979d</code> 2026-08-06 kshitij — chore: map contributor email for @sylbae</li>
 <li><code>042a2cf3d</code> 2026-08-06 kshitij — fix(agent): keep the start-order gate under the batch deadline and abort abandoned workers</li>
 <li><code>5d83400f8</code> 2026-08-06 Sylvain Baeriswyl — fix(agent): bound the concurrent start-order gate wait</li>
@@ -154,7 +172,9 @@
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-04</link>
       <guid isPermaLink="false">hermes-daily-2026-08-04</guid>
       <pubDate>Wed, 05 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 99 个提交合入 main（feat 16 · fix 43 · perf 7 · docs 0 · merge 22）</p>
+      <description><![CDATA[<p><strong>本期覆盖 2026-07-29 ~ 2026-08-04 合入 main 的提交，共 99 个 commit，其中 merge 22 个</strong></p>
+<p>共 99 个提交合入 main（feat 16 · fix 43 · perf 7 · docs 0 · merge 22）</p>
+<h3>完整 commit 列表（99 条）</h3>
 <ul><li><code>36cb5ae55</code> 2026-08-04 ethernet — ci: test updating from sampled release tags, on tag + every 12h</li>
 <li><code>3d9ec4d62</code> 2026-08-04 ethernet — test(install): prove updating from a release reaches this commit</li>
 <li><code>84874c58a</code> 2026-08-04 ethernet — feat(dev-sandbox): support fake installer / fake main / git clones</li>
@@ -260,7 +280,9 @@
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-03</link>
       <guid isPermaLink="false">hermes-daily-2026-08-03</guid>
       <pubDate>Tue, 04 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 289 个提交合入 main（feat 12 · fix 140 · perf 39 · docs 6 · merge 27）</p>
+      <description><![CDATA[<p><strong>本期覆盖 2026-08-02 ~ 2026-08-04 合入 main 的提交，共 289 个 commit，其中 merge 27 个</strong></p>
+<p>共 289 个提交合入 main（feat 12 · fix 140 · perf 39 · docs 6 · merge 27）</p>
+<h3>完整 commit 列表（289 条）</h3>
 <ul><li><code>a991dfc25</code> 2026-08-03 Teknium — docs: document /personality none|default|neutral reset across personality docs</li>
 <li><code>0845232d7</code> 2026-08-04 kshitij — fix: prefer explicit anthropic api key</li>
 <li><code>aad8f7412</code> 2026-08-03 Hao Wang — fix(backup): serialize and atomically publish snapshots</li>
@@ -468,7 +490,9 @@
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-02</link>
       <guid isPermaLink="false">hermes-daily-2026-08-02</guid>
       <pubDate>Sun, 02 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 245 个提交合入 main（feat 21 · fix 169 · perf 5 · docs 4 · merge 28）</p>
+      <description><![CDATA[<p><strong>本期覆盖 2026-07-29 ~ 2026-08-01 合入 main 的提交，共 245 个 commit，其中 merge 28 个</strong></p>
+<p>共 245 个提交合入 main（feat 21 · fix 169 · perf 5 · docs 4 · merge 28）</p>
+<h3>完整 commit 列表（245 条）</h3>
 <ul><li><code>cc0af6b9e</code> 2026-08-01 Teknium — ci: skip Desktop E2E + Docker build on tests-only PRs (python_prod lane)</li>
 <li><code>a5f94e93a</code> 2026-08-01 dsad — fix(acp): bind session_id in session context for subprocess isolation</li>
 <li><code>ff6ed7c49</code> 2026-08-01 Teknium — fix(update): detect EOL-only churn via numstat, not name-only</li>
@@ -676,7 +700,9 @@
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-07-31</link>
       <guid isPermaLink="false">hermes-daily-2026-07-31</guid>
       <pubDate>Sat, 01 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 109 个提交合入 main（feat 18 · fix 66 · perf 3 · docs 5 · merge 11）</p>
+      <description><![CDATA[<p><strong>本期覆盖 2026-07-30 ~ 2026-07-31 合入 main 的提交，共 109 个 commit，其中 merge 11 个</strong></p>
+<p>共 109 个提交合入 main（feat 18 · fix 66 · perf 3 · docs 5 · merge 11）</p>
+<h3>完整 commit 列表（109 条）</h3>
 <ul><li><code>e444d1658</code> 2026-07-31 Austin Pickett — fix(vision): make desktop image uploads reachable from profile Docker sandboxes (#69575) (#75671)</li>
 <li><code>c2872cf53</code> 2026-07-31 Brooklyn Nicholson — fix(kanban): key the worker-session retag per board, not per database</li>
 <li><code>4a8eeb5d1</code> 2026-07-31 Ben Barclay — fix(gateway): relay semantic thread rename — register eagerly, poll send-result feedback at fire time (#75581)</li>
@@ -792,7 +818,9 @@
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-07-30</link>
       <guid isPermaLink="false">hermes-daily-2026-07-30</guid>
       <pubDate>Fri, 31 Jul 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 212 个提交合入 main（feat 29 · fix 106 · perf 4 · docs 3 · merge 49）</p>
+      <description><![CDATA[<p><strong>本期覆盖 2026-07-29 ~ 2026-07-30 合入 main 的提交，共 212 个 commit，其中 merge 49 个</strong></p>
+<p>共 212 个提交合入 main（feat 29 · fix 106 · perf 4 · docs 3 · merge 49）</p>
+<h3>完整 commit 列表（212 条）</h3>
 <ul><li><code>524ab5399</code> 2026-07-30 Teknium — fix(telegram): apply media read_timeout to all upload send paths, not just video</li>
 <li><code>0a2859cf9</code> 2026-07-30 rob-maron — drop env var</li>
 <li><code>88f694909</code> 2026-07-30 rob-maron — more conservative</li>
@@ -1000,7 +1028,9 @@
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-07-29</link>
       <guid isPermaLink="false">hermes-daily-2026-07-29</guid>
       <pubDate>Thu, 30 Jul 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p>共 427 个提交合入 main（feat 62 · fix 194 · perf 15 · docs 26 · merge 36）</p>
+      <description><![CDATA[<p><strong>本期覆盖 2026-07-18 ~ 2026-07-30 合入 main 的提交，共 427 个 commit，其中 merge 36 个</strong></p>
+<p>共 427 个提交合入 main（feat 62 · fix 194 · perf 15 · docs 26 · merge 36）</p>
+<h3>完整 commit 列表（427 条）</h3>
 <ul><li><code>7142dc458</code> 2026-07-29 teknium1 — test: complete the readonly-stub pairing sweep (6 more files)</li>
 <li><code>a16fd675d</code> 2026-07-29 teknium1 — test: pair attribute-form load_config stubs with readonly siblings</li>
 <li><code>243c9182b</code> 2026-07-29 teknium1 — test: patch load_config_readonly alongside load_config across affected suites</li>
