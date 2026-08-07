@@ -5,83 +5,350 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 07 Aug 2026 23:59:19 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 08 Aug 2026 06:47:41 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
-      <title>Hermes 日报 2026-08-07：新增 /refine 和 /heartbeat 命令，委托控制权强化</title>
-      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-07</link>
-      <guid isPermaLink="false">hermes-daily-2026-08-07</guid>
-      <pubDate>Fri, 07 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p><strong>本期覆盖 8 月 5 日 ~ 8 月 6 日合入 main 的提交，共 45 个 commit，其中 merge 0 个。</strong></p>
+      <title>Hermes 日报 2026-08-08（208 个提交）</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-08</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-08</guid>
+      <pubDate>Sat, 08 Aug 2026 06:31:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 7 日 ~ 8 月 8 日合入 main 的提交，共 208 个 commit（不含 merge），另有 18 个 merge。新增 26 个功能、119 个修复、4 个性能优化，修复占比过半，重点是桌面端稳定性和语音识别优化。</strong></p>
+<p># 标题：新增 hermes pause/resume 全局急停，桌面端会话恢复与固定持久化</p>
+<p>## 📌 今日要点</p>
+<ul>
+<li>桌面端 stale session 掉线恢复：检查点、附件、压缩、文件面板 cwd 全部找回，仓库主分支不再重复显示</li>
+<li>固定会话（pinned session）持久化落地：固定状态写入后端，超限不丢、拖拽排序生效</li>
+<li>新增全局急停命令 hermes pause / hermes resume</li>
+<li>斜杠 /learn 扩展：整本书和大型语料库可转成知识库技能</li>
+<li>cron 任务增强：监控模式、持久便签、派发前配置校验、token 用量审计</li>
+</ul>
+<p>## 重点条目</p>
+<p>### 桌面端（改动最多，20 条 fix）</p>
+<ul>
+<li>fix(desktop): stale session 掉线后恢复 checkpoint 恢复与磁贴操作（c1305b645）</li>
+<li>fix(desktop): stale session 掉线后恢复图片/文件附件与 /compress（3c4f5c521）</li>
+<li>fix(desktop): 工作区 cwd 归属原子切换，文件面板切会话不再串目录（ae6eb578b + 416e025c4）</li>
+<li>fix(tui_gateway): 懒会话报告自己的 cwd 而非启动目录（6ff052479）</li>
+<li>fix(desktop): 命名会话的 session.info 不再把新草稿重新归位（9cdbeceda）</li>
+<li>fix(desktop): 仓库主分支 checkout 不再作为重复侧边栏项渲染（4cefba3ec）</li>
+<li>fix(api): 固定会话写入后端而非直接 400 拒绝（cef7d1a1e）</li>
+<li>fix(desktop): 固定会话无论多少都显示、不重复、拖拽排序在日期分组内生效（45f23205d + 256aac54d + 03b759db8）</li>
+<li>fix(desktop): 固定会话写保护持有到页面确认、超页数限制不再丢弃（daeedf67c + fd9fc50dd）</li>
+<li>fix(desktop): git 文件树虚拟化，大仓库 DOM 节点上限不再卡死（a4b235c4b）</li>
+<li>fix(desktop): Focus 布局下聊天窗保持在终端前面（5c6aff143）</li>
+<li>feat(desktop): 会话不再藏在&quot;Show earlier&quot;后面，按实际渲染内容计价（75717d29e + 31459ef0c）</li>
+</ul>
+<p>### 新命令与 CLI</p>
+<ul>
+<li>feat(cli): 全局紧急停止 — `hermes pause` / `hermes resume`（5db1b72b1）</li>
+<li>feat(cli): `hermes approvals test` 审批规则试运行（563f0a6fd）</li>
+<li>feat(doctor): `hermes doctor --live` 真实调用后端探测（1006faa6f）</li>
+</ul>
+<p>### /learn 与技能</p>
+<ul>
+<li>feat(/learn): 书籍和大型语料知识库技能（32e7fb07a）</li>
+<li>feat(skills): 新增 document-to-action-items 文档转行动项技能（ff2fa40b1）</li>
+</ul>
+<p>### cron</p>
+<ul>
+<li>feat(cron): 监控模式任务 — hash 抑制的变化检测（6dff2109a）</li>
+<li>feat(cron): 每任务持久便签 KV，跨调度运行存活（04e8a661f）</li>
+<li>feat(cron): 派发前配置校验 blocked_config + alert-once（ed903f953）</li>
+<li>feat(cron): usage_audit.jsonl token 用量审计日志（15927c1d2）</li>
+<li>fix(cron): TERMINAL_CWD 锁超时 fail-closed（11ce6419c + a1e5ccb32）</li>
+<li>fix(cron): 保存 jobs.json 保留并发创建（4d84aa2a6）</li>
+</ul>
+<p>### 语音与 STT</p>
+<ul>
+<li>feat(stt): 本地 whisper 模型空闲自动卸载（7b006ea6e）</li>
+<li>feat(stt): 云端识别前预上传静音裁剪（a683ef95d）</li>
+<li>fix(voice): 播放阶段回声不再被当成用户插话打断（d4a753ea4 + b7bff6f2d + 979bf0cc4）</li>
+</ul>
+<p>### 安全与脱敏</p>
+<ul>
+<li>fix: .env 终端输出按检测脱敏而非已知变量名列表（cf755f5c4）</li>
+<li>fix(secrets): 进程检查点文件命令脱敏（8969ebac1）</li>
+<li>fix(redact): 环境变量后缀键、控制字符拆分、process(list) 遗漏补齐（8563fe343）</li>
+<li>feat(security): 受保护 agent 指令文件改写必须审批（fe66596df）</li>
+</ul>
+<p>### 稳定性修复</p>
+<ul>
+<li>fix(compress): 上下文压缩保留进行中的工具链（788b8ab49）</li>
+<li>fix(sessions): 无续接的压缩父会话可恢复（988f2baaf）</li>
+<li>fix(agent): 只读压缩交接不再变成活动轮次（6d3ff6eda）</li>
+<li>fix(gateway): 致命断开前先排队重连（7141a6dc3）</li>
+<li>fix(gateway): 会话轮次租约超时 fail-closed（29af112cd）</li>
+<li>fix(gateway): 关闭时中断所有在飞 API 轮次（d9ddfb23d）</li>
+<li>fix: 轮次崩溃时保留会话历史（fc05247be）</li>
+</ul>
+<p>### 插件与 MCP</p>
+<ul>
+<li>feat(plugins): 加载便携式 agent 组件（ca78c6d7a）</li>
+<li>feat(plugins): 便携插件包校验（c5117655b）</li>
+<li>feat(mcp): 写能力 MCP 工具按 readOnlyHint 信任分级（c8369e37f）</li>
+<li>feat(kanban,mcp): 孤儿卡对账 + 每服务器 MCP 身份头（9fad45fcd）</li>
+</ul>
+<p>### delegation 与工具</p>
+<ul>
+<li>feat(delegation): 子任务可选结构化输出模式（d6ee58b58）</li>
+<li>feat(delegation): 结果条目显示单次子任务成本（d7635e43b）</li>
+<li>feat(delegation): 批量派发前校验任务质量（94bc3194b）</li>
+<li>feat(vision): vision_analyze 区域放大裁剪（e166159f2）</li>
+<li>feat(terminal): 远程后端连接失败时终端优雅降级（5c29566e8）</li>
+</ul>
+<p>### 性能改善（4 条）</p>
+<ul>
+<li>perf(model): 自定义提供商 /v1/models 探针磁盘缓存（fb435aae9）</li>
+<li>perf(fts): 回收表高水位标记清理，不再全表重扫（23dce021a）</li>
+<li>perf(slack): conversations.info 查询 asyncio.gather 并行化（f3ec2f36f）</li>
+<li>perf(cron): shrink-merge stat-stamp 快路径（261aef526）</li>
+</ul>
+<h3>完整 commit 列表（208 条）</h3>
+<ul><li><code>b3aa561fa</code> 2026-08-07 rob-maron — add Hermes headers to Fireworks provider (#81321)</li>
+<li><code>a8c50eb1d</code> 2026-08-08 kshitij — fix: relax start_new_session assertion for systemd scope path</li>
+<li><code>b5c211678</code> 2026-08-08 kshitij — fix: defer O(n) fallback_data construction to failure path in _save_entry</li>
+<li><code>c5e032c80</code> 2026-08-08 Dominic Bejar — fix(gateway): close ambiguous recovery cleanup gaps</li>
+<li><code>46b531422</code> 2026-08-08 Dominic Bejar — fix(terminal): harden scope fallback and memory override</li>
+<li><code>5ff328cc7</code> 2026-08-08 Dominic Bejar — fix(gateway): make active turn markers failure-atomic</li>
+<li><code>b0346ba42</code> 2026-08-08 Dominic Bejar — fix(terminal): align worker limit with local guard</li>
+<li><code>5f9308322</code> 2026-08-08 Dominic Bejar — fix(terminal): bound isolated worker memory</li>
+<li><code>0690fd77c</code> 2026-08-08 Dominic Bejar — fix(terminal): make systemd cleanup gateway-safe</li>
+<li><code>69397937d</code> 2026-08-08 Dominic Bejar — fix(terminal): serialize systemd scope capability probe</li>
+<li><code>59a128c6f</code> 2026-08-08 Dominic Bejar — fix(gateway): harden active turn marker lifecycle</li>
+<li><code>6774760b6</code> 2026-08-08 Dominic Bejar — fix(gateway): recover exact turns after unclean exits</li>
+<li><code>21de22a4e</code> 2026-08-08 toprakeker — fix(terminal): fully-qualified .scope unit name, exit-code check, already_exited cleanup (#70716)</li>
+<li><code>7cfa90d90</code> 2026-08-08 toprakeker — fix(terminal): address review gaps — PTY isolation, unit-name kill, --quiet (#70716)</li>
+<li><code>099eb7373</code> 2026-08-08 toprakeker — fix(terminal): isolate local background executors in their own systemd cgroup (#70716)</li>
+<li><code>005421d88</code> 2026-08-07 hermes-seaeye[bot] — fmt(js): `npm run fix` on merge (#81276)</li>
+<li><code>7307f8899</code> 2026-08-08 kshitij — fix: follow-up for salvaged PR #18255</li>
+<li><code>15927c1d2</code> 2026-08-08 0xarkstar — feat(cron): add usage_audit.jsonl logger for cron token leak instrumentation</li>
+<li><code>d3e3c6234</code> 2026-08-08 0xarkstar — feat(cron): set skip_background_review=True; doc title-generation non-presence</li>
+<li><code>eaeba6474</code> 2026-08-08 0xarkstar — feat(agent): add skip_background_review flag to AIAgent constructor</li>
+<li><code>8370141f1</code> 2026-08-07 hermes-seaeye[bot] — fmt(js): `npm run fix` on merge (#81259)</li>
+<li><code>37aaecf48</code> 2026-08-07 bb — test(desktop): cover the stale-session recovery bug class</li>
+<li><code>c1305b645</code> 2026-08-07 bb — fix(desktop): recover checkpoint restore and tile actions after a stale session drop</li>
+<li><code>3c4f5c521</code> 2026-08-07 bb — fix(desktop): recover image/file attach and /compress after a stale session drop</li>
+<li><code>fab99e828</code> 2026-08-07 bb — refactor(desktop): one resolver for stale runtime-session recovery</li>
+<li><code>cdc10cd78</code> 2026-08-07 bb — test(desktop): cover the Files-pane cwd desync bug class</li>
+<li><code>6ff052479</code> 2026-08-07 bb — fix(tui_gateway): report a lazy session&#x27;s own cwd, not the launch dir</li>
+<li><code>9cdbeceda</code> 2026-08-07 bb — fix(desktop): don&#x27;t let a named session.info rehome a fresh draft</li>
+<li><code>416e025c4</code> 2026-08-07 bb — fix(desktop): rebind the Files pane cwd when switching sessions</li>
+<li><code>ae6eb578b</code> 2026-08-07 bb — fix(desktop): add workspace-cwd ownership so switches are atomic</li>
+<li><code>690dc87a8</code> 2026-08-07 bb — chore: map contributor email</li>
+<li><code>4cefba3ec</code> 2026-08-07 bb — fix(desktop): stop rendering a repo&#x27;s main checkout as a duplicate sidebar lane</li>
+<li><code>aaa4299a2</code> 2026-08-07 bb — fix(gateway): normalize common repo root separators in the git probe</li>
+<li><code>78bc9acdf</code> 2026-08-07 teknium1 — chore(skills/document-to-action-items): promote to bundled tier</li>
+<li><code>7b8d0d800</code> 2026-08-07 teknium1 — chore(skills/document-to-action-items): tighten to hardline standards, move to optional</li>
+<li><code>ff2fa40b1</code> 2026-08-07 Ben Barclay — feat(skills): add document-to-action-items</li>
+<li><code>c015663b2</code> 2026-08-07 kshitij — fix(models): corrupt-at cache rows degrade to live fetch in cached_provider_model_ids</li>
+<li><code>24b7ca725</code> 2026-08-07 Jakub Wolniewicz — fix(desktop): preserve root recovery through StrictMode replay</li>
+<li><code>bb9434d30</code> 2026-08-07 Jakub Wolniewicz — fix(desktop): match current assistant-ui lookup errors</li>
+<li><code>0405c2664</code> 2026-08-07 Jakub Wolniewicz — fix(desktop): recover root boundary from tapClientLookup races</li>
+<li><code>a62eaaf31</code> 2026-08-07 Adolanium — fix(desktop): self-retry transient boundary errors, reactive edit composer context</li>
+<li><code>fa1a5c048</code> 2026-08-07 Teknium — Integrate verify subsystem with the existing verification stack</li>
+<li><code>cc1acfb22</code> 2026-08-07 Teknium — fix: Windows-safe process-group teardown in verify runner (footgun CI)</li>
+<li><code>47a35d63c</code> 2026-08-07 Teknium — Port from superagent-ai/grok-cli: verify subsystem (run-recipe detection + environment manifest + hermes verify smoke runner)</li>
+<li><code>8cb066404</code> 2026-08-07 GodsBoy — fix(plugins): address portable MCP review feedback</li>
+<li><code>6575fb0f8</code> 2026-08-07 GodsBoy — fix(plugins): preserve opaque stdio commands</li>
+<li><code>e288d93fc</code> 2026-08-07 GodsBoy — fix(review): harden portable plugin boundaries</li>
+<li><code>ca78c6d7a</code> 2026-08-07 GodsBoy — feat(plugins): load portable agent components</li>
+<li><code>c5117655b</code> 2026-08-07 GodsBoy — feat(plugins): validate portable agent packages</li>
+<li><code>920eaf2fc</code> 2026-08-07 Bryan Bednarski — chore(relay): require 0.7.1</li>
+<li><code>6e87d43a5</code> 2026-08-07 PRATHAMESH75 — fix(tools): lazily bring up sandbox for vision_analyze reads</li>
+<li><code>bc80a0be5</code> 2026-08-07 Teknium — test: stub EnvironmentConnectionError in environments.base module stub</li>
+<li><code>5c29566e8</code> 2026-08-07 Teknium — feat(terminal): graceful degradation for remote backend connection failures</li>
+<li><code>c228d1c55</code> 2026-08-07 Teknium — fix(dashboard): fold one-field doctor category into general tab</li>
+<li><code>1006faa6f</code> 2026-08-07 Teknium — feat(doctor): add opt-in `hermes doctor --live` real-call backend probes</li>
+<li><code>0ebaa490b</code> 2026-08-07 Teknium — test: use valid 2-task batches in schema-rejection tests</li>
+<li><code>d6ee58b58</code> 2026-08-07 Teknium — feat(delegation): optional structured-output schema on delegate_task</li>
+<li><code>e166159f2</code> 2026-08-07 Teknium — feat(vision): optional region zoom crop on vision_analyze</li>
+<li><code>fe66596df</code> 2026-08-07 Teknium — feat(security): protected agent-instruction files always require write approval</li>
+<li><code>c8369e37f</code> 2026-08-07 Teknium — feat(mcp): trust-tier gating for write-capable MCP tools via readOnlyHint</li>
+<li><code>37cc99992</code> 2026-08-07 Teknium — feat(mcp): collapse const-only anyOf/oneOf unions to property enums</li>
+<li><code>9fad45fcd</code> 2026-08-07 Teknium — feat(kanban,mcp): orphaned-card reconciliation + per-server MCP identity header</li>
+<li><code>5db1b72b1</code> 2026-08-07 Teknium — feat(cli): global emergency stop — `hermes pause` / `hermes resume`</li>
+<li><code>5396da844</code> 2026-08-07 Teknium — docs: DX sweep — 7 verified-absent documentation items</li>
+<li><code>d7635e43b</code> 2026-08-07 Teknium — feat(delegation): surface per-delegation cost in the result entry</li>
+<li><code>94bc3194b</code> 2026-08-07 Teknium — feat(delegation): validate batch task quality before spawning children</li>
+<li><code>ed903f953</code> 2026-08-07 Teknium — feat(cron): pre-dispatch configuration validation (blocked_config + alert-once)</li>
+<li><code>04e8a661f</code> 2026-08-07 Teknium — feat(cron): per-job durable notepad — KV scratchpad surviving scheduled runs</li>
+<li><code>6dff2109a</code> 2026-08-07 Teknium — feat(cron): monitor-mode jobs — hash-suppressed change detection</li>
+<li><code>563f0a6fd</code> 2026-08-07 Teknium — feat(cli): add `hermes approvals test` — dry-run approval verdict CLI</li>
+<li><code>7cf71c32b</code> 2026-08-07 kshitij — fix: follow-ups for salvaged PR #80740</li>
+<li><code>fb435aae9</code> 2026-08-07 Prashant Jain — perf(model): disk-cache custom-provider /v1/models probes</li>
+<li><code>83bad5cdd</code> 2026-08-07 kshitij — fix: follow-ups for salvaged PR #80795</li>
+<li><code>2d0c2682c</code> 2026-08-07 HexLab98 — docs: document the gateway agent cache memory budget</li>
+<li><code>6bbe55dd0</code> 2026-08-07 HexLab98 — fix(gateway): bound the agent cache by memory, not just count and age</li>
+<li><code>5ded99af4</code> 2026-08-07 kshitij — chore: add prashantjain25 to AUTHOR_MAP</li>
+<li><code>48e2dcd7a</code> 2026-08-07 hermes-seaeye[bot] — fmt(js): `npm run fix` on merge (#81102)</li>
+<li><code>a4b235c4b</code> 2026-08-07 webtecnica — fix(desktop): virtualize git file-tree to cap DOM nodes (#77257)</li>
+<li><code>4a3942d94</code> 2026-08-07 kshitij — fix: show explicit member spend cap message instead of &#x27;no credits&#x27;</li>
+<li><code>813793db2</code> 2026-08-07 kshitij — test(tui_gateway): pin the raising-close swallow + no-retry contract</li>
+<li><code>be14a4bee</code> 2026-08-07 Yishova — tui_gateway: close dedicated profile SessionDB handles at teardown too</li>
+<li><code>79625e3c0</code> 2026-08-07 Yishova — tui_gateway: session.resume abandons the profile SessionDB it opens</li>
+<li><code>fecba5afc</code> 2026-08-07 kshitij — refactor(agent): fold simplify findings — DB picker parity, single scan, canonical strip delegation</li>
+<li><code>4eabb595f</code> 2026-08-07 kshitij — fix(agent): finish the #80622 bug class — sibling predicates, refund ordering, prompt carve-out, honest skip response</li>
+<li><code>b9636b104</code> 2026-08-07 HexLab98 — test(agent): cover reference-only handoff sole-active-turn regression</li>
+<li><code>6d3ff6eda</code> 2026-08-07 HexLab98 — fix(agent): stop reference-only compaction handoff from becoming the active turn</li>
+<li><code>3737bb1ad</code> 2026-08-07 kshitij — docs(compression): correct the projection&#x27;s safety claims (review findings)</li>
+<li><code>6d89b1065</code> 2026-08-07 Alan Hsu — fix(agent): project real usage in preflight defer instead of fixed growth tolerance</li>
+<li><code>e7667e56d</code> 2026-08-07 kshitij — docs(stt): honest memory-behavior wording for idle unload</li>
+<li><code>72c63aa58</code> 2026-08-07 kshitij — fix(stt): close idle-unload races — strong model ref, single long-lived watcher</li>
+<li><code>7b006ea6e</code> 2026-08-07 kshitij — feat(stt): idle unload for local whisper model</li>
+<li><code>5cff192b3</code> 2026-08-07 kshitij — docs(stt): document the 12s short-clip gate for the cloud trim</li>
+<li><code>3277eb887</code> 2026-08-07 kshitij — refactor(stt): fold review findings into the cloud silence trim</li>
+<li><code>a683ef95d</code> 2026-08-07 kshitij — feat(stt): pre-upload silence trim for cloud providers</li>
+<li><code>5c6aff143</code> 2026-08-07 Austin Pickett — fix(desktop): keep the chat in front of the terminal in Focus layout (#81019)</li>
+<li><code>b7eb97a83</code> 2026-08-07 kshitij — fix(vision): stream image and video downloads with chunk-by-chunk size cap</li>
+<li><code>23dce021a</code> 2026-08-07 Chen Jin — perf(fts): drain trash tables with a high-water marker instead of re-scanning</li>
+<li><code>f3ec2f36f</code> 2026-08-07 kshitij — perf(slack): parallelize conversations.info lookups with asyncio.gather</li>
+<li><code>025fc7e74</code> 2026-08-07 kyssta-exe — fix(slack): dedupe thread-qualified channel lookups (#80668)</li>
+<li><code>e5e96e8bb</code> 2026-08-07 kshitij — fix: harden _await_disconnect_step against outer cancellation + add claim keys</li>
+<li><code>95e78556f</code> 2026-08-07 HexLab98 — test(gateway): cover fatal-handler queue-before-disconnect (#80598)</li>
+<li><code>7141a6dc3</code> 2026-08-07 HexLab98 — fix(gateway): queue reconnect before fatal disconnect wedges (#80598)</li>
+<li><code>dfa0de92c</code> 2026-08-07 kshitij — chore: add contributor email mappings for dombejar + toprakeker</li>
+<li><code>2a0d0bc69</code> 2026-08-07 kshitij — refactor(gateway): drop dead degraded token field; de-churn salvage diff</li>
+<li><code>3a3aed3c1</code> 2026-08-07 poisdahl — fix(gateway): keep pending turn lease acquires registered</li>
+<li><code>b3e9e9170</code> 2026-08-07 texasich — fix(gateway): configure turn lease timeout via yaml</li>
+<li><code>b2b681fef</code> 2026-08-07 texasich — fix(gateway): harden turn-lease timeout rejection</li>
+<li><code>29af112cd</code> 2026-08-07 texasich — fix(gateway): fail closed when session turn lease times out</li>
+<li><code>2ef294f02</code> 2026-08-07 HexLab98 — docs: spell out the rewind contract on prompt.submit</li>
+<li><code>c24ff38c5</code> 2026-08-07 HexLab98 — fix(gateway): make a history-dropping submit prove it meant to</li>
+<li><code>bf2e193a0</code> 2026-08-07 kshitij — fix(cron): review follow-ups for the fail-closed cwd-lock timeout</li>
+<li><code>30679b876</code> 2026-08-07 kshitij — test(cron): pin fail-closed TERMINAL_CWD lock timeout behavior</li>
+<li><code>5fcca432f</code> 2026-08-07 dsad — test(cron): cover bounded TERMINAL_CWD lock acquisition</li>
+<li><code>11ce6419c</code> 2026-08-07 kshitij — fix(cron): fail closed when the TERMINAL_CWD lock times out (#79768)</li>
+<li><code>69cf06a82</code> 2026-08-07 kshitij — chore: map texasich commit email to GitHub login</li>
+<li><code>458ce7b2b</code> 2026-08-07 kshitij — fix(streaming): close the same mid-tool-call drop gap on the Anthropic path</li>
+<li><code>e6f31b07c</code> 2026-08-07 joaomarcos — test(streaming): cover mixed tool-call and retry-exhaustion paths for #80498</li>
+<li><code>f73457803</code> 2026-08-07 joaomarcos — fix(streaming): flag empty tool-call args on clean stream end (#80498)</li>
+<li><code>72b730526</code> 2026-08-07 kshitij — polish: document newline residual, reuse span local, cheap check first</li>
+<li><code>9377c5a53</code> 2026-08-07 kshitij — fix(redact): narrow control-split join guard to line-crossing spans</li>
+<li><code>afb46fdab</code> 2026-08-07 kshitij — refactor(cron): polish registration partial-failure surfaces</li>
+<li><code>f346458f2</code> 2026-08-07 Gille — fix(cron): surface initial scheduler registration failures</li>
+<li><code>261aef526</code> 2026-08-07 kshitij — perf(cron): stat-stamp fast path for the shrink-merge; no caller-list mutation</li>
+<li><code>5511ec623</code> 2026-08-07 HexLab98 — test(cron): cover jobs.json shrink-merge against concurrent creates</li>
+<li><code>4d84aa2a6</code> 2026-08-07 HexLab98 — fix(cron): preserve concurrent creates when saving jobs.json</li>
+<li><code>aecb9ca89</code> 2026-08-07 kshitij — fix(redact): don&#x27;t join across controls when a fragment already matches</li>
+<li><code>8969ebac1</code> 2026-08-07 Soheil Fakour — fix(secrets): redact command in process checkpoint file (#77484)</li>
+<li><code>e9d1551e6</code> 2026-08-07 Soheil Fakour — fix(redact): strip control chars from mask_secret display (#55319, #55321)</li>
+<li><code>5444f6853</code> 2026-08-07 Soheil Fakour — test(redact): harden new #77484 tests - assert fragments, opaque values (review)</li>
+<li><code>8563fe343</code> 2026-08-07 Soheil Fakour — fix(redact): close emission gaps - env suffix keys, control-char splits, process(list) (#77484)</li>
+<li><code>15d7103aa</code> 2026-08-07 kshitij — fix: harden .env-read detection — review follow-ups for #61352</li>
+<li><code>cf755f5c4</code> 2026-08-07 Peter — fix: redact .env terminal output via detection instead of known-env-var list</li>
+<li><code>83902620c</code> 2026-08-07 kshitij — chore: map soheil.fakour@gmail.com -&gt; thatssoheil for attribution</li>
+<li><code>1a02e8a79</code> 2026-08-07 kshitij — fix(agent): preserve destroyed tool-call argument bytes in the WARNING log</li>
+<li><code>c18e19c3c</code> 2026-08-07 kshitij — fix(agent): make the send-path copy structural — close the write-through class</li>
+<li><code>cd152d9da</code> 2026-08-07 kshitij — chore: map ahmetsonersancak@anadolu.edu.tr -&gt; 0xGr1mm for attribution</li>
+<li><code>e60ca1c6c</code> 2026-08-07 Gr1mmJ4w — fix(agent): stop the send-path repair from rewriting persisted history</li>
+<li><code>8b6dd27cd</code> 2026-08-07 kshitij — test(auxiliary): update _resolve_auto patch to _resolve_auto_route</li>
+<li><code>c95a1b717</code> 2026-08-07 kshitij — fix(auxiliary): widen effective provider to relay, logging, and endpoint detection</li>
+<li><code>293e67328</code> 2026-08-07 Gille — fix(agent): preserve auto-routed provider identity</li>
+<li><code>a82910c37</code> 2026-08-07 kshitij — test: fold review findings — plain fixture, call-shaped probe guard, public-API row counting</li>
+<li><code>1e5b50744</code> 2026-08-07 kshitij — fix(cron): move watchdog state under the request lock; fail closed on resolver errors</li>
+<li><code>d7fb503c2</code> 2026-08-07 HexLab98 — docs: note that the non-stream stale budget covers cron and subagents</li>
+<li><code>cb066a971</code> 2026-08-07 HexLab98 — fix(cron): bound the inline non-streaming call with a stale watchdog</li>
+<li><code>ee6d79648</code> 2026-08-07 kshitij — fix(state): finish the #80216 bug class — archive-preserving rewrites at the two remaining sibling sites</li>
+<li><code>20e01f935</code> 2026-08-07 kshitij — fix(voice): early-exit sliding window on match, clear barge phase in finally, fix test helper</li>
+<li><code>979bf0cc4</code> 2026-08-07 chelsealong — fix(voice): require minimum evidence for fragment echo matching, use char windows</li>
+<li><code>b7bff6f2d</code> 2026-08-07 chelsealong — fix(voice): catch short echoed fragments of longer multi-sentence TTS replies</li>
+<li><code>d4a753ea4</code> 2026-08-07 chelsealong — fix(voice): drop playback-phase barge transcripts that echo Hermes&#x27; own TTS</li>
+<li><code>6ab7528c3</code> 2026-08-07 kshitij — refactor(matrix): extract _strip_reply_fallback to deduplicate text+media handlers</li>
+<li><code>e8511efe7</code> 2026-08-07 kshitij — fix(matrix): propagate sender + reply context to media MessageEvents too</li>
+<li><code>e245a9878</code> 2026-08-07 WintleChoung — fix(matrix): propagate sender MXID + reply context to MessageEvent</li>
+<li><code>dacdae014</code> 2026-08-07 kshitij — chore: map contributor cwt@users.noreply.github.com → Wintle</li>
+<li><code>1fe53bd1a</code> 2026-08-07 kshitij — docs: comment accuracy — pending-ness is a presumption, not a construction guarantee</li>
+<li><code>03beb662e</code> 2026-08-07 kshitij — fix: cover the partial multi-call batch in the in-flight exemption</li>
+<li><code>c4c2265f0</code> 2026-08-07 kshitij — chore: map craig@shotflame.local -&gt; Shotflame in contributor directory</li>
+<li><code>788b8ab49</code> 2026-08-07 Shotflame — fix(compress): preserve in-flight tool chain across context compression (#79278)</li>
+<li><code>416d2a015</code> 2026-08-07 kshitij — fix(gateway): re-signal interrupts when work is still live at settle-window exit</li>
+<li><code>d9ddfb23d</code> 2026-08-07 briandevans — fix(gateway): interrupt every in-flight API turn on shutdown, not just /v1/runs</li>
+<li><code>51fa7db46</code> 2026-08-07 dsad — fix(gateway): interrupt api server runs on shutdown timeout</li>
+<li><code>2d9b809ff</code> 2026-08-07 kshitij — fix(yuanbao): preserve archived history on recall redaction</li>
+<li><code>30c1421ac</code> 2026-08-07 poisdahl — fix(gateway): make retry archive preservation fail-safe</li>
+<li><code>56fbac6b3</code> 2026-08-07 Adolanium — fix(gateway): preserve archived compaction history on /retry</li>
+<li><code>65de109ef</code> 2026-08-07 kshitij — fix: notify_all on lock timeout to wake blocked readers</li>
+<li><code>a1e5ccb32</code> 2026-08-07 JonthanaHanh — fix(cron): bound TERMINAL_CWD lock acquire with timeout (#79768)</li>
+<li><code>99237a444</code> 2026-08-07 kshitij — refactor: derive teams install hint via feature_install_command(venv_pip=True)</li>
+<li><code>f5784617e</code> 2026-08-07 kshitij — refactor: fold simplify-code review findings</li>
+<li><code>a658dfe50</code> 2026-08-07 kshitij — fix: address self-review findings on the check_fn/ensure_deps_fn split</li>
+<li><code>0d32607c6</code> 2026-08-07 kshitij — fix(gateway): split check_fn (passive probe) from ensure_deps_fn (active installer)</li>
+<li><code>042c309ec</code> 2026-08-07 xxxigm — docs(teams): native gateway start and Hermes-venv dependency install</li>
+<li><code>98408f713</code> 2026-08-07 xxxigm — fix(teams): lazy-install SDK via registry check_fn</li>
+<li><code>a0801b878</code> 2026-08-07 kshitij — fix: bind continuation-marker exclusions to the queried parent (fail-open fix)</li>
+<li><code>95a7058e4</code> 2026-08-07 izumi0uu — fix(sessions): fence expired orphan recovery leases</li>
+<li><code>988f2baaf</code> 2026-08-07 izumi0uu — fix(sessions): recover compression parents without continuations</li>
+<li><code>71dc211b9</code> 2026-08-06 Teknium — docs(cron): document async manual runs and per-run prompt context</li>
+<li><code>358d55051</code> 2026-08-06 liuhao1024 — fix(plugins): use asyncio.wait_for instead of ClientTimeout in Matrix standalone send</li>
+<li><code>66c60f81b</code> 2026-08-06 liuhao1024 — fix(cron): thread per-run prompt through cronjob(action=&#x27;run&#x27;) (#57331)</li>
+<li><code>fa9641999</code> 2026-08-06 liuhao1024 — test(cron): add _build_job_prompt extra_prompt regression tests</li>
+<li><code>7a5fe0024</code> 2026-08-06 Fly — fix(cron): deliver manual runs on gateway loop</li>
+<li><code>3671c9f18</code> 2026-08-06 Teknium — fix: share in-flight cron dedupe between ticker and manual runs</li>
+<li><code>7ab42dda6</code> 2026-08-06 Teknium — fix: dispatch cronjob(action=&#x27;run&#x27;) to the background like delegate_task</li>
+<li><code>32e7fb07a</code> 2026-08-06 Teknium — feat(/learn): expansive knowledge-base skills for books and large corpora</li>
+<li><code>eb1e63090</code> 2026-08-06 teknium1 — fix(skills): align hermes-agent-skill-authoring with hardline authoring standards</li>
+<li><code>bdee48928</code> 2026-08-07 emozilla — fix(dashboard): derive the stale-schema read probe from SCHEMA_SQL</li>
+<li><code>fc05247be</code> 2026-08-06 Brooklyn Nicholson — fix: preserve session history when a turn crashes</li>
+<li><code>6f1072c83</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): drop the gateway-pill dogfood plugin</li>
+<li><code>a5cddcd8d</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): render already-glued reasoning as separate blocks</li>
+<li><code>6bb630ef7</code> 2026-08-06 Brooklyn Nicholson — fix(codex): split reasoning summary parts on summary_index</li>
+<li><code>0f8366180</code> 2026-08-06 Brooklyn Nicholson — fix(reasoning): keep gpt-5.x summary parts as separate blocks on the chat wire</li>
+<li><code>eb8421ba9</code> 2026-08-07 hermes-seaeye[bot] — fmt(js): `npm run fix` on merge (#80725)</li>
+<li><code>45f23205d</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): show every pinned session, however many there are</li>
+<li><code>0265797b8</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): keep elapsed status text from overlapping</li>
+<li><code>75717d29e</code> 2026-08-06 Brooklyn Nicholson — feat(desktop): stop hiding a session behind Show earlier</li>
+<li><code>31459ef0c</code> 2026-08-06 Brooklyn Nicholson — feat(desktop): price a turn by what it paints</li>
+<li><code>7eb461d69</code> 2026-08-06 Brooklyn Nicholson — refactor(desktop): share how a tool row renders</li>
+<li><code>03b759db8</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): rank dragged sessions inside their date group</li>
+<li><code>256aac54d</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): show a pinned session once, and keep its drag order</li>
+<li><code>daeedf67c</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): hold the pin write guard until a page confirms it</li>
+<li><code>fd9fc50dd</code> 2026-08-06 Brooklyn Nicholson — fix(desktop): stop dropping pinned sessions past the page limit</li>
+<li><code>cef7d1a1e</code> 2026-08-06 Brooklyn Nicholson — fix(api): persist session pins instead of 400ing them</li></ul>
+<p>…共 208 条，其余见原文存档。</p>]]></description>
+    </item>
+    <item>
+      <title>Hermes 日报 2026-08-06：应用内浏览器可读、远程桌面唤醒词、分片投递修复</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-06</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-06</guid>
+      <pubDate>Thu, 06 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 5 日 ~ 8 月 6 日合入 main 的提交，共 83 个 commit，其中 merge 22 个。</strong></p>
 <p>📌 今日要点：</p>
 <ul>
-<li>三个新命令：/refine（按需自改进审查）、/heartbeat（空闲定时唤醒）、goal 质量门禁</li>
-<li>委托与生命周期加固：子任务 steer 控制权绑定会话代际，cron 生命周期守卫全面化</li>
-<li>性能与可靠性：read_file 支持 PDF/Office 文档提取，测试 52s→10s，CI 门禁缩短 33%</li>
+<li>桌面端：Hermes 能读应用内浏览器（read_preview），浏览器和预览升级为真正的布局树标签页</li>
+<li>语音唤醒：远程桌面场景支持客户端采集麦克风（wake.feed），无麦后端也能用唤醒词</li>
+<li>可靠性：Gateway 分片投递整类 bug 修复（不吞消息、不重复），远程文件预览补全</li>
+<li>平台：新推理提供商 Actual Computer 接入，配置驱动本地免认证</li>
 </ul>
 <p>重点条目：</p>
 <ul>
-<li>feat: /refine — 按需运行记忆/技能自改进审查（8f2712725）</li>
-<li>feat: /heartbeat — 空闲时定时重新进入会话（6518aa184）</li>
-<li>feat(goals): 质量门禁 — /goal 完成前必须通过的确定性命令（6e041d524）</li>
-<li>feat(read_file): PDF/Office/ODF/RTF/EPUB 文档提取（b2598b41e）</li>
-<li>fix(delegation): 子任务 steer 控制权绑定会话代际（9d4ef04ed）</li>
-<li>perf(tests): test_hermes_state.py 52s → 10s（169758d42）</li>
+<li>feat(desktop): read_preview — agent 可读取应用内浏览器当前标签页标题与可见文本，分页读取单次 24k 上限（64646dda5）</li>
+<li>feat(desktop): 浏览器和预览升级为布局树 zone tab，支持拖拽/堆叠/分屏，Ctrl+W/Ctrl+Tab 在预览区生效（c8648278c）</li>
+<li>feat(wake): 远程桌面客户端采集唤醒词（client-capture），auto 模式优先用后端自带麦克风（105fbf6b7）</li>
+<li>fix(wake): auto capture 保留后端麦克风时优先本机采集，不丢 wake_word.input_device（60808dcf7）</li>
+<li>perf(desktop): 合并 wake.feed 数据帧，减少唤醒音频传输开销（6df3912e0）</li>
+<li>fix(desktop): 远程 PDF 改走 Chromium 内置查看器，不再渲染成二进制乱码（c8fdc5174）</li>
+<li>fix(desktop): 远程文件行打开进应用内预览（17a5a9587）</li>
+<li>fix(desktop): SSH 远程 HTML 安全预览，内容先净化（069551d19）</li>
+<li>feat(update): hermes update 打印带 action ID 的完成收据，含&quot;已是最新&quot;空跑路径（950b55d4d）</li>
+<li>fix(desktop): 远程后端更新改为 terminal-state 驱动，不再轮询 45 秒误报失败（eb68ffbe4）</li>
+<li>fix(gateway): 分片投递六个生产路径源头修复，不重复发送也不吞掉末尾消息（392e3a8c5）</li>
+<li>fix(gateway): 空回退恢复不再把已删除的头分片记为已投递（68ebb198c）</li>
+<li>fix(gateway): 无 payload 分片投递不再吞掉 final（c46027b04）</li>
+<li>feat(providers): 新推理提供商 Actual Computer，配置驱动本地免认证 + reasoning-effort 限制（a9acb400b）</li>
+<li>fix(desktop): 工作树对话框按项目命名，不再每个输入框挂一个（b879df27f）</li>
+<li>feat(desktop): convert-a-branch 支持选择远程分支（cb7f594be）</li>
+<li>fix(cache): 主动修剪持久化 + 缓存感知（bf6a210ab）</li>
+<li>fix(compression): 模型切换时修剪跑道同步落盘（241605d1e）</li>
+<li>fix(cache): prompt 缓存键按会话隔离，不再跨会话共享桶（34c3f06f9）</li>
+<li>fix(agent): start-order 门闩有界等待 + 超时中止被抛弃的 worker（042a2cf3d）</li>
+<li>fix(agent): 阻止历史 steer 重放（c4f3d5a31）</li>
+<li>fix(dashboard): 事件 WebSocket 自动重连（带退避）（fb402106f）</li>
+<li>fix(delegation): 慢模型等待期间子代理保持存活（d55bc063f）</li>
+<li>fix(cli): profile.yaml 和皮肤写入原子化，不再静默丢字段（649ce1f81）</li>
+<li>fix(install): 解析 8.3 profile 别名，桌面端不再误报构建失败（9621f9032）</li>
+<li>feat(desktop): Linux 桌面启动器入口 + 应用图标（Nix）（eea604409）</li>
+<li>fix(terminal): 远程读脚本回退时跳过二进制内容（49d8a155c）</li>
 </ul>
-<h3>完整 commit 列表（45 条）</h3>
-<ul><li><code>0957277f2</code> 2026-08-06 teknium1 — refactor(skills): move polymarket to optional-skills/finance</li>
-<li><code>9d4ef04ed</code> 2026-08-06 SmokeDev — fix(delegation): bind steering to session generation</li>
-<li><code>a94ebf5f5</code> 2026-08-06 SmokeDev — fix(delegation): harden steer lifecycle ownership</li>
-<li><code>60e1f7517</code> 2026-08-06 SmokeDev — fix(delegation): surface a child&#x27;s undelivered steer instead of dropping it</li>
-<li><code>6e9cae6ac</code> 2026-08-06 Teknium — fix(tests): resolve guard&#x27;s production root via expanduser, immune to Path.home monkeypatches</li>
-<li><code>19fc9c103</code> 2026-08-06 Teknium — fix(tests): fail hard when pytest resolves the production state.db (live-DB isolation guard)</li>
-<li><code>c4aea3231</code> 2026-08-06 Teknium — fix(db): never downgrade journal mode on a database with concurrent openers</li>
-<li><code>70de95892</code> 2026-08-06 Teknium — fix(cron): lifecycle guard — never crash on binary referenced paths, stop matching lifecycle words inside SQL/text</li>
-<li><code>863e31318</code> 2026-08-06 kshitij — fix: close simplify-pass findings — scheduler sibling site + home-unresolvable totality</li>
-<li><code>c135b88d2</code> 2026-08-06 kshitij — fix: address 4-angle review findings on the guard-total change</li>
-<li><code>c8d48b8b1</code> 2026-08-06 kshitij — fix(cron): make the lifecycle guard total — sanitize at ingestion, not per-syscall</li>
-<li><code>ea0d54db1</code> 2026-08-06 kshitij — refactor: fold /simplify-code findings</li>
-<li><code>10fb01e72</code> 2026-08-06 kshitij — fix: harden human-wait tracker from review findings</li>
-<li><code>3305cfd2b</code> 2026-08-06 kshitij — fix(agent): measure batch-deadline exclusion at the human wait, not authorization-gate residency</li>
-<li><code>aaf968851</code> 2026-08-06 kshitij — refactor(gateway): extract the hygiene recovery gate and forward the failure reason</li>
-<li><code>8f2712725</code> 2026-08-05 Teknium — feat: /refine — run the memory/skill self-improvement review on demand</li>
-<li><code>6518aa184</code> 2026-08-05 Teknium — feat: /heartbeat — recurring session re-entry prompt fired when idle</li>
-<li><code>6e041d524</code> 2026-08-05 Teknium — feat(goals): quality gates — deterministic commands that must pass before /goal completes</li>
-<li><code>ff3793fdf</code> 2026-08-05 Adolanium — fix(read_file): stop promising anydoc conversion in the tool schema</li>
-<li><code>ffdbc883e</code> 2026-08-05 Adolanium — fix(read_extract): cap anydoc input size before conversion</li>
-<li><code>997a913a5</code> 2026-08-05 Adolanium — fix(read_extract): retry anydoc init after failure instead of sticky disable</li>
-<li><code>01a1037d1</code> 2026-08-05 Teknium — chore: map contributor email for rille111</li>
-<li><code>4e7e103ba</code> 2026-08-05 Teknium — fix(gemini): interpose placeholder model turn between tool result and user text</li>
-<li><code>0afeaaa0a</code> 2026-08-05 Rickard Robin — fix(gemini): prevent user message merge into adjacent function response</li>
-<li><code>169758d42</code> 2026-08-06 kshitij — perf(tests): cut test_hermes_state.py 52s -&gt; 10s — kill sleep throttle + per-row seeding</li>
-<li><code>be1740d11</code> 2026-08-05 Teknium — chore: revert incidental uv.lock churn (no dependency changes)</li>
-<li><code>b2598b41e</code> 2026-08-05 Teknium — feat(read_file): widen document extraction to PDF/legacy Office/ODF/RTF/EPUB via optional anydoc</li>
-<li><code>9baf92b7f</code> 2026-08-06 kshitij — test(search): update grep command mirrors to -rnHE for fidelity with production</li>
-<li><code>7c6f9affd</code> 2026-08-06 Kevin Yin — fix(file): align grep fallback regex behavior</li>
-<li><code>71f1b371c</code> 2026-08-06 kshitij — perf(ci): 12 test slices — cut the merge-gate critical path ~33%</li>
-<li><code>9a9cf6ae8</code> 2026-08-05 Teknium — fix(cron): tolerate NUL bytes in referenced-script paths at os.open</li>
-<li><code>5c5f1a6b7</code> 2026-08-06 kshitij — chore: AUTHOR_MAP for @dromai (PR #42700 salvage)</li>
-<li><code>03dc4aad5</code> 2026-08-06 Paolo Shamoon — fix: hide memory tool from cron agents</li>
-<li><code>ca120413f</code> 2026-08-05 kshitij — fix(tests): forward HERMES_TEST_* knobs through the hermetic runner</li>
-<li><code>c0d974b19</code> 2026-08-06 kshitij — fix(gateway): escalate the session-hygiene compaction cooldown on repeat failures</li>
-<li><code>43fc86562</code> 2026-08-06 kshitij — fix(utils): tighten create_mode semantics and close the yaml 0600 transit window</li>
-<li><code>3556728a5</code> 2026-08-06 kshitij — refactor(utils): move mode+owner preservation into atomic_write_text</li>
-<li><code>4541d3018</code> 2026-08-06 briandevans — fix(cli): keep newly created SOUL.md and distribution.yaml at 0644</li>
-<li><code>c005546cb</code> 2026-08-06 briandevans — test(cli): skip the permission-preservation cases on Windows</li>
-<li><code>67827dd99</code> 2026-08-06 briandevans — fix(cli): route the remaining destructive user-file rewrites through atomic writes</li>
-<li><code>52a5fc004</code> 2026-08-06 kshitij — refactor(state): consolidate SQL LIKE escaping onto one shared helper</li>
-<li><code>55e70f570</code> 2026-08-06 kshitij — test(sessions): guard the Windows backslash child arm of _cwd_prefix_clause</li>
-<li><code>4bab91944</code> 2026-08-06 kshitij — refactor(sessions): use _escape_like in _cwd_prefix_clause</li>
-<li><code>b37de0192</code> 2026-08-06 Drexuxux — fix(sessions): escape LIKE wildcards in the cwd-prefix clause</li>
-<li><code>1d2dabce5</code> 2026-08-06 Drexuxux — fix(sessions): escape LIKE wildcards in prune/archive substring filters</li></ul>]]></description>
-    </item>
-    <item>
-      <title>Hermes 日报 2026-08-05（83 个提交）</title>
-      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-05</link>
-      <guid isPermaLink="false">hermes-daily-2026-08-05</guid>
-      <pubDate>Thu, 06 Aug 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p><strong>本期覆盖 2026-07-29 ~ 2026-08-06 合入 main 的提交，共 83 个 commit，其中 merge 22 个</strong></p>
-<p>共 83 个提交合入 main（feat 12 · fix 35 · perf 1 · docs 13 · merge 22）</p>
 <h3>完整 commit 列表（83 条）</h3>
 <ul><li><code>9ea01979d</code> 2026-08-06 kshitij — chore: map contributor email for @sylbae</li>
 <li><code>042a2cf3d</code> 2026-08-06 kshitij — fix(agent): keep the start-order gate under the batch deadline and abort abandoned workers</li>
