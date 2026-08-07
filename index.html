@@ -26,9 +26,23 @@
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
     <section id="2026-08-07" class="day">
-      <h2>Hermes 日报 2026-08-07（45 个提交）</h2>
-      <p><strong>本期覆盖 2026-08-05 ~ 2026-08-06 合入 main 的提交，共 45 个 commit，其中 merge 0 个</strong></p>
-<p>共 45 个提交合入 main（feat 4 · fix 27 · perf 2 · docs 0 · merge 0）</p>
+      <h2>Hermes 日报 2026-08-07：新增 /refine 和 /heartbeat 命令，委托控制权强化</h2>
+      <p><strong>本期覆盖 8 月 5 日 ~ 8 月 6 日合入 main 的提交，共 45 个 commit，其中 merge 0 个。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>三个新命令：/refine（按需自改进审查）、/heartbeat（空闲定时唤醒）、goal 质量门禁</li>
+<li>委托与生命周期加固：子任务 steer 控制权绑定会话代际，cron 生命周期守卫全面化</li>
+<li>性能与可靠性：read_file 支持 PDF/Office 文档提取，测试 52s→10s，CI 门禁缩短 33%</li>
+</ul>
+<p>重点条目：</p>
+<ul>
+<li>feat: /refine — 按需运行记忆/技能自改进审查（8f2712725）</li>
+<li>feat: /heartbeat — 空闲时定时重新进入会话（6518aa184）</li>
+<li>feat(goals): 质量门禁 — /goal 完成前必须通过的确定性命令（6e041d524）</li>
+<li>feat(read_file): PDF/Office/ODF/RTF/EPUB 文档提取（b2598b41e）</li>
+<li>fix(delegation): 子任务 steer 控制权绑定会话代际（9d4ef04ed）</li>
+<li>perf(tests): test_hermes_state.py 52s → 10s（169758d42）</li>
+</ul>
 <h3 class="collapsed">完整 commit 列表（45 条）</h3>
 <ul><li><code>0957277f2</code> 2026-08-06 teknium1 — refactor(skills): move polymarket to optional-skills/finance</li>
 <li><code>9d4ef04ed</code> 2026-08-06 SmokeDev — fix(delegation): bind steering to session generation</li>
