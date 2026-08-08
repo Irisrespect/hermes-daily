@@ -5,16 +5,15 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 08 Aug 2026 06:47:41 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 08 Aug 2026 08:28:21 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
-      <title>Hermes 日报 2026-08-08（208 个提交）</title>
+      <title>Hermes 日报 2026-08-08：新增 hermes pause/resume 全局急停，桌面端会话恢复与固定持久化</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-08</link>
       <guid isPermaLink="false">hermes-daily-2026-08-08</guid>
       <pubDate>Sat, 08 Aug 2026 06:31:00 +0800</pubDate>
       <description><![CDATA[<p><strong>本期覆盖 8 月 7 日 ~ 8 月 8 日合入 main 的提交，共 208 个 commit（不含 merge），另有 18 个 merge。新增 26 个功能、119 个修复、4 个性能优化，修复占比过半，重点是桌面端稳定性和语音识别优化。</strong></p>
-<p># 标题：新增 hermes pause/resume 全局急停，桌面端会话恢复与固定持久化</p>
-<p>## 📌 今日要点</p>
+<p>📌 今日要点：</p>
 <ul>
 <li>桌面端 stale session 掉线恢复：检查点、附件、压缩、文件面板 cwd 全部找回，仓库主分支不再重复显示</li>
 <li>固定会话（pinned session）持久化落地：固定状态写入后端，超限不丢、拖拽排序生效</li>
@@ -22,8 +21,8 @@
 <li>斜杠 /learn 扩展：整本书和大型语料库可转成知识库技能</li>
 <li>cron 任务增强：监控模式、持久便签、派发前配置校验、token 用量审计</li>
 </ul>
-<p>## 重点条目</p>
-<p>### 桌面端（改动最多，20 条 fix）</p>
+<p>重点条目：</p>
+<p>桌面端（改动最多，20 条 fix）：</p>
 <ul>
 <li>fix(desktop): stale session 掉线后恢复 checkpoint 恢复与磁贴操作（c1305b645）</li>
 <li>fix(desktop): stale session 掉线后恢复图片/文件附件与 /compress（3c4f5c521）</li>
@@ -38,18 +37,18 @@
 <li>fix(desktop): Focus 布局下聊天窗保持在终端前面（5c6aff143）</li>
 <li>feat(desktop): 会话不再藏在&quot;Show earlier&quot;后面，按实际渲染内容计价（75717d29e + 31459ef0c）</li>
 </ul>
-<p>### 新命令与 CLI</p>
+<p>新命令与 CLI</p>
 <ul>
 <li>feat(cli): 全局紧急停止 — `hermes pause` / `hermes resume`（5db1b72b1）</li>
 <li>feat(cli): `hermes approvals test` 审批规则试运行（563f0a6fd）</li>
 <li>feat(doctor): `hermes doctor --live` 真实调用后端探测（1006faa6f）</li>
 </ul>
-<p>### /learn 与技能</p>
+<p>/learn 与技能</p>
 <ul>
 <li>feat(/learn): 书籍和大型语料知识库技能（32e7fb07a）</li>
 <li>feat(skills): 新增 document-to-action-items 文档转行动项技能（ff2fa40b1）</li>
 </ul>
-<p>### cron</p>
+<p>cron</p>
 <ul>
 <li>feat(cron): 监控模式任务 — hash 抑制的变化检测（6dff2109a）</li>
 <li>feat(cron): 每任务持久便签 KV，跨调度运行存活（04e8a661f）</li>
@@ -58,20 +57,20 @@
 <li>fix(cron): TERMINAL_CWD 锁超时 fail-closed（11ce6419c + a1e5ccb32）</li>
 <li>fix(cron): 保存 jobs.json 保留并发创建（4d84aa2a6）</li>
 </ul>
-<p>### 语音与 STT</p>
+<p>语音与 STT</p>
 <ul>
 <li>feat(stt): 本地 whisper 模型空闲自动卸载（7b006ea6e）</li>
 <li>feat(stt): 云端识别前预上传静音裁剪（a683ef95d）</li>
 <li>fix(voice): 播放阶段回声不再被当成用户插话打断（d4a753ea4 + b7bff6f2d + 979bf0cc4）</li>
 </ul>
-<p>### 安全与脱敏</p>
+<p>安全与脱敏</p>
 <ul>
 <li>fix: .env 终端输出按检测脱敏而非已知变量名列表（cf755f5c4）</li>
 <li>fix(secrets): 进程检查点文件命令脱敏（8969ebac1）</li>
 <li>fix(redact): 环境变量后缀键、控制字符拆分、process(list) 遗漏补齐（8563fe343）</li>
 <li>feat(security): 受保护 agent 指令文件改写必须审批（fe66596df）</li>
 </ul>
-<p>### 稳定性修复</p>
+<p>稳定性修复</p>
 <ul>
 <li>fix(compress): 上下文压缩保留进行中的工具链（788b8ab49）</li>
 <li>fix(sessions): 无续接的压缩父会话可恢复（988f2baaf）</li>
@@ -81,14 +80,14 @@
 <li>fix(gateway): 关闭时中断所有在飞 API 轮次（d9ddfb23d）</li>
 <li>fix: 轮次崩溃时保留会话历史（fc05247be）</li>
 </ul>
-<p>### 插件与 MCP</p>
+<p>插件与 MCP</p>
 <ul>
 <li>feat(plugins): 加载便携式 agent 组件（ca78c6d7a）</li>
 <li>feat(plugins): 便携插件包校验（c5117655b）</li>
 <li>feat(mcp): 写能力 MCP 工具按 readOnlyHint 信任分级（c8369e37f）</li>
 <li>feat(kanban,mcp): 孤儿卡对账 + 每服务器 MCP 身份头（9fad45fcd）</li>
 </ul>
-<p>### delegation 与工具</p>
+<p>delegation 与工具</p>
 <ul>
 <li>feat(delegation): 子任务可选结构化输出模式（d6ee58b58）</li>
 <li>feat(delegation): 结果条目显示单次子任务成本（d7635e43b）</li>
@@ -96,7 +95,7 @@
 <li>feat(vision): vision_analyze 区域放大裁剪（e166159f2）</li>
 <li>feat(terminal): 远程后端连接失败时终端优雅降级（5c29566e8）</li>
 </ul>
-<p>### 性能改善（4 条）</p>
+<p>性能改善（4 条）</p>
 <ul>
 <li>perf(model): 自定义提供商 /v1/models 探针磁盘缓存（fb435aae9）</li>
 <li>perf(fts): 回收表高水位标记清理，不再全表重扫（23dce021a）</li>
