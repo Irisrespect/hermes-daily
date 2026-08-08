@@ -5,7 +5,7 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 08 Aug 2026 08:48:01 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 08 Aug 2026 09:20:20 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>Hermes 日报 2026-08-08：新增 hermes pause/resume 全局急停，桌面端会话恢复与固定持久化</title>
