@@ -38,85 +38,49 @@
 </ul>
 <p>重点条目：</p>
 <p>桌面端（改动最多，20 条 fix）：</p>
-<ul>
-<li>fix(desktop): stale session 掉线后恢复 checkpoint 恢复与磁贴操作（c1305b645）</li>
-<li>fix(desktop): stale session 掉线后恢复图片/文件附件与 /compress（3c4f5c521）</li>
-<li>fix(desktop): 工作区 cwd 归属原子切换，文件面板切会话不再串目录（ae6eb578b + 416e025c4）</li>
-<li>fix(tui_gateway): 懒会话报告自己的 cwd 而非启动目录（6ff052479）</li>
-<li>fix(desktop): 命名会话的 session.info 不再把新草稿重新归位（9cdbeceda）</li>
-<li>fix(desktop): 仓库主分支 checkout 不再作为重复侧边栏项渲染（4cefba3ec）</li>
-<li>fix(api): 固定会话写入后端而非直接 400 拒绝（cef7d1a1e）</li>
-<li>fix(desktop): 固定会话无论多少都显示、不重复、拖拽排序在日期分组内生效（45f23205d + 256aac54d + 03b759db8）</li>
-<li>fix(desktop): 固定会话写保护持有到页面确认、超页数限制不再丢弃（daeedf67c + fd9fc50dd）</li>
-<li>fix(desktop): git 文件树虚拟化，大仓库 DOM 节点上限不再卡死（a4b235c4b）</li>
-<li>fix(desktop): Focus 布局下聊天窗保持在终端前面（5c6aff143）</li>
-<li>feat(desktop): 会话不再藏在&quot;Show earlier&quot;后面，按实际渲染内容计价（75717d29e + 31459ef0c）</li>
-</ul>
-<p>新命令与 CLI</p>
-<ul>
-<li>feat(cli): 全局紧急停止 — `hermes pause` / `hermes resume`（5db1b72b1）</li>
-<li>feat(cli): `hermes approvals test` 审批规则试运行（563f0a6fd）</li>
-<li>feat(doctor): `hermes doctor --live` 真实调用后端探测（1006faa6f）</li>
-</ul>
-<p>/learn 与技能</p>
-<ul>
-<li>feat(/learn): 书籍和大型语料知识库技能（32e7fb07a）</li>
-<li>feat(skills): 新增 document-to-action-items 文档转行动项技能（ff2fa40b1）</li>
-</ul>
-<p>cron</p>
-<ul>
-<li>feat(cron): 监控模式任务 — hash 抑制的变化检测（6dff2109a）</li>
-<li>feat(cron): 每任务持久便签 KV，跨调度运行存活（04e8a661f）</li>
-<li>feat(cron): 派发前配置校验 blocked_config + alert-once（ed903f953）</li>
-<li>feat(cron): usage_audit.jsonl token 用量审计日志（15927c1d2）</li>
-<li>fix(cron): TERMINAL_CWD 锁超时 fail-closed（11ce6419c + a1e5ccb32）</li>
-<li>fix(cron): 保存 jobs.json 保留并发创建（4d84aa2a6）</li>
-</ul>
-<p>语音与 STT</p>
-<ul>
-<li>feat(stt): 本地 whisper 模型空闲自动卸载（7b006ea6e）</li>
-<li>feat(stt): 云端识别前预上传静音裁剪（a683ef95d）</li>
-<li>fix(voice): 播放阶段回声不再被当成用户插话打断（d4a753ea4 + b7bff6f2d + 979bf0cc4）</li>
-</ul>
-<p>安全与脱敏</p>
-<ul>
-<li>fix: .env 终端输出按检测脱敏而非已知变量名列表（cf755f5c4）</li>
-<li>fix(secrets): 进程检查点文件命令脱敏（8969ebac1）</li>
-<li>fix(redact): 环境变量后缀键、控制字符拆分、process(list) 遗漏补齐（8563fe343）</li>
-<li>feat(security): 受保护 agent 指令文件改写必须审批（fe66596df）</li>
-</ul>
-<p>稳定性修复</p>
-<ul>
-<li>fix(compress): 上下文压缩保留进行中的工具链（788b8ab49）</li>
-<li>fix(sessions): 无续接的压缩父会话可恢复（988f2baaf）</li>
-<li>fix(agent): 只读压缩交接不再变成活动轮次（6d3ff6eda）</li>
-<li>fix(gateway): 致命断开前先排队重连（7141a6dc3）</li>
-<li>fix(gateway): 会话轮次租约超时 fail-closed（29af112cd）</li>
-<li>fix(gateway): 关闭时中断所有在飞 API 轮次（d9ddfb23d）</li>
-<li>fix: 轮次崩溃时保留会话历史（fc05247be）</li>
-</ul>
-<p>插件与 MCP</p>
-<ul>
-<li>feat(plugins): 加载便携式 agent 组件（ca78c6d7a）</li>
-<li>feat(plugins): 便携插件包校验（c5117655b）</li>
-<li>feat(mcp): 写能力 MCP 工具按 readOnlyHint 信任分级（c8369e37f）</li>
-<li>feat(kanban,mcp): 孤儿卡对账 + 每服务器 MCP 身份头（9fad45fcd）</li>
-</ul>
-<p>delegation 与工具</p>
-<ul>
-<li>feat(delegation): 子任务可选结构化输出模式（d6ee58b58）</li>
-<li>feat(delegation): 结果条目显示单次子任务成本（d7635e43b）</li>
-<li>feat(delegation): 批量派发前校验任务质量（94bc3194b）</li>
-<li>feat(vision): vision_analyze 区域放大裁剪（e166159f2）</li>
-<li>feat(terminal): 远程后端连接失败时终端优雅降级（5c29566e8）</li>
-</ul>
-<p>性能改善（4 条）</p>
-<ul>
-<li>perf(model): 自定义提供商 /v1/models 探针磁盘缓存（fb435aae9）</li>
-<li>perf(fts): 回收表高水位标记清理，不再全表重扫（23dce021a）</li>
-<li>perf(slack): conversations.info 查询 asyncio.gather 并行化（f3ec2f36f）</li>
-<li>perf(cron): shrink-merge stat-stamp 快路径（261aef526）</li>
-</ul>
+<p>会话掉线恢复（c1305b645 + 3c4f5c521 + 6ff052479 + 9cdbeceda）：桌面端会话意外掉线后，之前有一批功能会跟着失效——检查点恢复、磁贴操作、图片和文件附件、斜杠压缩全都可能卡死或丢状态。这期把这条恢复链路整体修通：断线重连后这些操作都能正常找回，不用重建会话。另外懒会话现在报告自己的 cwd 而不是启动目录，命名会话的 session.info 也不会再把新草稿错误归位。</p>
+<p>文件面板 cwd 归属（ae6eb578b + 416e025c4）：切换会话时，文件面板的当前目录之前会串到上一个会话的工作目录。现在工作区 cwd 有了明确的归属权，切换做成原子操作，文件面板会正确绑定到当前会话自己的目录。</p>
+<p>固定会话持久化（cef7d1a1e + fd9fc50dd + 256aac54d + 45f23205d + 03b759db8 + daeedf67c）：之前固定（pin）会话操作会被 API 直接拒绝返回 400，固定状态根本存不下来，页面刷新就丢。现在固定状态真正写入后端，不再报错；固定了的会话无论多少个都完整显示，超过页面数量限制也不会被挤掉，拖拽排序在日期分组内正常生效，写保护会持有到页面确认完成。</p>
+<p>文件树虚拟化（a4b235c4b + 4cefba3ec）：大仓库的 git 文件树之前会渲染成千上万个 DOM 节点，滚动和展开都卡。现在文件树改为虚拟化渲染，DOM 节点数量封顶；同时仓库主分支的 checkout 不再作为重复的侧边栏项显示，侧边栏干净了。</p>
+<p>Focus 布局聊天置前（5c6aff143）：Focus 分屏布局下，聊天窗之前会被终端面板盖住，边聊边跑命令时看不清对话。现在聊天窗保持在终端前面，焦点布局里对话始终可见。</p>
+<p>会话显示优化（75717d29e + 31459ef0c）：会话不再藏在&quot;Show earlier&quot;后面，该显示的都会显示出来；桌面端按实际渲染内容计价，显示成本更真实。</p>
+<p>新命令与 CLI：</p>
+<p>全局急停（5db1b72b1）：新增 hermes pause / hermes resume 命令。运行中的任务出问题时，一条 hermes pause 就能全局暂停所有活动，hermes resume 恢复执行。适合紧急情况下兜底，不用逐个会话手动停。</p>
+<p>审批规则试运行（563f0a6fd）：hermes approvals test 可以试运行审批判定，不发真实请求，先把每条规则会怎么判打印出来。调审批规则时可以提前验证效果，不用拿真实操作试错。</p>
+<p>doctor 真实探测（1006faa6f）：hermes doctor --live 会真实调用一次后端接口做连通性探测，能查出配置层面的连接问题（比如 key 配错、endpoint 不可达），比只看配置静态检查更接近真实使用。</p>
+<p>/learn 与技能：</p>
+<p>/learn 知识库（32e7fb07a）：斜杠 /learn 命令扩展，现在支持把整本书、大型语料库变成可查询的知识库技能。之前只适合小规模材料，现在系统学习场景（读一本书、喂一批文档）可以建立长期可查的知识库。</p>
+<p>文档转行动项（ff2fa40b1）：新增 document-to-action-items 技能包，让 agent 读一份文档后自动提取行动项清单（谁、做什么、什么时候），配套两条 chore 把它提升到内置层级并收紧到标准规范。</p>
+<p>cron 定时任务：</p>
+<p>监控模式（6dff2109a）：cron 新增 monitor-mode，任务只做变化检测，内容没变时不发通知，内容变了才提醒。适合盯梢类任务（价格、状态、feed），避免每次都轰炸消息。</p>
+<p>持久便签（04e8a661f）：每个定时任务有独立的 KV 便签，跨调度运行存活。任务可以在一次运行里写中间状态，下次运行接着用，不用把状态塞进文件名或外部文件。</p>
+<p>派发前配置校验（ed903f953）：任务真正派发执行前先做配置校验，配置有问题（比如 blocked_config）直接拦截并只告警一次，避免坏配置反复空跑。</p>
+<p>token 用量审计（15927c1d2）：cron 新增 usage_audit.jsonl 审计日志，记录每次调度的 token 消耗。排查&quot;定时任务偷偷烧 token&quot;的问题有据可查，不用靠猜。</p>
+<p>语音与 STT：</p>
+<p>本地模型空闲卸载（7b006ea6e）：本地 whisper 识别模型空闲时自动从内存卸载，需要时再加载。省内存，长时间挂机不白占资源。</p>
+<p>云端静音裁剪（a683ef95d）：发到云端识别的语音，上传前先把前后静音段裁掉。省流量、省 token、识别也更快，配套文档说明了 12 秒短片段门控。</p>
+<p>回声防打断（d4a753ea4 + b7bff6f2d + 979bf0cc4）：语音对话时，Hermes 自己念出来的 TTS 之前会被当成用户插话打断自己（barge）。现在播放阶段的回声不再触发打断，短回声片段、片段匹配都加了最小证据门槛，长回复也不会被自己的声音拦腰截断。</p>
+<p>安全与脱敏：</p>
+<p>.env 输出脱敏（cf755f5c4 + 15d7103aa）：终端输出里的 .env 内容改为按检测脱敏，而不是靠已知变量名列表——之前列表里没写到的环境变量可能漏出去，现在只要检测到是 .env 内容就统一打码。</p>
+<p>检查点脱敏（8969ebac1 + 8563fe343 + e9d1551e6）：进程检查点文件里记录的命令也会脱敏，防止把敏感命令（含密码/key 的命令）写进检查点。环境变量后缀键、控制字符拆分、process(list) 这些容易漏的边角全部补齐。</p>
+<p>受保护文件写审批（fe66596df）：受保护的 agent 指令类文件（agent-instruction）改写必须走写审批，防止模型在任务里顺手改掉关键配置文件。</p>
+<p>稳定性修复：</p>
+<p>压缩保留工具链（788b8ab49 + 988f2baaf + 6d3ff6eda）：上下文压缩之前会打断正在执行的工具链，工具调用做到一半被压缩截断。现在压缩保留进行中的工具链；没有后续消息的压缩父会话也能恢复；只读压缩交接不会误变成当前活动轮次。</p>
+<p>gateway 重连与中断（7141a6dc3 + 29af112cd + d9ddfb23d + 51fa7db46）：致命断开前先排队重连，不把重连堵死；会话轮次租约超时 fail-closed，不继续处理过期租约；关闭时中断所有在飞 API 轮次，不只在 /v1/runs 路径上处理。</p>
+<p>崩溃保留历史（fc05247be）：一轮对话崩溃时保留会话历史，之前的消息不丢，重开还能接上。</p>
+<p>插件与 MCP：</p>
+<p>便携 agent 组件（ca78c6d7a + c5117655b）：插件系统新增便携式 agent 组件加载，组件可以随项目目录分发，加载前先做包校验，配套 3 条修复加固便携插件边界、保留 opaque stdio 命令。</p>
+<p>MCP 写工具信任分级（c8369e37f）：能写数据的 MCP 工具按 readOnlyHint 做信任分级，写能力工具走更严的管控，降低误写风险。</p>
+<p>看板对账（9fad45fcd）：看板孤儿卡片自动对账找回，MCP 请求带每服务器身份头，多服务器环境下区分来源。</p>
+<p>delegation 与工具：</p>
+<p>子任务增强（d6ee58b58 + d7635e43b + 94bc3194b）：delegate_task 支持可选的结构化输出模式，子任务结果按 schema 返回；每个子任务的成本直接显示在结果条目里，花多少一目了然；批量派发前先校验任务质量，不合格的批不发。</p>
+<p>看图区域放大（e166159f2）：vision_analyze 支持指定区域放大裁剪，看细节不用整张图重发，省 token 也更准。</p>
+<p>终端优雅降级（5c29566e8）：远程后端连接失败时，终端不再直接崩，降级到本地继续工作，连接恢复后回到远端。</p>
+<p>性能改善（4 条）：</p>
+<p>模型列表探针缓存（fb435aae9）：自定义提供商的 /v1/models 探测结果做磁盘缓存，不再每次启动都重新请求。</p>
+<p>全文搜索清理提速（23dce021a）：FTS 回收表用高水位标记清理，不再全表重扫，长期使用后搜索不再越用越慢。</p>
+<p>Slack 查询并行化（f3ec2f36f）：conversations.info 查找用 asyncio.gather 并行化，多会话查询明显变快。</p>
+<p>cron 合并快路径（261aef526）：jobs.json shrink-merge 走 stat 时间戳快路径，不复制调用者列表，调度器保存任务更省时间。</p>
 <h3 class="collapsed">完整 commit 列表（208 条）</h3>
 <ul><li><code>b3aa561fa</code> 2026-08-07 rob-maron — add Hermes headers to Fireworks provider (#81321)</li>
 <li><code>a8c50eb1d</code> 2026-08-08 kshitij — fix: relax start_new_session assertion for systemd scope path</li>
