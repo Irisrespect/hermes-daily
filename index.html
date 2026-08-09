@@ -22,54 +22,78 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 9 期 · 1930 个提交 · 每日自动更新 ·
+<p class="meta">共 10 期 · 2088 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
-    <section id="2026-08-09" class="day">
-      <h2>Hermes 日报 2026-08-09：桌面端 HUD 悬浮模式上线，图像视频模型大扩充，Windows 编码问题集群修复</h2>
-      <p><strong>本期覆盖 8 月 8 日 ~ 8 月 9 日合入 main 的提交，共 258 个 commit（不含 merge），另有 15 个 merge。新增 38 个功能、145 个修复、6 个性能优化。</strong></p>
+    <section id="2026-08-10" class="day">
+      <h2>Hermes 日报 2026-08-10：桌面端插件管理落地、侧边栏会话列表大改、Windows 更新链路修复 + Electron 回滚</h2>
+      <p><strong>本期覆盖 8 月 9 日 ~ 8 月 10 日合入 main 的提交，共 158 个 commit（不含 merge），另有 11 个 merge。新增 17 个功能、98 个修复、5 个性能优化。</strong></p>
 <p>📌 今日要点：</p>
-<p>桌面端 HUD 悬浮模式上线：无边框透明置顶小窗，保留真实聊天输入框，关窗自动交接会话</p>
-<p>图像视频生成模型大幅扩充：FAL 新增 Nano Banana 2、Seedance 2.5、FLUX 3 等，低清模型默认放大</p>
-<p>Windows 编码问题集群修复：凭据静默丢失、剪贴板中文乱码、邮件抓取崩溃等一批高感知 bug 被修</p>
-<p>会话即时命名：开场就起标题，不再等第一轮回复；记录导出上限改为可配置</p>
-<p>办公文档技能 clean-room 重写：docx/xlsx/pptx/pdf 技能消除 Anthropic 许可风险</p>
+<p>桌面端插件管理落地：设置页新增插件页，后端插件可见可启停，便携插件 streamable-http 真正接入 MCP</p>
+<p>侧边栏会话列表大改：头部的二选一开关变成完整筛选/分组/排序菜单，会话行显示 PR 状态</p>
+<p>Windows 更新链路修复集群：Electron 回滚 40.10.2（新装机解压失败），更新移交脚本仓库化，孤儿后端回收</p>
+<p>会话连续性加固：会话身份持久化写入，崩溃重启不再丢对话或续错会话</p>
+<p>HUD 模式继续完善：工作/焦点状态直接显示在 HUD 条上，退出按钮无焦点也可点</p>
 <p>重点条目：</p>
-<p>桌面端 HUD 模式（本期最大亮点）：</p>
-<p>HUD 模式是桌面端新增的一种悬浮交互形态：一个无边框、透明、始终置顶的小窗口，复用应用自身的真实聊天界面，只改变窗口框架——没有标题栏、没有状态栏、没有窗格树。窗口底部是输入框，上方消息带以渐隐方式显示：回合进行中或输入框聚焦时保持可见，空闲后逐渐淡出，鼠标可以穿透到背后的应用。用户可以通过标题栏按钮或快捷键（macOS 为 ⌘⇧H）随时进入 HUD 模式（e8b83f37c、6a01b429d）。</p>
-<p>HUD 里的会话交接做得比较完整：因为网关把一个会话的事件流绑定到唯一 socket，HUD 里开始的一轮对话只会在 HUD 里流动，关闭 HUD 时主窗口会自动恢复该会话、重建传输并接续进行中的回合，不会丢上下文（7b0dbd224）。</p>
-<p>HUD 模式下 agent 能感知自己的悬浮状态：桌面端给 HUD 提交打上 surface: &#x27;hud&#x27; 标记，网关把它转成每回合的提示，指向新加的 read_window_below 工具——agent 可以查询 Hermes 窗口底下是哪个应用窗口（应用名、标题、位置，仅元数据不读像素），回答&quot;你下面是什么窗口&quot;&quot;帮我查天气&quot;这类问题时直接针对用户正在用的应用操作（e24bac49f、406501fd9、f22ae7292）。工具调用前会先检查 agent 自己的 schema，没有 computer_use 或 read_window_below 的会话不会被指向调不了的工具。</p>
-<p>HUD 消息带改用 macOS 原生毛玻璃（vibrancy）渲染，三档渐隐：刚落地时半显示供扫一眼、聚焦时提升到可读、空闲后收起滑到输入框后面。只有空闲记录才会淡出，运行中的回合或等待用户回复时保持打开（4500b4391）。从其他标签页唤出 HUD 时会正确重定向到当前查看的会话（f444e0c5e），一批 HUD 细节修复同步合入（窗口尺寸、面板显隐、鼠标穿透边界、对话框下不穿透等：0e260b3c8、6ada733f9、c5332b2f8、843c3abcc、f9860b050、717b49c08、48d672e49、ba4456ab0、f03fc4684）。</p>
-<p>图像与视频生成模型扩充（FAL + Krea）：</p>
-<p>图像生成新增 FAL Nano Banana 2 模型（2b16a6b03）。视频端新增 Seedance 2.5、MiniMax H3、Seedance 2.0 Mini、FLUX 3、Grok Imagine 1.5、Gemini Omni Flash（仅图生视频）等新端点；图像端新增 Seedream 5.0 Pro（含编辑）与 Lite、Ideogram V4 instant/fast、Qwen Image 3（含编辑）、MAI Image 2.5 Pro、Nano Banana 2 Lite（含编辑）、Recraft V4.1，全部 18 个新端点通过真实 payload 在 fal.run 上实测通过（70c6cf8e7）。</p>
-<p>放大策略调整：所有原生输出低于约 2MP 的图像模型默认开启放大（upscale=True），用户不会悄悄拿到低清图——FAL 目录 16 个模型翻转默认值（klein、z-image、nano-banana pro/2/2-lite、gpt-image 1.5/2、ideogram v3/v4、recraft v4/v4.1、qwen image/3、krea-2 medium、MAI 2.5 pro 等）；Krea 插件按模型设置默认（medium/medium-turbo 开启、large 关闭）。原生高分辨率模型（Seedream 5 Pro/Lite、Krea 2 Large）保持关闭，避免为已够大的输出付费。upscale 参数仍保留按次覆盖（false=快速草稿，true=强制放大）（66ea4e686）。image_generate / video_generate 同时支持可选放大通道（137960c9a）。</p>
-<p>Windows 编码问题集群修复（高感知修复季）：</p>
-<p>auth 凭据读取改用 UTF-8：之前凭据存储文件按系统代码页（Windows 上是 cp1252）解码，任何非 ASCII 字节（中文/emoji 标签、带重音符号的显示名）都会抛 UnicodeDecodeError，最坏情况是 _load_auth_store 的宽泛 except 把文件改名 .corrupt 后返回空存储——下次启动静默清空所有提供商凭据。现已统一 UTF-8 读取（762f1c588），其余 auth.json 读取点同步覆盖（2fda6a384、2e227d74f）。</p>
-<p>剪贴板读取改 base64 传输：PowerShell 的 Get-Clipboard 输出系统 ANSI 代码页文本（CP1252/CP936），Node 按 UTF-8 读会把中文/emoji 弄乱；现在读路径也像写路径一样先 base64 编码再传（9dcce84c3）。</p>
-<p>working_diff 在 Windows 上按 UTF-8 解码 git 输出：之前用系统代码页（cp932）解码，非 ASCII 文件名直接抛 UnicodeDecodeError，破坏&quot;git 失败也不抛异常&quot;的契约；改为 UTF-8 + errors=replace，遗留的 cp932 编码内容降级为替换字符而不是崩溃（26eeb8568）。</p>
-<p>邮件抓取不再被畸形字符集打断：未知字符集标签（QQ 邮箱的 unknown-8bit 占位符、拼写错误的编码名）会从 bytes.decode 抛 LookupError，中断整个批次抓取；因为 UID 在抓取前就标记为已读，崩溃等于永久丢掉整批消息。现在有字符集别名表（unknown-8bit→utf-8、gb2312/gbk→gb18030 等）+ utf-8/latin-1 逐级回退，畸形 RFC 2047 头降级为原始字符串（65f407184）。</p>
-<p>孤代理项（lone surrogate）崩溃在三个关口统一拦截：finalize_turn 在模型文本离开会话循环时清理、网关聊天面边界清理（Telegram utf16_len、Signal 格式化）、run_conversation 遍历完整 api_kwargs 清理工具描述——覆盖 oneshot 输出、NIM/任意提供商响应和所有投递消费者（566b5b16a、8b799fa77）。</p>
-<p>二进制文件检测改在字节层做：之前通过终端传输采样文本判断（head -c 1000 采样经文本层解码），多字节字符在字节 1000 处被截断会变成 U+FFFD 替换符，_is_likely_binary 把任何含 U+FFFD 的文本都当成二进制——合法的中文/emoji 文本被标记为不可读。现在按 base64 传输的字节内容分类，不再依赖有损文本层（e40315d53）。</p>
-<p>.env 读取统一 utf-8-sig：BOM 不再吞掉第一个键（aa1fac980、ece678db9、b76498ba0、7fef76a6c），json_parse 容忍 UTF-8 BOM（f2feb6f37）。更新过程的交互提示也处理了 UnicodeDecodeError（70957591f、1bb261251），cron 投递输出文件按 UTF-8 写入（4af7f0550）。</p>
-<p>会话即时命名与记录管理：</p>
-<p>会话标题生成从&quot;第一轮回复后&quot;提前到&quot;开场&quot;：原来标题在第一轮回复时才生成，一个回合是多次工具调用而非一次往返，实测 p50 要 151 秒、p90 要 1212 秒才等到标题，且失败或被中断的回合永远没有标题。现在拆成两步：先用确定性规则从用户开场消息生成标题、在模型运行前写入，再调用一次小模型升级；响应约束为 JSON 对象无需剥离前言，斜杠命令按用户实际意图命名而非命令名本身（f726090d4）。标题加来源追踪防止互相覆盖（5566379f5），起标题模型从提供商实时目录解析（perf，e358eaf44）。</p>
-<p>记录导出上限可配置：sessions.max_resume_messages / sessions.max_export_messages（默认 20000，0 关闭）替代硬编码的硬拒绝；CLI 的 sessions export 保护从累计改为按会话，备份大量小会话的全库备份不再被卡；错误提示指向配置项而非（仅针对损坏的）修复命令（f0794640f）。超大会话记录不再耗尽内存（c750d5354）。</p>
-<p>办公文档技能 clean-room 重写（许可证合规）：</p>
-<p>bundled 的 docx、xlsx、powerpoint、pdf 四个技能原本改编自 Anthropic 的文档技能，带有专有 LICENSE.txt（禁止衍生、禁止再分发），被 SkillEvaluator 一级扫描标记为关键许可问题。现在全部替换为 clean-room 重写：由隔离子代理仅凭库知识（python-docx、openpyxl、python-pptx、pypdf/reportlab/pdfplumber，均为 MIT/BSD 许可）从零编写，明确禁止阅读旧技能内容或 anthropics/skills，会话记录保留作为来源证明（51570f4da）。功能对齐持续补齐（fad88cf13）。另新增 8 个技能：competitor-news-monitor（竞品新闻监控）、social-media-content-calendar（社媒内容日历）、weekly-review-planning（周复盘规划）、product-price-monitor（产品价格监控）、meeting-action-items（会议行动项）、google-workspace-daily-brief（Google Workspace 每日简报）、github-issue-to-pr（Issue 转 PR）、email-inbox-triage（收件箱分类）（309c9bbbe、5cc4c2d30、6eaea9c70、56d9e75db、8dcebded5、9e2d37250、29783634b、ebb242d81）。</p>
-<p>上下文与压缩：</p>
-<p>gpt-5.6 系列可开启 OpenAI 服务端压缩（compression.codex_responses_native，默认关闭）：通过 compression.codex_responses_native 启用后，直接 OpenAI API 或 ChatGPT Codex 订阅的 gpt-5.6 系列请求带上 context_management 参数，OpenAI 在服务端压缩并返回加密的压缩产物，Hermes 捕获后存入 codex_reasonings 侧车、后续回合回放，零新增状态继承持久化、会话回放、跨 issuer 守卫和加密回放开关（5e1b50115）。压缩清理边界修正，原生压缩检查点豁免（e00965a7e）。</p>
-<p>注：本期曾合入 DCP 上下文引擎（context.engine: dcp，d7072ab91），但窗口内又经历 rewire（9841a6c65）和 Revert×2（206f74baa、0647bf988），最终 tip 上仅剩空目录，该功能实际未上线。</p>
-<p>稳定性与诊断：</p>
-<p>hermes doctor 新增 state.db 健康统计：库大小、WAL 状态、消息/会话数、journal 模式、持有进程数、FTS 表状态和延迟重建状态，超过 1GiB 给出增长告警并建议开启自动清理——用于诊断多写入实例的锁竞争问题（64c342c1c、a96a4621f、658329708）。</p>
-<p>terminal 工具硬性拦截针对正在运行的源码仓库的 git 修改操作：force=True 也无法绕过（只能推迟崩溃），本地后端生效，拦截消息解释版本偏移机制并引导用 git worktree / 临时克隆（ecbe6ef0d、206531a1e、886092bc5、f0a3ef8bd）。</p>
-<p>文档站搜索从本地 lunr 换成 Algolia DocSearch：原来每次访问都要下载并水合约 16MB 的客户端索引，慢连接上体验很差；现在从 Algolia 服务器即时返回，中英文结果通过 docusaurus_tag 分面隔离，已上线验证 9,404 条记录（60942fc78）。</p>
-<p>依赖与安全：</p>
-<p>OSV 每周扫描报告 50 个已知漏洞，本次修复 31 个有可用修复版本的：Python 侧 aiohttp 3.14.1→3.14.3（3 个 GHSA）、h2 4.3.0→4.4.1（CVE-2026-71554 请求走私）；npm 侧 brace-expansion、undici、js-yaml、nanoid、ip-address 等（7537de9e7）。依赖升级实施 14 天老化 + 精确 pin 策略（45f31de4e、a1e4fee33）。</p>
-<p>其他值得关注：</p>
-<p>新增 --resume latest 启动参数：解析最近会话（同 -c 的工作区 MRU 查找，--tui 下 TUI 源优先），配合 --in DIR 在指定目录恢复——hermes --tui --resume latest --in ./dir（c5f5fa40c）。</p>
-<p>TTS 长文本按提供商和平台上限拆分，不再超限报错（73997c41b）。</p>
-<p>PDF 读取失败时标注不可读段落所属的章节文本，方便定位（7c2bc87f8）。</p>
-<p>桌面端交互细节：输入框草稿可跨窗口移动（8560dc6b9）、记住用户选择的工作区而非浏览过的（9050913e6）、Windows 路径拼写差异下正确匹配项目与 cwd（7ff9d7db9）、新会话不再继承聚焦会话的文件夹（6dda0c91d）、回合进行中状态不再误显空闲（b70c5cadb）、恢复运行中会话时完整保留记录（0db11f995）。</p>
+<p>桌面端插件管理（本期最大亮点）：</p>
+<p>桌面端此前完全看不到后端插件——原生 Hermes 插件和便携 Agent Plugins v1 包在桌面应用里都是不可见的。现在设置 → 插件页会把它们和桌面端渲染插件列在一起：每行带来源/便携标签、按注册键的启用/禁用开关、实时筛选搜索框，数据源是 plugins.manage 的 nanostore。其他面板自己管的类别（dashboard_auth/*、model-providers/*、platforms/*）在渲染端过滤掉，不污染列表（c86da8397）。</p>
+<p>配套改动：插件记录新增一句话描述（Kanban 等内置插件也补了），列表里显示描述而不是原始文件路径；插件区新增&quot;打开插件文件夹&quot;按钮，路径按 config.get 的 profile 解析，仅本地后端可用（44790bc9c）。</p>
+<p>底层寻址方式同步修正：plugins.manage 列表行现在携带规范注册键和便携标记——此前启停开关按名字寻址，跨类别目录同名插件会&quot;一开全开&quot;（image_gen/fal 和 video_gen/fal 的 toggles 会互相影响）；改为按键寻址后互不干扰。便携包的进程内 MCP 服务器也并入 enabled_mcp_server_names()，之前它们的工具注册进了 MCP 运行时但没进模型的 schema，等于白注册（a60b492e0）。</p>
+<p>便携 Agent Plugins v1 包中带 streamable-http mcp.json 条目的，现在通过 Hermes 现有的 URL-based MCP 客户端真正加载，不再&quot;报告后跳过&quot;（这是 PR #81196 约定好的后续切片）。按 v1 规范 §7.2.1 执行边界规则：URL 必须是绝对 http(s)，不能带用户信息或 fragment；明文 HTTP 仅限 localhost/回环地址（471baea52）。</p>
+<p>侧边栏会话列表大改：</p>
+<p>会话列表头部原本是&quot;项目/列表&quot;二选一开关，现在变成一个完整菜单：按日期/项目/状态分组，按更新时间/创建时间/状态/token/成本排序，行内可显示 token、成本、PR、profile 或常驻时间戳，按状态/PR/项目/归档筛选。所有选择持久化，一个重置按钮全部还原。细节上：状态分组复用日期分隔线不另造分隔符；按量级排序（token/成本）时不再显示日历（&quot;今天&quot;排在史上最贵会话上面是句假话）；行内元数据和悬停时的 kebab 共用尾部位置，只让最后一项让位；启用筛选时加载深度扩到 300 行（83b8ca1e1）。</p>
+<p>会话行现在能显示对应 PR 的状态（open/merged/closed）并可点击跳转：按会话自己的 repo+branch，通过 remote-aware git facade 走后端 gh，每个 repo 一次批量 GraphQL 请求。边界情况都处理了：主干分支不查（Fork PR 共享分支命名空间，查 main 会误标陌生人的 PR）；worktree 会话绑定实际使用的分支（21aaa8b4f）。</p>
+<p>未发送的草稿标签页此前全部叫&quot;New session&quot;，一排放开根本分不清谁是谁。现在每个草稿按输入框内容自动命名，用的是后端 derive_title 同一套&quot;首行 + 词边界&quot;规则——草稿显示的名字就是发送后保留的名字（c143ec7f0）。草稿还获得独立的空心状态点，和已定稿会话区分开；消息数为 0 才算草稿，避免把刚恢复的旧会话误标成草稿（5b3a5ccae）。</p>
+<p>侧边栏拖拽排序原来只能拖首列 14px 的抓取柄（还只在悬停时出现），现在整行标题都能拖。会话和项目的两种拖拽共用一个按压手势，各自在自己的区域里生效，互不干扰（35b82fdef）。</p>
+<p>Windows 更新链路修复集群：</p>
+<p>Electron 回滚到 40.10.2：此前 40.10.2 → 40.10.6 的升级（修复 GHSA-r4w5-6pfg-jxp5）在新装 Windows 机器上翻车——40.10.3+ 把 install.js 的解压换成了 @electron-internal/extract-zip，一个 MSVC 编译的原生绑定，没有装 VC++ Redistributable 的机器直接 ERR_DLOPEN_FAILED（8 月 9 日现场报告，全新 VM 复现）。回滚到 40.10.2 修复装机问题；安全影响评估为零——该 CVE 需要遗留的 ProtocolResponse.url API 加 session-partition 隔离，桌面端只用现代 protocol.handle() 且无跨会话隔离，不触碰（bb8280b75）。</p>
+<p>更新移交脚本仓库化：桌面端&quot;更新&quot;按钮此前移交给 HERMES_HOME/hermes-setup.exe，而这个 Tauri 二进制没有自更新路径——所有 updater 侧修复只能等新安装包构建签名发布，实际落后 main 数月。8 月 9 日的事故链就是 6 月 4 日的老二进制跑 8 月的仓库：四个独立失败（过期 install.ps1 缓存解析器、标记采用、残留进程清理）全是这个根因。现在改为仓库自带的 Windows 更新移交脚本，不再依赖冻结的 hermes-setup 二进制（92be912d7）。</p>
+<p>更新移交全面加固（回应 #82328/#82366 评审 + 补上缺失的进度 GUI）：①失败即停——桌面端 30 秒还活着就 exit 4 不动任何东西，shim 被锁 20 秒就 exit 5，两者都会重新拉起桌面端，用户不会被晾在原地；②真实完成状态——`hermes update` 把桌面端构建失败当非致命（警告但 exit 0）对 CLI 是对的，但对桌面端驱动的更新是撒谎（会拿旧 exe 重启还说&quot;成功&quot;），脚本现在能识别更新输出里的警告、重试一次构建、仍失败就 exit 6 如实上报；③标记所有权——清理时只有自己的 PID 还持有标记才移除，移交伙伴改写过的标记保留认领权；④结果落地——每条退出路径写 .hermes-update-result.json，桌面端启动时消费一次，成功记日志、失败弹真实对话框指向更新日志，过期/畸形结果静默消费，此前失败的分离更新跟&quot;什么都没发生&quot;无法区分；⑤进度界面——脚本从隐藏控制台改成 WinForms 进度窗口（跑马条 + 流式日志），-NoUi 保持无头会话干净（6495ef82f）。</p>
+<p>一批更新细节修复：更新进度窗口先抢焦点，重启后的桌面端再接管（952f44f84）；回收残留的桌面端后端进程——桌面端退出后 Python 后端可能存活，venv-holder 保护会误判&quot;Hermes is still running&quot;让更新死锁（8 月 9 日 01:59 和 02:17 两次实测），现在按 PID 判断父进程确实死亡的后端直接回收（826bf9b6d）；每次更新都刷新安装器的 bootstrap-cache 脚本，不再&quot;存在就永远复用&quot;几个月前的 install.ps1（3dcbe9001）；venv 阻塞扫描不再截断命令行——网关的 exe 路径超过 120 字符导致截断后匹配不上豁免规则，桌面端更新每次都误报&quot;Update didn&#x27;t finish&quot;（0b33ee88e）。</p>
+<p>会话连续性加固（gateway 会话身份持久化）：</p>
+<p>根因（#82616）：网关会话身份（session_key/chat_id/origin_json）此前是建行后&quot;尽力而为&quot;的单独 UPDATE 写入，重置路径的两次 DB 写都静默吞掉失败（logger.debug / bare print），会话记录读取还忽略写入用的重路由表，重启恢复按 started_at 排候选行且硬拒空行。一次失败写就能让活跃对话流进一个无法路由的孤儿行，而一个几天前的僵尸行握着路由键——网关一重启，对话静默续到僵尸会话上（单机 6 月以来 5 起确认事故）。现在会话身份持久化写入，崩溃重启后对话不中断（d2a4d373e）。</p>
+<p>配套修复：会话恢复时遵守 session_reset 策略——此前恢复路径用 updated_at=now 重建路由条目、从不查 _should_reset，自愿开启的空闲/每日重置策略在重启后完全失效，恢复的会话永远显示&quot;刚活跃&quot;、再也无法老化（784f733cf、6e99531c8）；状态库写失败（FTS 损坏或崩溃落在路由发布与建行之间）导致的&quot;缺身份列&quot;孤儿会话，重启后不再续到好几天前的兄弟会话——消息没丢，只是够不到，现在恢复路由身份（c790ed2a5）；每会话待发队列撞 200 条上限且会话库坏掉时，此前把最旧消息弹掉永久丢弃（#78182 静默丢数据），现在运行时落盘缓存，不再丢弃（de0f20ff0）；FTS 索引损坏时主数据写入仍可用（1527a81b5）。</p>
+<p>HUD 模式继续完善：</p>
+<p>HUD 模式下条栏常常是屏幕上唯一的东西，所以关键状态得显示在条上：工作中显示侧边栏同款旋转弧线（2px 圆角），聚焦时给条边框变色（条贴着窗口边缘，用光环或阴影会被窗口裁掉，直接改边框色）。退出控件从条上挪到输入框上方的空白区，右对齐、聚焦才出现（048907fb6）。</p>
+<p>一批 HUD 细节修复：HUD 条从覆盖内容上方抬起，不再压住底层窗口（3d5f17344）；输入框无焦点时退出按钮仍可点击（#82403，11dc61b45）；HUD 固定在打开它的会话上不跳走（#82360，b105a3b05）；HUD 模式开在当前聚焦会话的 profile 上（#82325，124aff0aa）；Linux 上 HUD 保持可点击（da933bf27）。</p>
+<p>CLI 状态栏与会话标题修复：</p>
+<p>CLI 状态栏现在显示当前会话标题（5a16635f4）。标题生成一批边界修复：模型切换标记不再被当成会话标题（b684cbb09）；自己的脚手架和 TTS 模型不再触发会话命名（53a400320）；cron 和子代理运行不再自动命名会话（cedc933c1）；标题生成器能看到提供商真实模型目录（071eab821）。</p>
+<p>其他值得说的：</p>
+<p>多 cron 投递目标：桌面端支持配置多个 cron 投递目标（67927808b），投递目标分组补了可访问名称（3a8d95a93）。</p>
+<p>Hyprland 版&quot;窗口下方读取&quot;：read_window_below 在 Linux 上走 get-windows（X11 协议），Wayland 拒绝向应用透露别的窗口，XWayland 下只能找到少数旧 X11 客户端、漏掉所有原生 Wayland 窗口——Hyprland 桌面下 HUD 浮在叫不出名字的应用上。现在 HYPRLAND_INSTANCE_SIGNATURE 存在时先问 Hyprland 的命令套接字（j/clients 返回每个窗口的 class/标题/位置/大小/pid/焦点历史），再回退 get-windows（c8318460e）。</p>
+<p>Docker 终端后端会话隔离：两个 bug——新会话的容器继承上一个会话的工作区（挂载源是进程级 TERMINAL_CWD 环境变量，超过会话存活期），且所有会话共享同一个 default 容器；以及每条命令 exit 126（桌面端网关记录了宿主启动目录当会话 cwd）。现在容器按会话隔离、工作区挂载按会话作用域（e95e13783）。</p>
+<p>搜索修复：非中日韩文的查询去除 % 号（90311ee75），并补全 FTS5 特殊字符清洗（c595dcb95）——此前未清洗的字符会让搜索被通配符干扰甚至报错。</p>
+<p>排队媒体投递：排队重发时保留受保护的 MEDIA 令牌（1648ab3a9）、保留后续媒体投递（808c8570a）、排队媒体连续性（a52dd17d9）——此前重发会把附件降级成纯文本。</p>
+<p>终端 CLI：OSC 11 背景色查询加 DA1 围栏，晚到的回复不再泄漏进输入行（herdr 等吞 OSC 11 的终端每次启动白等 100ms，SSH 桥/慢 tmux 会把 rgb:... 转义灌进输入行）（851f23ebc）；TCSAFLUSH 后排空迟到的 OSC 11 回复防输入泄漏（54641186f）。</p>
+<p>模型切换：别名有歧义时列出候选不再瞎猜（b79e83827）；模型排序键把 YYYYMMDD 日期戳和版本号拆开（21bc9ba34）；switch_model 用户提供商密钥读取走 per-profile 密钥作用域（0569c001d）。</p>
+<p>压缩：过期思考内容只计最新助手回合的尾部预算（#73624，212e84176）；快照采用前先保留活动尾部（1e8339a48）。</p>
+<p>工具与技能：新增 ast-grep 结构化搜索/批量改写可选技能（来自 oh-my-openagent 共享技能包，MIT 许可，已适配 Hermes 约定：search_files 路由、argparse 修复、patch 与 ast-grep 分工）（461c49397）；技能描述裁剪到 60 字符硬上限（3e05d7abf）。</p>
+<p>人格状态：改为单属主，带一次性重置迁移（244d29664）；TUI/网关写配置保留注释（e7d01dd02）。</p>
+<p>性能：项目树解析预热所有将要解析的路径（368625e00）、不再读取会被丢弃的系统提示（3ef8cdd26）、不会出结果的路径不再起 git 子进程（e3836efc5）——侧边栏加载骨架不再逐个目录探测；技能回合在构建器声明的稳定/易变边界处拆分缓存——此前 webhook/cron 技能调用把大段静态脚手架和易变尾部拼成一个字符串，Anthropic 缓存规划器把它当单个原子块，尾部几个字节变了就整块重写，现在注册稳定前缀字节，尾部变化只重写易变部分（214f2b82d），缓存稳定前缀边界加固防驱逐防内存膨胀（4c5be0c29）。</p>
+    </section>
+    
+    <section id="2026-08-08" class="day">
+      <h2>Hermes 日报 2026-08-08：新增 hermes pause/resume 全局急停，桌面端会话恢复与固定持久化</h2>
+      <p><strong>本期覆盖 8 月 7 日 ~ 8 月 8 日合入 main 的提交，共 208 个 commit（不含 merge），另有 18 个 merge。新增 26 个功能、119 个修复、4 个性能优化，修复占比过半，重点是桌面端稳定性和语音识别优化。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端 stale session 掉线恢复：检查点、附件、压缩、文件面板 cwd 全部找回，仓库主分支不再重复显示</li>
+<li>固定会话（pinned session）持久化落地：固定状态写入后端，超限不丢、拖拽排序生效</li>
+<li>新增全局急停命令 hermes pause / hermes resume</li>
+<li>斜杠 /learn 扩展：整本书和大型语料库可转成知识库技能</li>
+<li>cron 任务增强：监控模式、持久便签、派发前配置校验、token 用量审计</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端（改动最多，20 条 fix）：</p>
+<p>新命令与 CLI：</p>
+<p>/learn 与技能：</p>
+<p>cron 定时任务：</p>
+<p>语音与 STT：</p>
+<p>安全与脱敏：</p>
+<p>稳定性修复：</p>
+<p>插件与 MCP：</p>
+<p>delegation 与工具：</p>
+<p>性能改善（4 条）：</p>
     </section>
     
     <section id="2026-08-07" class="day">
