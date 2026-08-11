@@ -22,9 +22,96 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 14 期 · 2536 个提交 · 每日自动更新 ·
+<p class="meta">共 15 期 · 2635 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-12" class="day">
+      <h2>Hermes 日报 2026-08-12：浏览器自动化默认升级为 Browser Use CLI 3.0，Kanban 新增 review 交接生命周期</h2>
+      <p><strong>本期覆盖 8 月 11 日 ~ 8 月 12 日合入 main 的提交，共 99 个 commit（不含 merge），另有 6 个 merge。新增 11 个功能、59 个修复、2 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>浏览器自动化全面切换到 Browser Use CLI 3.0，未安装时自动安装，不再静默降级：</p>
+<p>Kanban 引入一等公民 review 交接状态，替代滥用 kanban_block 的旧约定：</p>
+<p>桌面端长流式会话渲染大优化，孤儿 gateway 清理链补齐：</p>
+<p>CLI 冷启动从 1.8 秒压到 400 毫秒内：</p>
+<p>上游 blender MCP 仓库被劫持，条目与技能整体下架：</p>
+<p>重点条目：</p>
+<p>浏览器自动化（Browser Use CLI 3.0）</p>
+<p>浏览器自动化是本期用户感知最直接的板块，核心是把 Browser Use CLI 3.0 全面接入并设为默认后端。</p>
+<p>`8d8bc85dc` feat(browser): make Browser Use mode the default browser backend — 之前未设置 browser.backend 时走内置浏览器工具，现在默认解析到 Browser Use 模式（CLI 可运行或 uvx 可用时）；CLI 不可用才回退内置工具，浏览功能不会静默失效。Camofox 配置始终保留内置工具（无 CDP 表面），backend: off 强制回退内置栈。</p>
+<p>`baa6b2e34` feat(browser): auto-install the Browser Use CLI instead of silently downgrading — 这是 8d8bc85dc 的配套补丁：CLI 变成默认后端但没人预装，没有 uv/uvx 的用户（macOS 有真实案例）会无提示降级回内置工具。现在 install_cli() 用托管 uv 自动安装 browser-use 并链接到 $HERMES_HOME/bin，安装脚本 install.sh / install.ps1 在装 Hermes 时同步预装（非致命、可 --skip-browser 跳过），CLI 启动时如果默认后端降级会打一行提示（24 小时限频）。</p>
+<p>`a1835c8c1` feat(browser): integrate Browser Use CLI 3.0 — 接入 Browser Use CLI 3.0。</p>
+<p>`7e04718ec` feat(browser): Browser Use mode composes with all CDP browser backends — Browser Use 模式与所有 CDP 浏览器后端组合可用。</p>
+<p>配套修复（browser_exec 安全与可靠性）：</p>
+<ul>
+<li>`e076d230f` 从 browser_exec 子进程环境移除密钥，支持 /browser off 关闭，隐藏 Windows 控制台窗口</li>
+<li>`9e5e1740e` 对 browser_exec 的 URL 施加安全检查</li>
+<li>`92968a5c7` 工作区在多次 browser_exec 调用间持久化；执行超时上限提升到 300s / 1800s；工具头部带上聚合与计数校验</li>
+<li>`39a234b13` browser_exec 限定在终端界面使用；固定 schema helpers digest</li>
+<li>`f21d9714e` 不把 Camofox 用户迁移到 Browser Use CLI 模式</li>
+</ul>
+<p>Kanban：review 交接生命周期</p>
+<p>`16accefd2` feat(kanban): add first-class &quot;review&quot; handoff lifecycle — 新增非终态 review 状态：worker 完成实现后可交接给人工审查，不再用 kanban_block(reason=&quot;review-required: ...&quot;) 的旧约定——旧约定会走 unblock 循环断路器，正常的 review → 修改 → review 循环会被误升级到 triage。具体：kanban_db 新增 request_review / reopen_review_task / complete_task 接受 review → done；新增 kanban_request_review worker 工具和 request-review / reopen-review CLI 动词；Dashboard 新增 review 列的 PATCH 与批量路由和渲染；网关在 review_requested 时唤醒来源订阅者，订阅持续到 done/archived，每次 review 循环都会重新通知。needs_input / failed 语义不变（仍走 kanban_block，仍计入 block_recurrences，仍升级 triage）。</p>
+<p>编排层配套（防多 worker 打架）：</p>
+<ul>
+<li>`11b027124` feat(kanban): add split-brain decision-ownership contract to orchestrator guidance — 编排器指导加入「双脑」决策归属契约，明确谁拥有最终决策权</li>
+<li>`b614f7036` feat(kanban): teach workers to flag collision hotspots instead of piling on — worker 学会标记冲突热点区域，而不是继续往里堆叠任务</li>
+</ul>
+<p>review 生命周期加固（13 条 fix，构成完整生命周期闭环）：</p>
+<ul>
+<li>`ae23b1f67` 补全 kanban review 生命周期</li>
+<li>`0fe4d9022` 加固 review 图交接</li>
+<li>`6d7e86c26` 强制 review 生命周期不变量</li>
+<li>`4ab998a7d` 关闭 review 图竞态缺口</li>
+<li>`b90da8243` 重试时保留 review 阶段</li>
+<li>`31c0e0fe6` 重新 review 时保留 reviewer</li>
+<li>`917c27d4a` review 转换间保留失败计数</li>
+<li>`1810cfc8d` 防 live-claim 窃取 request_review</li>
+<li>`a235d1917` review 车道跳过 PR/成功 respawn 守卫</li>
+<li>`224592875` 要求持久化 re-review 来源</li>
+<li>`0acf49b16` 隔离 review 交接所有权</li>
+<li>`c230d1202` 澄清下游 review 检查</li>
+<li>`a98aee47c` 后代失效移到 domain 层且不再静默</li>
+</ul>
+<p>桌面端：长会话流式渲染优化 + HUD 加固 + 孤儿进程清理</p>
+<p>`920beecfa` perf(desktop): long streaming agent sessions — steady window cut, stable rows, stepped backfill, pane-shared budget (#83446) — 长流式 agent 会话的渲染优化，三个层面：1) 转录窗口裁剪锚定到消息 id，原来每次 store flush 都重新裁剪一次（约每秒 30 次）、整窗重索引，现在每半页新内容才重裁一次；2) 行级 memo 化可见分组和每轮行，预算裁剪推进时不再对每个挂载的 turn 按 token 重渲染；首屏回填改为分步提交（每帧一个有界提交），替代原来一次性 20→600 行的提交（会卡 780ms）；3) 渲染预算跨已挂载窗格共享，4 窗格网格时每个窗格只分到四分之一的预算，多窗格同时流式不互相拖垮。</p>
+<p>`9e7700e8a` fix(desktop): title HUD windows Hermes HUD — 浮动 HUD 窗口继承了 index.html 的默认标题，现在主进程和渲染进程显式设为 &quot;Hermes HUD&quot;，OS 窗口标签与模式一致。</p>
+<p>`e5e2fb8b2` fix(desktop): persist renderer crashes to desktop.log + finish the render() isolation class — 渲染进程崩溃记录持久化到 desktop.log，render() 隔离类补完。</p>
+<p>`0a60b164f` fix(desktop): single-owner console capture + HUD lifecycle coverage — 控制台捕获改为单一持有者，补 HUD 生命周期覆盖。</p>
+<p>孤儿 gateway/serve 后端清理链（桌面端启动/关闭回收僵尸进程）：</p>
+<ul>
+<li>`bc1223840` 桌面端启动时回收孤儿 gateway</li>
+<li>`6386c7530` 桌面端启动时回收孤儿本地 serve 后端</li>
+<li>`a9a0648f4` 通过父进程死亡看门狗 + 组杀回收孤儿 serve 后端</li>
+<li>`888624ae6` CLI 不回收被有效 backend.lock.json 持有的 serve 进程（防误杀）</li>
+<li>`07298df80` 网关 spawn 重启前先回收孤儿 gateway（#77276）</li>
+<li>`0b15eb5f0` 关闭时终止应用托管的 gateway</li>
+</ul>
+<p>性能：CLI 冷启动 sub-400ms</p>
+<p>`55f9e472a` perf(cli): sub-400ms warm startup — probe-mode check_fns, lazy MCP SDK, banner snapshot, parallel worktree add — CLI 冷启动到 banner 从 ~1.8s 压到 400ms 内（hermes -w 模式 ~2.8s → ~0.6s）。改动：1) 辅助能力探测不再构建真实 OpenAI/httpx 客户端（openai import ~0.3s + SSL 上下文），改用缓存排除的 stub；2) MCP SDK 改懒加载（省 ~260ms），零 MCP server 时不再白付 pydantic 模型构建；3) banner 的更新检查阻塞从 500ms 降到 50ms，警告行挪到守护线程在提示符上方打印；4) banner 数据（tool 定义、技能扫描、git 状态）快照缓存到 ~/.hermes/cache/banner_snapshot.json，按 config/.env/checkout rev/toolsets 为 key，热启动直接回放 + 后台刷新；5) 上下文长度探测不再每启动打 /models 网络请求，优先读磁盘缓存；6) schema 解析按 DDL hash 磁盘记忆化（省 ~85ms）；7) 技能同步和插件发现移出启动路径，改守护线程。</p>
+<p>Dashboard / 运行时 fd 泄漏修复链（#81547）</p>
+<p>`373631bea` fix(dashboard): raise fd soft limit + replace iterdir with scandir to stop fd leak (#81547) — Dashboard fd 耗尽修复，两步：1) 启动时（uvicorn 绑定前）把 RLIMIT_NOFILE 软限制抬到硬限制（或最低 4096）——macOS LaunchAgent 进程默认 256，对每个请求每个 profile 的 SessionDB 开 3 个 fd（db+wal+shm）来说太紧，跑几天软限制耗尽后每个 os.listdir/open 都报 Errno 24；2) 四个热路径（profile dicts、文件管理列表、checkpoint 列表、插件发现）把裸 Path.iterdir() 换成上下文管理的 os.scandir()——iterdir 的生成器在异常中断迭代时会泄漏打开的目录 fd。</p>
+<p>`acb7547da` fix(runtime): make nofile soft limit configurable — nofile 软限制可配置。</p>
+<p>`87aedbe7b` state: pool SessionDB read connections instead of leaking one per (SessionDB x thread) — SessionDB 读连接池化，不再每 (SessionDB × 线程) 泄漏一个连接；`0472c31aa` 用 permit 绑定 PEAK 读连接上限，不只靠池归还。</p>
+<p>安全：上游劫持应对 + 依赖漏洞修复 + 导出脱敏</p>
+<p>`bdbdfead0` fix(security): remove blender MCP catalog entry and skill after upstream compromise — 上游 ahujasid/blender-mcp 与 ahujasid/ableton-mcp 仓库在 2026-08-08 被劫持：维护者 @sidahuj 公开报告账号被盗、所有权被剥离，两个仓库重定向到攻击者控制的组织（MCPBlender，当天创建并持续推新 commit）。虽然目录 pin 的 blender-mcp==1.6.4 来自 PyPI（劫持前发布、sha256 校验未变），但服务器只是桥的一半：manifest 的安装后指令和可选 skill 指引用户从被劫持的 GitHub 下载 addon.py——在 Blender 里执行的任意 Python，且该 raw URL 目前已 404、addon 也不在 PyPI 制品里，整条链路没有可信来源。目录条目和 skill 整体移除，维护者确认账号恢复且上游验证干净后再加回。</p>
+<p>`2b618fe7e` fix(sec): move cryptography to 50.0.0 — cryptography 48.0.1 带 3 个通告（GHSA-m2h6-j472-rp4c、GHSA-jwv3-5hgf-82ww、CVE-2026-69247），bump 到 50.0.0 需要 [tool.uv] override-dependencies（msal 和 alibabacloud-tea-openapi 把 cryptography 卡在 49 以下，实测 tea-openapi 在 cryptography 50 下运行无错）。同批 aiohttp 3.14.3 修 GHSA-9548-qrrj-x5pj。</p>
+<p>`8789cf9f0` fix(sec): patch the npm advisories main left open — 补完 main 没修完的 npm 通告：website 加 js-yaml 4.3.1、dompurify 3.4.13、mermaid 11.16.1、tar 7.5.22 的持久 override，根 workspace 的 tar override 把 get-windows 和 @mapbox/node-pre-gyp 下的 tar 6.2.1 副本移出 12 个开放通告；image-size &lt;=2.0.2 有两个无限循环 DoS 通告且上游无修复版，override 指向官方维护的 fork @nous-research/image-size 2.0.3；photon sidecar 的 @opentelemetry/core 升到 2.10.0。</p>
+<p>`6c5cb2db4` fix(profiles): scrub secret-shaped strings from export archives — 可分享 profile 导出包之前只丢 auth.json/.env，粘贴进 skills、SOUL.md、memories 的密钥会明文随包带出。现在对暂存副本强制跑 sessions export --redact 用的 redact_sensitive_text 脱敏，live profile 本身从不被改写。</p>
+<p>其他值得关注</p>
+<p>`1362ffc7d` feat(file-ops): name the binary type in read_file refusals (magic-byte sniff) — read_file 拒绝二进制文件时直接报类型名：25 个 magic 签名（图片、压缩包、可执行、媒体、SQLite）+ ISO 媒体 ftyp 检查 + 人类可读大小。背景：纯文件工具集里模型把 PNG 当 txt 读会空转 41 轮 / 178 次工具调用 / 1.5M token 找不存在的工具，报类型一句话就答了 what-is-this。read_file 和 read_file_raw 共用 describe_binary_file()，扩展名守卫保持原样（扩展名是声称，只有嗅探内容配得上类型名）。</p>
+<p>`34b6bbb96` feat(skills): add bundled merge-reconciler skill for neutral multi-agent conflict resolution — 新增内置 merge-reconciler 技能：教一个中立第三方 agent 调解两个 agent 分支的 git 冲突——收集双方 diff 与意图、按 hunk 分类（不相交意图 / 同一问题不同答案 / 被取代）、在公正契约下解决、验证、交回逐 hunk 摘要。已对真实冲突夹具端到端实测，带契约测试，kanban 文档（中英）建议用中立 profile 以双父卡方式派调解卡。</p>
+<p>`e47a931d3` Port from earendil-works/pi#7493: advertise AI_AGENT env var for child-process attribution — CLI 和 gateway 入口为子进程设置 AI_AGENT=hermes（跨 agent 新兴标准，huggingface_hub 的 agent 检测会读）和 HERMES_AGENT=true，用 setdefault 保证外部 harness 不被覆盖；`e5bc6b218` 配套修正 AI_AGENT id 为注册表值并让所有终端后端都带上 harness 标记。</p>
+<p>`6a7cf1930` fix(gateway,relay): stop frozen-preview finals and dropped idle-session delegation callbacks (#82592) — 修复空闲会话委托回调丢失与冻结的 preview final。</p>
+<p>`c8f235a10` feat(gateway): allow selective multiplex profile serving — 网关支持选择性多路 profile 服务，`9829746df` 配套要求显式路由拒绝标记，`a31be4803` 尊重路由 profile 的 busy 模式。</p>
+<p>`1e6a7b331` fix(desktop): scope custom provider settings to the active profile — 桌面端自定义 provider 设置按活动 profile 隔离，`9d6c5a920` 首次运行时把 Fireworks 折叠进 provider 披露。</p>
+<p>`48c233d50` fix(gateway): offload remaining atomic_json_write calls in async paths — 异步路径剩余的原子 JSON 写移出事件循环；`0cf48bca2` channel-directory 写也移出事件循环，`b1e979f3b` evaluate_after_turn 移到线程执行器。</p>
+<p>`10e9da6f2` fix: ASCII-only install.ps1 comment; allow-list install_cli&#x27;s uv PATH fallback — 安装脚本 ASCII 注释 + uv PATH 回退白名单。</p>
+<p>`ed5e17f4b` fix(auth): /auth/native/authorize 空 provider 自动选择不再统计会被拒绝的密码 provider — 授权页空 provider 自动选择时不再把会被拒绝的密码 provider 计入统计。</p>
+<p>`c0106e50e` fix(kimi): send Hermes attribution headers instead of claude-code/0.1.0 — Kimi 请求发送 Hermes 归属头，不再伪装成 claude-code/0.1.0。</p>
+<p>`f51aa6a9b` fix(ci): repair red main — busy-mode test + missing checkout in skills-index workflows — 修复 CI 红 main：busy-mode 测试 + skills-index 工作流缺 checkout。</p>
+<p>`585cee1a4` fix(gateway): persist RLIMIT_NOFILE floor into the generated launchd plist — 生成的 launchd plist 固化 RLIMIT_NOFILE 下限。</p>
+    </section>
+    
     <section id="2026-08-11" class="day">
       <h2>Hermes 日报 2026-08-11：HUD 拖动不再变大、多 tile 性能提升、跨 profile 侧边栏 + read_file 系列增强</h2>
       <p><strong>本期覆盖 8 月 10 日 ~ 8 月 11 日合入 main 的提交，共 75 个 commit（不含 merge），另有 5 个 merge。新增 11 个功能、41 个修复、1 个性能优化。</strong></p>
