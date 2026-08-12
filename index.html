@@ -22,9 +22,88 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 15 期 · 2635 个提交 · 每日自动更新 ·
+<p class="meta">共 16 期 · 2706 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-13" class="day">
+      <h2>Hermes 日报 2026-08-13：grok 4.6 正式支持，桌面端更新握手大改造，Windows 审批漏洞修复</h2>
+      <p><strong>本期覆盖 8 月 12 日 ~ 8 月 13 日合入 main 的提交，共 71 个 commit（不含 merge），另有 1 个 merge。新增 6 个功能、49 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>grok 4.6 完整支持，500K 上下文、OpenRouter 默认模型切换、xAI OAuth 直连</p>
+<p>桌面端更新流程重做为「先退出再更新」握手模式，Windows/mac/linux 三端统一</p>
+<p>Windows 破坏性命令审批漏洞修复，15/15 个高危命令此前全部静默绕过</p>
+<p>SSH 配置文件写入从硬拒绝改为审批门控，跨工具行为统一</p>
+<p>Windows 环境修复集群：SSH ControlMaster、MCP PATHEXT、MSYS 路径、agent-loop 小问题</p>
+<p>重点条目：</p>
+<p>模型支持：grok 4.6 上线</p>
+<p>xAI 新一代模型 grok 4.6 正式接入 Hermes。两条提交完成全链路支持：</p>
+<ul>
+<li>3e09adb10：模型元数据补齐——500K 上下文窗口（与 grok-4.5 相同）、推理超时 300 秒、支持 reasoning effort 调节（grok-4.5 的换代型号，同一套档位拨盘）；OpenRouter 默认模型从 x-ai/grok-4.5 切换到 x-ai/grok-4.6。涉及 agent/model_metadata.py、agent/reasoning_timeouts.py、hermes_cli/models.py 以及官网 model-catalog.json。</li>
+<li>66a416162：xAI OAuth 直连路径同步——grok-4.6 加入 _XAI_STATIC_FALLBACK 静态回退列表和 _XAI_CURATED_EXTRAS（GA 2026-08，在 models.dev 磁盘缓存刷新前保留手动条目）。</li>
+</ul>
+<p>配套：17688f994 把 Nemotron Lightning 加入推理超时配置（reasoning_timeouts.py），推理模型不再被提前掐断。</p>
+<p>桌面端：更新握手改造（Windows/mac/linux quit-first 更新）</p>
+<p>桌面端更新流程从「应用内更新」重构为「先退出、由独立脚本接管」的握手模式，三端统一：</p>
+<ul>
+<li>503e61b3b（Windows shim UI）：更新脚本移到 scripts/desktop-update/ 目录（旧路径留兼容转发器），新增 shim 界面：chromeless Edge 窗口渲染 ui.html，经 loopback /progress 端点接收 done|error 状态。界面是 #75895 手绘屏的移植——Fourier Flow 加载动画、一个标题、一行说明、跟随系统明暗主题（暗色用炭黑种子色）。失败时显示精简卡片，指向 hermes debug share。WinForms 卡片保留作为无 Edge 环境的后备。</li>
+<li>c991e3f62（POSIX 握手编排器）：mac/linux 的 twin 脚本 posix.sh——桌面端 detached 启动它后退出，脚本等应用退出、运行 hermes update（跨更新边界重试一次、如实报告桌面端重建完成）、替换 .app bundle（mac）或 release 二进制（linux）、写 .hermes-update-result.json、驱动同一套 shim。脚本归仓库所有，每次更新都会刷新驱动下次更新的代码。</li>
+<li>c9f0b6824：删除桌面端内嵌的 posix 更新路径（applyUpdatesPosixInApp 及配套的 relaunch-outcome 矩阵、update-relaunch.ts/update-rebuild.ts、shellQuote、resolveHermesCliBinary）。应用在更新开始前就退出，HERMES_DESKTOP_CHILD_PID reaper-exclusion 竞态在桌面端路径上结构性消失。</li>
+<li>854ab7f6d（Windows 窗口精简）：更新窗口从 720×420 仪表盘（流式日志框、宽 marquee、警告标签）精简为 280×320 固定面板——单标题、单行静态说明、marquee 加载动画、跟随系统明暗主题。失败时只显示「Failed to update + 在终端运行 hermes debug share 发送报告」，结果 JSON 同样指向 debug share。</li>
+<li>f121cd8a0：修复 posix 编排器继承桌面端 cwd 的问题——部分更新管线按工作目录解析要变更的树，沙箱复现抓到了它更新开发者主 checkout 却报告成功。现在先 cd &quot;$INSTALL_ROOT&quot; 再跑 hermes update，复跑验证外部 checkout 未被触碰（reflog 干净）。</li>
+<li>配套修复链：1dd5c9de8（终端事件前的启动验收，双编排器）、ba28a18b9（fail-closed cd、拒绝启动语义、保证恢复界面）、968ec6c6f（人工结果协议，受门控的结果能到达用户）、4280413db（人工结果豁免握手新鲜度窗口）、bdb4cfd35（posix 握手真值排序、relaunch-gate 端口、JSON 转义）。</li>
+<li>ca5b015e7：更新复现路径做成 npm scripts（沙箱化复现）。</li>
+</ul>
+<p>桌面端另外一条渲染修复：f52577272 修掉「散文围栏」启发式误伤——原来 3 行以上、无 JS/SQL token 的纯文本块会被剥掉代码围栏（SSH config、.env 导出、INI 键值列表都中招），现在这类结构化块保持代码块原样渲染。</p>
+<p>安全：Windows 破坏性命令审批漏洞 + SSH 配置写入门控</p>
+<ul>
+<li>e1caf88c6（高危）：Windows 上所有破坏性命令此前静默绕过审批。根因两个：DANGEROUS_PATTERNS 危险模式是 POSIX 形状的，Windows 的 Remove-Item/del/taskkill/Format-Volume/diskpart/reg delete 等一个都匹配不上；且路径归一化器把反斜杠当 shell 转义符剥掉，任何 Windows 路径都匹配不了路径规则。修复前实测 15/15 个破坏性命令（Remove-Item -Recurse -Force、del /s /q、iwr | iex、taskkill /F、Format-Volume、diskpart、icacls /grant Everyone、vssadmin delete shadows、bcdedit /set、reg delete、cipher /w…）全部逃过检测，修复后按规则拦截。</li>
+<li>62a9c0f0e：~/.ssh/config 写入从「硬拒绝」改为「审批门控」。之前 write_file/patch 工具硬拒绝这个「受保护系统/凭据文件」，terminal 工具却只是弹审批——同一操作换个工具就从不行变行。SSH 客户端配置不含私钥材料，编辑它（host 别名、ProxyJump、VSCode Remote-SSH 目标）是常规操作，现在统一为审批放行；SSH 私钥文件仍硬拒绝。非交互消费者 fail-closed：ACP 文件桥直接拒绝需审批的路径，TTS 输出路径选择器保持原行为。</li>
+</ul>
+<p>Windows 环境修复集群</p>
+<ul>
+<li>f20d16fbf：两个 Windows 环境完整性修复。①Windows OpenSSH 没有 Unix 域套接字的 ControlMaster 支持，之前无条件传 ControlPath/ControlMaster/ControlPersist 导致 Windows 端每个 ssh 工具调用都报「getsockname failed: Not a socket」，现在按平台门控这三个复用选项（scp 上传路径同样门控），Windows 上每次命令新开连接，POSIX 行为不变。②安装脚本之前把整个 venv\Scripts 目录挂进用户 PATH——里面有 python.exe/pythonw.exe/pip.exe，会静默劫持机器上所有终端的 python 命令，无关项目开始解析到 Hermes 的运行时解释器。现在只把 launcher（hermes.exe、hermes-acp.exe）复制到独立的 $InstallDir\bin 并只加这个目录进 PATH；已有安装会在下次安装/更新时自动剥离旧 PATH 条目。同批还修了 install.ps1 注释里的 em-dash 编码问题（PowerShell 5.1 按 ANSI 码页读无 BOM 的 .ps1 会误解码，install.ps1 保持纯 ASCII）。</li>
+<li>4a2198bf5：MCP 可执行文件解析修复——shutil.which 读的是父进程 PATHEXT 而不是 MCP 子进程环境的 PATHEXT，stdio MCP 配置自带 PATH+PATHEXT 时可能解析不到命令。修复：首次解析失败且配置 env 带 PATHEXT（任意大小写）时，临时套用配置的 PATHEXT 重试。跨平台技能模板同步把 python3 改为 python。</li>
+<li>1156ba43b：agent 的 Windows shell 提示新增「原生二进制路径规则」——Hermes 对 bash 关闭了 MSYS 路径转换，agent 把 /c/Users/...、/tmp/... 传给 git -C、node、python、rg 等原生程序时反复报「cannot change to / not found」，而 bash 内建命令却能用。提示现在引导用 C:/Users/x 正斜杠原生形式。同批修复 pin 行尾保留。</li>
+<li>ee472a7fd：Windows agent-loop 日常问题清扫（排除安装/设置和 locale 类）：新增 Windows 安全命令行分词器 split_command_line()（posix=False + 引号剥离），反斜杠路径不再被拆坏；console 命令（如 sessions export C:\Users\me\out.jsonl）不再静默篡改路径；路径哈希、自动补全、截图、OS 检测修复。</li>
+<li>07ee4a2ec：search_files 的 rg 调用和 patch 转义漂移的 Windows 路径处理修复。</li>
+<li>197a18314：Windows 上通过 pty 驱动 gh auth login 这类交互式控制台 TUI 会静默挂起——根因是 PTY submit 只发裸 \n，经 ConPTY 时不作为行终止符，子进程阻塞行读永不返回（实测 pywinpty：\n 挂起、\r 和 \r\n 都能送达）。修复：Windows PTY 会话 submit 改发 \r\n（POSIX 和管道保持 \n），并引导 agent 优先走非交互路径（flags、--with-token、配置文件、curl 轮询 OAuth device flow），github-auth 技能补手动 OAuth 流程。</li>
+<li>e1caf88c6 见上（Windows 审批修复）。</li>
+</ul>
+<p>工具链修复</p>
+<ul>
+<li>76961b61b：execute_code 运行外部项目环境时隔离外部环境的 PYTHONPATH——外部项目的环境变量不再污染 agent 自身运行环境（ec884fc65 补覆盖测试）。</li>
+<li>87af576e6：标题生成默认尊重主模型配置——辅助模型不再比主模型低一档导致对话标题质量不稳。</li>
+<li>33855f1b3（性能）：敏感信息遮蔽重建从 O(n×k) 改为线性——5 万个小 heredoc 的遮蔽耗时从 1.7 秒降到 152ms；新行计数改在原始命令上做；last-opener 提前退出。</li>
+<li>a768a6c1a：错误分类修复——本地引擎跑 Qwen 模板时报「No user query found」被错误匹配成 llama.cpp 语法错误，触发剥 schema 关键词重试，真实原因是压缩失败后的损坏/超大上下文。现在分类为格式错误，快速失败引导 /new（配套 068f58740 提取共享常量、847cc47cd 覆盖测试）。</li>
+<li>5b4c03fa4：kanban show graph 查询在数据库关闭前执行，避免 CLI 查询偶发报错。</li>
+<li>7113a6924：models.dev 映射修复——meta-ai provider 映射到 models.dev 的 &#x27;meta&#x27; id（挽救 #81418）。</li>
+<li>89556c63a：解释器环境探测加固（strict-mode 默认值）；222465d84 统一探测缓存并去重排除日志。</li>
+<li>patch/execute_code 工具打磨：8d0d908be（V4A 校验跳过完全相同的退化 hunk）、6061377bb（skill_manage new_string 的 must-differ 提示镜像到 schema）、48db2011b（提取 IDENTICAL_STRINGS_ERROR 常量）、9c541de91/31a04db46（patch 参数描述与报错澄清）、b50d8f691（错误参数报错更友好）、c5e2bff6c（execute_code 非字符串 code 重定向处理）、a3bcb2c23（terminal 侧补齐错位参数恢复）。</li>
+<li>heredoc 遮蔽加固：2bfdd8cd3（后台 &#x27;&amp;&#x27; 检测前先剥离 heredoc 主体，避免误判）、307cc814a（加固成保守的共享 helper）。</li>
+<li>10b2b11ef：最终化 drain 循环放宽 APIConnectionError 处理；aa3ca1c3b agent 容忍无 requests 的传输错误、da1170670 记录 Codex 传输失败详情。</li>
+<li>14692ec91：verify_on_stop 改为全平台 opt-in（默认 False，不再自动启用）。</li>
+<li>d8e3b4f51：Hermes 推理档位映射到 K3 的 low/high/max 词汇（169f207a8 更新测试）。</li>
+</ul>
+<p>网关与 relay</p>
+<ul>
+<li>bb597e1c0：外部触发的 cron fire（webhook /dashboard）改在 gateway 进程内执行——之前适配器传 None 走独立路径，E2EE 平台和 relay 前端的逻辑平台（唯一发送通道是 live relay 适配器）无法投递。配套 76d832d38 经 canonical home_channel 投递、333536e7c Discord 交互事件打上逻辑平台与 relay 信任标记。</li>
+<li>5fffe5606：常驻受管 watcher 不再计入 scale-to-zero 的 busy 判定，避免网关因常驻进程永不缩容。</li>
+<li>356c702b5：scale-to-zero 网关通过 flaps socket 自挂起，不再依赖 Fly autostop。</li>
+<li>a189286ae：修复兄弟网关响应另一个实例的按钮按下事件。</li>
+<li>e9579a989（feat）：relay 网关 idp.token_url 支持「环境令牌端点」模式——只配 URL 不带 client_id/secret 时当作元数据服务器式端点：裸 GET，响应体即令牌（裸 JWT 或 {&quot;access_token&quot;: ...} envelope），适配 Domino 的 $DOMINO_API_PROXY/access-token 这类工作负载身份代理。</li>
+<li>223f70301：修复 provider=anthropic 指向 MiniMax /anthropic 代理时 M3 排除逻辑被原生-Anthropic 提前返回跳过的问题（c1e2529ae 配套：M3 在 Anthropic 线上协议不标记 cache_control）。</li>
+</ul>
+<p>其他</p>
+<ul>
+<li>0763e77bc：搜索的 grep 回退路径保持根目录可搜。</li>
+<li>9eab7a447：CI 不再对碰不到 lockfile 的 PR 跑 uv lock --check。</li>
+<li>0490b00e7：Nix 包装的二进制补上 HERMES_BIN 默认值。</li>
+<li>8a6deaaac（docs）：文档把 /export 和 /import 作为共享 profile 的第二种方式；a871948d8 修正 Lightpanda 回退文档（移除不存在的 PDF/上传/剪贴板操作）、0a81935a9 记录 Lightpanda 本地引擎。</li>
+<li>6da8b6541：删除临时文件。</li>
+<li>贡献者归属映射：1d3d02128（qq 邮箱 → wanquanY）、a2fbe745b（cmoiccool）、a5170af4a（hermes-agent@nous.local → @C-EXCITE-STUDIO）。</li>
+</ul>
+    </section>
+    
     <section id="2026-08-12" class="day">
       <h2>Hermes 日报 2026-08-12：浏览器自动化默认升级为 Browser Use CLI 3.0，Kanban 新增 review 交接生命周期</h2>
       <p><strong>本期覆盖 8 月 11 日 ~ 8 月 12 日合入 main 的提交，共 99 个 commit（不含 merge），另有 6 个 merge。新增 11 个功能、59 个修复、2 个性能优化。</strong></p>
