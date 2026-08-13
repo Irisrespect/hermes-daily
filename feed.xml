@@ -5,8 +5,223 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 13 Aug 2026 06:45:23 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 14 Aug 2026 06:52:32 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-08-14：插件生态大爆发：plugin packs、事件总线、社区索引 + 桌面端 MCP 授权卡片</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-14</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-14</guid>
+      <pubDate>Fri, 14 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 13 日 06:30 ~ 8 月 14 日 06:30 合入 main 的提交，共 392 个 commit（不含 merge），另有 13 个 merge。新增 81 个功能、202 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>插件体系全面升级：plugin packs 一键安装插件集、manifest v2 依赖声明、社区插件索引、插件间事件总线、Plugin Doctor 诊断器</p>
+<p>桌面端交互继续加码：MCP 服务器内联授权卡片、inbox 卡片式会话列表、侧边栏 cron 快捷入口、建议提供器体系</p>
+<p>模型管理更灵活：model_overrides 配置覆盖模型元数据、models.dev 目录 ETag 缓存、gemini-3.7-flash 上架</p>
+<p>子代理活编排：delegate_task 支持 list/steer/stop 实时指挥运行中的子代理</p>
+<p>安装修复：Windows setup 不再在 Node 依赖上无限挂起，POSIX 安装脚本失败如实报错</p>
+<p>重点条目：</p>
+<p>插件生态（27 条，含 1 fix，本期最大主题）</p>
+<p>plugin packs 一键安装插件集</p>
+<ul>
+<li>46e20083d|2026-08-12|Teknium|feat(plugins): plugin packs — declarative, shareable plugin sets (#64166)</li>
+</ul>
+<p>新增 hermes-pack.yaml 格式：一个 YAML 文件钉住一组插件到精确的 40 位 commit SHA，可带非敏感的 entries 配置种子和声明式技能列表。CLI 新增 `hermes plugins pack install` 命令，安装前有强制审查页（插件 + 引用 + 声明的能力），一次确认后走已有的钉住安装路径；每个插件的能力同意走标准 consent 流程，插件包不会批量授权。部分失败按插件逐个报告，任一失败则非零退出。v1 仅交互式，无 --yes 跳过。</p>
+<p>manifest v2：插件清单升级</p>
+<ul>
+<li>bd6dcd4bd|2026-08-12|Teknium|feat(plugins): manifest v2 — schema version, api_version, inter-plugin deps, pip-dependency declaration seam, config schema (#64165)</li>
+</ul>
+<p>plugin.yaml 新增可选字段（v1 清单永远不变）：manifest_version 区分文件格式版本、api_version 声明插件面向的运行时 API 代数、requires_plugins 声明插件间依赖（缺失只警告、仍加载，新增 ctx.has_plugin() 运行时探针；加载顺序按依赖拓扑排序）、python_dependencies 声明 pip 依赖。未知字段忽略，超出版本支持范围只警告不拒绝。</p>
+<p>能力声明 + 安装/更新同意流程</p>
+<ul>
+<li>b088535c7|2026-08-12|Teknium|feat(plugins): capability declarations + install/update consent flow (#64228)</li>
+</ul>
+<p>把散落的插件信任门统一成一份可声明的能力模型：CAPABILITY_REGISTRY 把每个能力 ID 一对一映射到已存在的强制门（tools.override、llm.provider_override、llm.model_override 等）。插件安装/更新时按能力清单走同意流程，可审计；明确不是沙箱，而是对宿主 API 面的同意 + 审计。</p>
+<p>社区插件索引 + 搜索命令</p>
+<ul>
+<li>2e0183169|2026-08-12|Teknium|feat(plugins): community plugin index + hermes plugins search (#64181)</li>
+</ul>
+<p>新增静态社区插件索引，支持模糊搜索（名称/描述/标签/作者 + 拼写容错）和能力过滤，索引解析安装。沿用 Skills Hub 的目录模式：拉取 → HERMES_HOME/cache 24h TTL → 内置种子回退。内置种子含 5 个真实生态插件，各钉到精确 commit SHA。索引 URL 可用 plugins.index_url 配置覆盖。</p>
+<p>插件间事件总线</p>
+<ul>
+<li>17030939d|2026-08-12|hans|feat(plugins): inter-plugin event bus with declared emits/listens</li>
+<li>67168a391|2026-08-12|Hans|fix(plugins): bound event delivery and own subscriptions</li>
+</ul>
+<p>插件获得一等公民的命名空间 pub/sub 事件总线：ctx.emit(event, payload) 发布、订阅方接收，插件↔插件交互变成声明的、可测试的契约而不是临时 import。命名空间强制为插件自身注册键，防冲突；无插件使用时不改变任何行为。事件投递有界、订阅归属明确。</p>
+<p>Plugin Doctor 插件诊断器</p>
+<ul>
+<li>1636206ff|2026-08-12|峯岸　亮|feat: add Plugin Doctor plugin</li>
+<li>7a5062fbc|2026-08-12|Teknium|feat(plugins): add runtime-backed plugin Doctor</li>
+</ul>
+<p>新增 Plugin Doctor 插件：运行时诊断插件状态，辅助排查插件装不上/不生效的问题。</p>
+<p>新增一批 observer hooks（6 类）</p>
+<ul>
+<li>11310068c|2026-08-12|Teknium|feat(plugins): pre_command observer hook + capability-gated ctx.call_mcp (#64204)</li>
+<li>00f4da01e|2026-08-12|Dineth Hettiarachchi|feat(plugins): add streaming output observer hooks</li>
+<li>929be4d1a|2026-08-12|Paolo Antinori|feat(plugins): gateway_platform_event observer hook (normalized envelopes)</li>
+<li>5e1035168|2026-08-13|webdevtodayjason|feat(plugins): kanban worker-lifecycle, task-mutation, and dispatch-tick observers</li>
+<li>52eb8eb53|2026-08-12|Hans|feat(plugins): add pre_transcription hook and STT prompt threading</li>
+<li>1d93b549c|2026-08-13|webdevtodayjason|feat(plugins): add classify_api_error hook so provider plugins can own error quirks</li>
+</ul>
+<p>插件观察点大幅扩展：pre_command（命令执行前）、streaming output（流式输出）、gateway_platform_event（网关平台事件，归一化信封）、kanban worker-lifecycle/task-mutation/dispatch-tick（看板生命周期）、pre_transcription（语音转写前，可注入 STT prompt）、classify_api_error（API 错误分类，让 provider 插件接管自家错误特性）。</p>
+<p>脱敏模式注册表（防 ReDoS）</p>
+<ul>
+<li>fdd45323b|2026-08-12|webdevtodayjason|feat(plugins): redaction pattern registry — vendor token formats as plugins</li>
+<li>22002b1d3|2026-08-12|webdevtodayjason|feat(plugins): per-source pattern attribution + explicit pre-screen rebuild proof</li>
+<li>50f12e6ad|2026-08-12|webdevtodayjason|feat(plugins): reject ReDoS-shaped patterns at redaction registration</li>
+</ul>
+<p>脱敏模式变成可插拔注册表：厂商 token 格式作为插件注册；支持按来源归因和显式预筛重建；注册时拒绝 ReDoS 形状的模式（拒绝顶层交替、ReDoS 形状检测），防止恶意/失误的正则拖垮脱敏。</p>
+<p>插件能力扩展</p>
+<ul>
+<li>b85e5bb4b|2026-08-12|zccyman|feat(plugins): allow plugins to register custom @-prefix context references</li>
+<li>6bf93c0e3|2026-08-12|Teknium|feat(plugins): add namespaced config and durable state bridge</li>
+<li>de56e49a7|2026-08-12|Teknium|feat(plugins): add approval transport interface</li>
+<li>f46c600a5|2026-08-12|GodsBoy|feat(gateway): allow plugins to inject session messages</li>
+<li>a37192546|2026-08-12|Kevin Anderson|feat(gateway,send_message): plugin platform target parsing via PlatformEntry.parse_target_ref_fn and verbatim fallback (#67941 #33547)</li>
+<li>1176222b7|2026-08-12|hans|feat(plugins): route ctx.llm.complete(task=) through registered aux slots</li>
+<li>9acf0db88|2026-08-12|SeoYeonKim|feat(plugins): add cache-safe system prompt sections</li>
+<li>e3983f91e|2026-08-12|Teknium|feat(plugins): capability-gated ctx.platform_actions facade (#64176)</li>
+<li>221974799|2026-08-12|Teknium|feat(plugins): widen ownership ledger to all registration surfaces</li>
+<li>22af80bcf|2026-08-12|doncazper|feat(plugins): add ownership ledger unload lifecycle</li>
+</ul>
+<p>插件 API 继续扩面：自定义 @-前缀上下文引用、命名空间配置 + 持久状态桥、审批传输接口、向会话注入消息、插件平台目标解析（send_message 可解析自定义平台）、ctx.llm.complete 路由到注册的辅助槽位、缓存安全的系统提示词段、能力门控的 ctx.platform_actions 门面、所有权账本覆盖所有注册面并支持卸载生命周期。</p>
+<p>桌面端（25 条，永远第一）</p>
+<p>MCP 服务器内联授权卡片</p>
+<ul>
+<li>adbc77eb5|2026-08-13|Brooklyn Nicholson|feat(desktop): setup_mcp tool — inline MCP consent card over the clarify-style blocking bridge</li>
+<li>6cd479308|2026-08-13|Brooklyn Nicholson|feat(desktop): render setup_mcp as an interactive consent card in the transcript</li>
+<li>3efce9b98|2026-08-13|Brooklyn Nicholson|feat(desktop): suggest MCP servers from the composer draft as brand pills</li>
+<li>6ef0fc4f6|2026-08-13|Brooklyn Nicholson|fix(desktop): cancel MCP OAuth flows server-side so a retry doesn&#x27;t 409</li>
+</ul>
+<p>新增 setup_mcp 工具：agent 提议接入某个 MCP 服务器（安装/启用/授权 + 一句话理由），在渲染端弹出内联同意卡片，用户选择已安装/已启用/已授权/拒绝后继续。与 clarify 同生命周期（10 分钟超时、过期可补答）。桌面端 prompt 引导模型用这个工具而不是手改配置。另外输入框草稿里如果提到 MCP 服务器，会以品牌药丸形式给出建议；MCP OAuth 流程改为服务端取消，重试不再 409 冲突。</p>
+<p>inbox 卡片式会话列表（opt-in）</p>
+<ul>
+<li>45f663b74|2026-08-12|Brooklyn Nicholson|feat(desktop): opt-in inbox-style session cards in the sidebar</li>
+<li>92620e4ad|2026-08-12|Brooklyn Nicholson|feat(desktop): live task progress on inbox cards</li>
+<li>81587c4f8|2026-08-13|Brooklyn Nicholson|fix(desktop): inbox cards render in every sidebar view, not just flat recents</li>
+</ul>
+<p>侧边栏过滤器菜单新增「Inbox style」开关：扁平最近列表渲染成卡片——工作区头行（项目名/目录/Home）+ 右侧时长、标题 + 单行最后消息预览、底部模型 + 大小。预览行默认开、有独立开关。卡片支持实时任务进度显示，且现在在所有侧边栏视图（不只 flat recents）都能渲染。</p>
+<p>侧边栏新增 cron + blueprint 快捷入口</p>
+<ul>
+<li>926c8d591|2026-08-13|Teknium|feat(desktop): cron + blueprint recipes in the sidebar nav rail</li>
+</ul>
+<p>侧边栏顶部导航新增「Scheduled jobs」行（Artifacts 下方，复用 nav.cron 快捷键），cron 浮层从与 New session / Capabilities / Messaging 同一导航栏打开。cron 浮层里任务列表下方还显示 Automation Blueprint 配方，同一搜索框同时过滤两者；点击配方打开预填好该配方槽位表单的创建对话框。</p>
+<p>建议提供器体系</p>
+<ul>
+<li>e7032bb26|2026-08-13|Brooklyn Nicholson|feat(desktop): recurrence-to-cron suggestion provider</li>
+<li>c8cad1cc9|2026-08-13|Brooklyn Nicholson|feat(desktop): skill-match and connection-repair suggestion providers</li>
+<li>a3da6d807|2026-08-13|Brooklyn Nicholson|feat(desktop): quiet suggestions the user has repeatedly ignored</li>
+<li>91a30705e|2026-08-13|Brooklyn Nicholson|refactor(desktop): generalize the composer suggestion pills into a provider bus</li>
+</ul>
+<p>输入框建议药丸重构为提供器总线。新提供器：识别周期性措辞（&quot;每天早上&quot;&quot;每天&quot;&quot;每周&quot;）的 Schedule-this 药丸，点击后在草稿前加显式调度指令、发送时由 agent 用 cronjob 工具建任务（药丸自身不调度）；技能匹配与连接修复建议。反复被用户忽略的建议会自动静音。</p>
+<p>状态栏默认显示 + 重置</p>
+<ul>
+<li>120e465c9|2026-08-13|Brooklyn Nicholson|fix(desktop): show statusbar by default</li>
+<li>e505ff977|2026-08-13|Brooklyn Nicholson|feat(desktop): add reset-to-defaults to the statusbar context menu</li>
+</ul>
+<p>状态栏改为默认显示；状态栏右键菜单新增「恢复默认设置」。</p>
+<p>其他桌面端改进</p>
+<ul>
+<li>ae56c97c6|2026-08-13|Teknium|feat(desktop): show full session title in a tooltip when it truncates</li>
+<li>4d9202b96|2026-08-12|Brooklyn Nicholson|feat(desktop): right-click the shell chrome for window-level actions</li>
+<li>071d27d1c|2026-08-12|Brooklyn Nicholson|feat(desktop): paste a PR review comment as structured composer context</li>
+<li>2960bf37a|2026-08-12|Brooklyn Nicholson|feat(desktop): steer a queued prompt into the live turn</li>
+<li>34e4ca14e|2026-08-12|Brooklyn Nicholson|feat(desktop): paste into the composer without focusing it first</li>
+<li>c96e0daba|2026-08-12|Brooklyn Nicholson|feat(desktop): marquee clipped card titles on hover</li>
+<li>a9eb7e09d|2026-08-13|Brooklyn Nicholson|feat(desktop): marquee clipped inline row titles on hover</li>
+<li>7c48dfba7|2026-08-13|Brooklyn Nicholson|feat(desktop): ship unified desktop halves opt-in; guard cross-root inventory rows</li>
+<li>4c1365b6c|2026-08-13|Brooklyn Nicholson|feat(desktop): load a desktop half from unified agent-plugin packages</li>
+<li>10cf65148|2026-08-13|Brooklyn Nicholson|feat(clarify): label the agent&#x27;s recommended choice on every surface</li>
+<li>fd6af8f83|2026-08-13|Brooklyn Nicholson|feat(desktop): render the clarify (Recommended) label in tertiary text</li>
+</ul>
+<p>会话标题截断时悬停显示完整标题；右键窗口 chrome 弹窗口级操作菜单；粘贴 PR 评审评论成为结构化输入上下文；排队中的 prompt 可并入当前回合；未聚焦输入框也能直接粘贴；卡片标题悬停跑马灯展示完整文本；统一插件包布局（desktop half 从统一 agent-plugin 包加载，opt-in）；clarify 每个界面标注 agent 推荐选项。</p>
+<p>模型与提供商（slide-04）</p>
+<p>per-model 元数据覆盖（model_overrides）</p>
+<ul>
+<li>dafdba324|2026-08-14|kshitij|feat(models): per-model metadata overrides via model_overrides config</li>
+<li>de47d19f1|2026-08-14|kshitij|fix(models): one canonical override schema, fill-gap _default semantics</li>
+</ul>
+<p>新增统一 model_overrides 配置段：可手动声明任意 provider+model 的 context_window、max_output_tokens、capabilities、cost、family，优先级高于 models.dev、OpenRouter 和硬编码默认。解析顺序：per-provider+model → per-provider _default → 全局 _default。</p>
+<p>models.dev 目录：ETag 条件请求 + 镜像覆盖</p>
+<ul>
+<li>acd8737c1|2026-08-14|kshitij|fix(models): ETag conditional GET, no-network hot-path invariant, mirror URL override for models.dev catalog</li>
+<li>b1ce50253|2026-08-14|kshitij|fix(models): close review findings on the ETag refresh path</li>
+</ul>
+<p>models.dev 目录刷新改用 ETag 条件请求：目录没变就 304 不重复下载；无网络热路径保证不卡；支持镜像 URL 覆盖（国内网络可用镜像）。</p>
+<p>gemini-3.7-flash 上架</p>
+<ul>
+<li>b8d9230cf|2026-08-13|Teknium|feat(models): add google/gemini-3.7-flash to nous + openrouter catalogs, drop gemini-3.6-flash</li>
+</ul>
+<p>nous 和 openrouter 目录加入 google/gemini-3.7-flash，移除 gemini-3.6-flash。</p>
+<p>pip 安装的模型提供商自动发现</p>
+<ul>
+<li>dbbd8935e|2026-08-13|Beto de Paola|feat(providers): discover pip-installed model providers via entry points</li>
+<li>69b27e3c7|2026-08-13|Teknium|fix: gate entry-point provider scan on plugins.enabled and skip register(ctx) targets</li>
+</ul>
+<p>通过 Python entry points 自动发现 pip 安装的模型提供商：装了提供商的包，Hermes 直接识别为新 provider，不用手写配置；扫描受 plugins.enabled 门控。</p>
+<p>子代理活编排（slide-05）</p>
+<ul>
+<li>2a26693e2|2026-08-13|Teknium|feat(delegation): live orchestration of running subagents via delegate_task action param</li>
+<li>001bcb908|2026-08-13|Jon Komet|feat(api): steer active runs</li>
+<li>c41db467f|2026-08-13|Teknium|docs(delegation): document delegate_task action=&#x27;list&#x27;/&#x27;steer&#x27;/&#x27;stop&#x27; live orchestration</li>
+</ul>
+<p>delegate_task 增加控制面：action=&#x27;list&#x27;/&#x27;steer&#x27;/&#x27;stop&#x27; 让父 agent 查看、转向、提前停止运行中的子代理（对应 TUI 已有的 delegation.pause / subagent.interrupt / subagent.steer RPC 的模型侧对应物）。list 返回实时子代理列表（id、目标、状态、运行秒数、是否接受 steer、实时 transcript 路径），通过 _delegate_parent_ref 弱引用链做所有权校验。API 侧新增 POST /v1/runs/{run_id}/steer，浏览器扩展/WebUI 会话流也桥接进活动运行注册表，可被 steer。</p>
+<p>cron 与任务调度</p>
+<ul>
+<li>6e76c2698|2026-08-13|Victor Kyriazakos|feat(cron): config-gated agent scheduling in cron context</li>
+<li>a297edf3c|2026-08-13|Victor Kyriazakos|feat(cron): resolve origin delivery at create time for cron-context job creation</li>
+<li>a364390da|2026-08-13|Teknium|feat: forward repeat through cron.manage add (#85602)</li>
+<li>654435210|2026-08-12|Carl Taylor|feat(cron): surface model drift impact in Desktop</li>
+<li>8d4b1e4b0|2026-08-13|Victor Kyriazakos|fix(cron): apply create-time origin resolution to the update path too</li>
+</ul>
+<p>cron 新增 cron.allow_agent_scheduling 配置（默认 false）：允许调度器里的 agent 再创建/调整/删除任务（reconciler 式任务管理团队 cron 表）。说明：默认拒绝是防循环策略而非安全边界（有 terminal 的 agent 本来就能 shell 出去）。cron 上下文创建任务时在创建时刻解析交付来源（origin），更新路径同样应用；cron.manage add 支持 repeat 参数；桌面端会显示模型漂移对 cron 任务的影响。</p>
+<p>安装修复（Windows + POSIX 双线）</p>
+<ul>
+<li>d753957e8|2026-08-13|brooklyn!|fix(install): Windows setup no longer hangs forever on Node.js dependencies (#85529)</li>
+<li>d0bb377c9|2026-08-13|fangliquanflq|fix(installer): recover Windows setup when node-deps host exits abruptly (#81390)</li>
+<li>6a198f8a1|2026-08-13|brooklyn!|fix(install): a failed Node dependency install now fails the install instead of printing success (#85537)</li>
+</ul>
+<p>Windows 安装器：Node 依赖安装加上了超时护栏（install.ps1 之前一直缺这个保护，registry 拉取卡死或 Chromium 解压卡住会让安装无限挂起，有用户挂了一整夜），现在超时会杀掉进程树并报错退出；node-deps 宿主进程意外退出时也能恢复而不是停在中间态。POSIX 安装脚本：以前 npm 失败只当警告、还打印依赖成功并零退出码收尾，现在两个必需的 npm 安装都按致命错误处理，返回状态码 1，不再假装成功。</p>
+<p>Slack 原生流式 + 任务卡片</p>
+<ul>
+<li>47ed5e496|2026-08-13|Arman|feat(slack): native streaming via chat.startStream/appendStream/stopStream</li>
+<li>eb137762f|2026-08-13|Simon van Laak|feat(slack): render tool progress as native plan/task cards (opt-in)</li>
+</ul>
+<p>Slack 适配器接入 Agents &amp; AI Apps 原生流式面：chat.startStream/appendStream/stopStream 渲染实时打字消息，替代旧的基于编辑的渐进更新。工具进度可选渲染为原生 plan/task 卡片（带 ID 关联、workspace 作用域、回退）。</p>
+<p>Kanban：notify/wake 双模式</p>
+<ul>
+<li>6e81ce273|2026-08-13|verybigdog|feat(kanban): explicit notify/wake delivery modes with faithful wake session routing</li>
+<li>c69231270|2026-08-13|Teknium|feat(kanban): GC stale done-task notify subscriptions</li>
+<li>b640e6303|2026-08-13|Dmytro Afanasiev|fix(kanban): preserve TUI subscription after done</li>
+<li>294272c18|2026-08-13|Dmytro Afanasiev|fix(kanban): preserve notifier subscription after done</li>
+</ul>
+<p>看板通知订阅新增显式 delivery_mode（notify / notify+wake / wake），持久化 chat_type + user_id_alt 让唤醒回合重建创建者的真实会话键，子任务继承返回路径；wake 不进模型可见的 send_message schema。过期任务的陈旧订阅会被 GC；任务完成后 TUI 订阅和通知订阅都保留（此前会丢）。</p>
+<p>profile 相关 RPC</p>
+<ul>
+<li>7afac122e|2026-08-13|Teknium|feat: profile asset store (profiles.set_asset/get_asset) for avatars (#85530)</li>
+<li>f795812c1|2026-08-13|Teknium|feat: profiles.describe/profiles.configure ws RPC for profile editors (#85216)</li>
+<li>89a84e1ae|2026-08-12|Teknium|feat: profiles.list/profiles.create ws RPC + plugin session-navigation doors (#85093)</li>
+<li>2ffed55c3|2026-08-13|Teknium|feat: server-side ui_meta on profiles.list/configure (#85440)</li>
+<li>9460cc11d|2026-08-13|Teknium|fix: profiles.create mirrors launch credentials so new profiles can run (#85111)</li>
+</ul>
+<p>新增 profile 资源存储（set_asset/get_asset，头像等）；profiles.list/create/describe/configure 一组 ws RPC，插件可做 profile 编辑器和会话导航；服务端 ui_meta 下发到 profiles.list/configure；修复新建 profile 镜像启动凭据的问题（否则新 profile 跑不起来）。</p>
+<p>其他值得说</p>
+<ul>
+<li>e4aeb6559|2026-08-13|Teknium|feat(webhook): per-route toolset overrides for webhook agent runs</li>
+<li>ccce6976e|2026-08-13|Teknium|feat: image.generate ws RPC for plugin surfaces (#85183)</li>
+<li>787f42cc1|2026-08-13|Teknium|fix: route image.generate through the provider dispatcher (#85520)</li>
+<li>34c727c5c|2026-08-13|Ben|feat(hindsight): memory provider improvements — recall_sync, retain_source, setup templates, memory indicators, error hints</li>
+<li>e665300d6|2026-08-13|kshitij|feat(langfuse): widen tracing to errors, sessions, subagents, and MoA fan-out</li>
+<li>11c74beff|2026-08-13|Victor Kyriazakos|feat(relay): session-span segmentation for continuous sessions</li>
+<li>f1c45f572|2026-08-12|khanhngoo|feat(voice): add configurable TUI draft submission</li>
+<li>0ca78e5f3|2026-08-12|Teknium|fix(voice): preserve existing TUI drafts</li>
+<li>7060ac7be|2026-08-13|Teknium|feat(computer-use): provision cua-driver at install time and on toolset enable</li>
+<li>1706502aa|2026-08-12|Teknium|feat(computer_use): spill full element tree to a cache file and report numeric bounds_scale (#85047)</li>
+<li>825a9753c|2026-08-12|Teknium|fix(computer_use): resolve cua-driver at its official Windows installer path (#85038)</li>
+<li>66a2a4c15|2026-07-14|Houston Searcy|feat(desktop): auto-detect Linux keychain backend for secure token storage</li>
+<li>e879d133d|2026-07-19|Zeus-Deus|fix(desktop): allow remote gateway token storage on keyring-less Linux</li>
+</ul>
+<p>webhook agent 运行支持按路由覆盖工具集；image.generate 变成 ws RPC 供插件面使用，且走 provider dispatcher 分发（不再固定后端）；hindsight 记忆提供器改进（recall_sync、retain_source、setup 模板、记忆指示器、错误提示）；langfuse 追踪扩大到错误/会话/子代理/MoA 扇出；relay 连续会话支持会话段切分；语音 TUI 草稿提交可配置，且不会覆盖已有草稿；computer-use 在安装时预置 cua-driver、元素树溢出写缓存文件；Linux 下自动检测 keychain 后端存 token，无 keyring 的 Linux 也允许远程网关 token 存储。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-08-13：grok 4.6 正式支持，桌面端更新握手大改造，Windows 审批漏洞修复</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-13</link>
