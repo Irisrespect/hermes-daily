@@ -22,9 +22,167 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 17 期 · 3098 个提交 · 每日自动更新 ·
+<p class="meta">共 18 期 · 3299 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-15" class="day">
+      <h2>Hermes 日报 2026-08-15：/loop 循环唤醒命令 + 桌面端「在终端中打开」+ 内存磁盘压力提示</h2>
+      <p><strong>本期覆盖 8 月 14 日 ~ 8 月 15 日合入 main 的提交，共 201 个 commit（不含 merge），另有 2 个 merge。新增 25 个功能、122 个修复、4 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端会话菜单新增「在终端中打开」，一键把会话交给自己的终端恢复</li>
+<li>新增 /loop 循环唤醒命令，Claude Code 同款，全平台可用</li>
+<li>内存/磁盘压力提示上线，OOM 被杀的宿主 agent 终于看得见了</li>
+<li>后台进程完成通知默认精简为一行状态</li>
+<li>更新检查不再误报「9980 个新 commit」「1 个变更」，shallow 克隆和 SSH 远程全部修正</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端：</p>
+<p>「Open in terminal」——会话菜单把聊天交给你的终端</p>
+<ul>
+<li>3d34b1916|feat(desktop): add &#x27;Open in terminal&#x27; to the session menu</li>
+<li>867eb1a38|feat(desktop): expose openSessionInTerminal over the capability bridge</li>
+<li>237abc1e9|feat(desktop): resolve the user&#x27;s terminal emulator and TUI resume argv</li>
+</ul>
+<p>会话菜单的 Open 组里新增了「Open in terminal」：点击后用 `--tui --resume &lt;id&gt;` 在用户自己的终端里恢复会话，工作目录定位到会话所在项目、绑定对应 profile。实现上会先解析桌面端自己用的后端（通常是 venv python 跑 hermes_cli.main），生成一个 launcher 脚本再脱离桌面端进程启动，所以关掉桌面端会话依然在。平台适配：macOS 走 LaunchServices 按用户绑定的 shell 脚本应用打开，Linux 优先用 Debian 系的 x-terminal-emulator，Windows 优先 Windows Terminal 而不是 cmd。远程连接时该菜单隐藏——终端是本地的但会话不在，点了也恢复不了。</p>
+<p>桌面端 bundle 半替换自恢复</p>
+<ul>
+<li>529ee80ac|Recover from a half-replaced desktop bundle instead of requiring a reinstall (#85887)</li>
+</ul>
+<p>更新桌面端时如果文件被占用，可能出现 renderer bundle 一半新一半旧的撕裂状态：index.html 和它引用的 hashed chunk 不是同一代，应用启动后在第一个懒加载就崩「Failed to fetch dynamically imported module」，而且每次重开都加载同一份坏副本，看起来只能重装。这个 commit 双管齐下：加载端逐个检查候选 bundle 声明的模块，优先选完整的那一代，两份都坏就明确日志缺哪些文件怎么修；构建端把「index.html 指向缺失 chunk」的 bundle 视为过期（哪怕 content stamp 说 up to date），主动触发重建。半替换状态不用重装，自己会修。</p>
+<p>更新检查不再误报</p>
+<ul>
+<li>d8d7cc068|fix(update): stop reporting bogus &#x27;Found 9980 new commit(s)&#x27; on shallow installs</li>
+<li>9442a718d|fix(update-check): recover the real behind-count via the GitHub compare API</li>
+<li>898d786ad|fix(update): count real behind commits in SSH fast path</li>
+<li>3f39f8035|fix(update-check): never flag local-ahead checkouts as updates (desktop SSH sibling)</li>
+<li>3dbdea8b8|fix(desktop): make shallow update status presence-only</li>
+<li>54bd47b81|fix(desktop): show &#x27;update available&#x27; instead of fake &#x27;1 change included&#x27; on shallow clones</li>
+<li>294071bf0|fix(banner): stop fabricating &#x27;1 commit behind&#x27; on SSH-official remotes</li>
+</ul>
+<p>一批「更新状态报错」的修复，覆盖两类问题。第一类是 shallow 克隆（depth-1 安装器检出）：`rev-list --count HEAD..origin/main` 在截断的图上会走完整远端祖先链，报出荒谬的「Found 9980 new commit(s)」；修法是零/非零判断保留（0 在任何图上都可信），正数时用 GitHub compare API 恢复真实数字（9442a718d），取不到就换成不带数字的说法。第二类是本地领先（local-ahead）：SSH 快路径只比对 tip SHA，本地有 carry commit 时 SHA 不同就误报「1 commit behind」——用户被引导跑 hermes update 恰好会清掉本地未推送的工作；修法是对比祖先关系，ahead_by==0 视为 up to date，桌面端被动 SSH 检查同步修正。顺带 shallow 克隆的更新状态改为只报「有更新可用」而不是编造「1 个变更」。</p>
+<p>Windows 更新 handoff 走 venv python</p>
+<ul>
+<li>5bfb7ee42|fix(desktop-update): drive the Windows hand-off through the venv python, not the hermes.exe shim</li>
+</ul>
+<p>Windows 桌面端更新时要把任务交给 python 进程执行，之前走 hermes.exe shim——子进程继承句柄会卡住 hermes.exe 的替换；现在改为直接调用 venv 里的 python，绕过 shim 层。</p>
+<p>agent 间消息渲染为时间线事件</p>
+<ul>
+<li>7a9634568|feat(desktop): agent-to-agent messages render as attributed cards, not user bubbles (#85855)</li>
+<li>bd22451f0|feat(desktop): collapse inter-agent exchange replies (Grok-bots parity) (#85884)</li>
+<li>084265538|feat(desktop): sender-side delivery notices — &#x27;Messaged X&#x27; / &#x27;Message from X&#x27; (#85888)</li>
+</ul>
+<p>桌面端里 bot 给 bot 发消息之前渲染成「用户气泡」或「终端工具行」，看起来像用户自己打的字。现在收件侧检测到投递前缀（Message from 🤖 &lt;sender&gt;）就渲染成居中的时间线通知：机器人图标 + 发送者 + 「agent message」标签，正文收在「show message」展开器后面；收到方回复时也折叠成「Replied to &lt;sender&gt;」小通知，流式输出中不折叠。发件侧「正在给 X 发消息」→「已发给 X」，若收到对方回复显示「来自 X 的消息」。发送方头像会解析 profiles 显示真实头像（hermes 主 profile 有约定映射），解析失败退回 🤖 字形。两端现在讲同一种视觉语言，对齐 Grok bots。</p>
+<p>MCP 建议目录扩到 18 个官方托管</p>
+<ul>
+<li>8c8d55bd0|feat(desktop): grow the MCP suggestion directory to 18 official hosted remotes</li>
+</ul>
+<p>MCP 连接建议目录从 8 个扩到 18 个：新增 Vercel、Supabase、Netlify、Hugging Face、Asana、Intercom、Airtable、Webflow、PayPal、Square，全部是厂商运营的远程服务，带文档链接。触发词做了防误触：square 英文单词本身不触发（只认 squareup），vercel.app/netlify.app 的预览部署链接故意排除（粘贴预览链接意图是网站本身不是平台）。</p>
+<p>桌面端杂项修复</p>
+<ul>
+<li>e10e34420|fix(desktop): make the HUD exit button findable, and only when wanted</li>
+<li>cd104ed49|fix(desktop): let you type spaces and arrows in the session rename dialog</li>
+<li>17d6a7d42|fix(desktop): avatar misses expire after 30s instead of caching forever (#85908)</li>
+<li>ad9e8c9b5|feat(desktop): expose data-attributes on sidebar sessions area for custom skinning</li>
+<li>c7a243d78|feat(desktop): tag each sidebar project row with data-sessions-project</li>
+</ul>
+<p>HUD 模式退出按钮更容易找到且只在需要时显示；会话重命名对话框现在能输入空格和方向键；头像未命中缓存 30 秒过期而不是永远缓存；侧边栏会话区和项目行暴露 data-attributes（data-sessions-project），方便自定义皮肤定位。</p>
+<p>新命令 /loop 循环唤醒（Claude Code 对等）</p>
+<ul>
+<li>f79440e0f|feat: /loop — recurring in-session wakeups (Claude Code parity)</li>
+</ul>
+<p>移植 Claude Code 的 /loop（及其 /proactive 别名）到 Hermes 全部界面。`/loop [间隔] &lt;提示词&gt;` 让一个 prompt 或斜杠命令在会话内按节奏重复执行；省略间隔进入自定速模式：从下限起步，agent 回复不再变化时指数退避，出现变化立刻恢复——用本地摘要对比，零额外 LLM 成本。停止条件：agent 发出的 LOOP_COMPLETE 标记、--times N、--until &lt;条件&gt;（走现有 goal_judge 辅助任务判定，fail-open）、/loop stop、loops.max_ticks 预算兜底。状态持久化在 SessionDB（loop:&lt;sid&gt;），/resume 后还能续上，跨压缩边界迁移；CLI、gateway、TUI、dashboard、桌面端全接入，桌面端斜杠面板里也有。与 /goal 的协作规则：非 parked 的 goal 持有空闲边界时，loop tick 会让路。配置项 loops.{min_interval_seconds,max_ticks,self_paced_floor_seconds,self_paced_ceiling_seconds}。新增 77 个测试。Slack 的 50 斜杠命令上限腾挪：/version 移到 /hermes version，把原生槽位让给 /loop。</p>
+<p>内存/磁盘压力提示 + OOM 检测</p>
+<ul>
+<li>e11d1ddc7|feat(status): surface memory pressure and suspected-OOM restarts to users (NS-656)</li>
+<li>6977d21fa|feat(gateway): disk-usage telemetry + dashboard disk-pressure banner (NS-656)</li>
+</ul>
+<p>宿主 agent 可能每小时被 OOM 杀掉，而 dashboard 和 NAS 卡片看起来完全健康——所有内存信号（心跳采样、生命周期账本的非正常退出判定、缓存压力逐出）都死在服务端日志里。这个改动是读侧修复：新的 gateway/memory_status.py 把现有 30 秒心跳（进程 RSS + 系统 MemAvailable/MemTotal + swap）和生命周期哨兵蒸馏成紧凑的 memory 块：压力 ok/elevated/critical/unknown 分级、粗略 MB 数字、上次启动的非正常退出/suspected-OOM 标记。纯文件读取，不加新采样不加网关 IPC；心跳过期（&gt;150s）或未来时间戳降级为 unknown，死网关的最后一口「critical」不会永远挂着。生命周期账本 record_startup 现在把 prior_unclean_exit / prior_suspected_oom 带到哨兵上（之前只存在于追加式诊断文本里）。/api/status 提供该块，故意不并入整体健康度——内存压力是提示性的，翻成 degraded 会把 NAS 可用性巡检也带崩。dashboard 新增 MemoryPressureBanner，按 critical &gt; suspected-OOM &gt; elevated 触发，按会话关闭、再次升级会重新弹出。磁盘侧同理：disk_status.py 采样 HERMES_HOME 的磁盘用量，critical 判定 &lt;256MB 空闲或 ≥95% 占用，elevated &lt;512MB；disk 块与 memory 并列，banner 优先级 disk critical &gt; memory critical &gt; OOM restart &gt; disk elevated &gt; memory elevated，关闭最上层会露出下一层而不是全部静音。针对的问题：agent 数据卷写满后 SQLite 写失败、会话停止持久化，而每个 dashboard 都看起来正常。</p>
+<p>消息平台：后台进程通知默认精简</p>
+<ul>
+<li>1c971769e|feat(gateway): concise background process notifications by default</li>
+</ul>
+<p>消息平台上后台进程完成的推送之前直接把原始输出缓冲区整个倒进聊天，现在默认改成一行状态：✅/❌ + 命令 + 耗时，失败时附加一小段输出尾部。新增 display.background_process_notifications 模式，&#x27;concise&#x27; 为默认，想要旧行为切回 &#x27;all&#x27;；配置迁移 v35 把还停在旧隐式默认 &#x27;all&#x27; 的用户迁到 &#x27;concise&#x27;，显式设置的 result/error/off 原样保留。</p>
+<p>roster 预览显示最新消息</p>
+<ul>
+<li>6c40300f9|feat(gateway): roster previews show the latest message, not the first (#85905)</li>
+</ul>
+<p>profiles.list 的 last_session.preview 之前复用会话列表的共享预览——会话的第一条用户消息，对会话列表是识别用没问题，对消息式 roster 就不对：每个 agent 名字下面永远挂着「Hey, tell me about yourself!」。现在改用最新的用户/助手文本，查询形状和锁纪律与 SessionDB.latest_message_row_id 一致，失败时 best-effort 回退旧行为。</p>
+<p>数据与账号安全：</p>
+<p>二进制文档写入保护</p>
+<ul>
+<li>6d51c831e|fix(file_tools): refuse plain-text writes that corrupt binary documents</li>
+</ul>
+<p>read_file 会自动把 .docx/.xlsx/.pptx（以及 anydoc 的 PDF）抽取成可读文本，模型于是「以为」自己握着文件全文，把编辑后的文本用 write_file/patch 写回去——静默摧毁文档容器：实测 write_file 覆盖一个合法 .docx 留下非 zip 尸体，文本写入已有 .pdf 覆盖了 %PDF 头。现在 write_file 和 patch 拒绝这类写入：doc/docx/xls/xlsx/ppt/pptx/odt/ods/odp 这些不透明容器格式一律拒绝；.pdf 只在覆盖已有文件时拒绝（新建 PDF 仍允许）。Delete/Move 不拦（不写文本）。</p>
+<p>密码提供商原生登录（系统浏览器自动填充）</p>
+<ul>
+<li>56f1afc83|feat(dashboard-auth): extend RFC 8252 native sign-in to password providers (system-browser autofill) (#75808)</li>
+</ul>
+<p>桌面端跑密码登录的 gated gateway 时用内嵌 Electron BrowserWindow，macOS 密码管理器/钥匙串自动填充够不到 Chromium-in-Electron 的表单——/login 表单明明带了对的 autocomplete 属性，用户还是得手打凭据。现有的 RFC 8252 原生流程（系统浏览器 + loopback + PKCE）对 OAuth 提供商正好解决这个问题，但之前以「密码提供商没有 IDP 往返可代理」为由禁用。这个改动把它打开：/auth/native/authorize 接受 supports_password 提供商，注册 pending 授权后 302 系统浏览器到交互式 /login 表单，凭据校验成功就按 /auth/callback 原生分支完成授权——铸造一次性 loopback 码、返回 loopback 重定向、清 PKCE cookie、不设会话 cookie。失败干净：代理过期返回 400 提示重新登录，凭据错误保留 pending 条目允许重试。纯网关改动，桌面端不用更新，旧桌面端构建等网关广告能力后自动生效。</p>
+<p>模型选择时数据训练警告</p>
+<ul>
+<li>a06f1d761|feat(models): warn on data-training tiers at model selection</li>
+<li>916653094|feat(models): unify selection-time guards into one registry across all surfaces</li>
+</ul>
+<p>muse-spark-1.2-contributor 便宜是因为 Meta 会用你的 prompt 和完成输出来训练未来模型——只看价格选它而不知道数据代价是脚枪。新增 model_data_policy_guard.py（对照 model_cost_guard）：data_training_warning() 由厂商无关规则表驱动，选择这类模型时给出警告。同时把选择期的各类守卫（成本、数据策略等）统一进一个注册表，覆盖全部界面。</p>
+<p>语音转写修复（profiles.create 建的 profile）</p>
+<ul>
+<li>486f4ace2|fix: voice dictation broken in profiles created via profiles.create (missing stt/tts config) (#85755)</li>
+</ul>
+<p>桌面端听写按 profile 隔离：/api/audio/transcribe 在目标 profile 的 home 里解析 stt 段。profiles.create 建的 profile 只有 model 段，听写和 TTS 静默回退到默认（本地 whisper，常常没装）——表现为「bot 模式听写不行，普通模式正常」。现在创建 profile 时把启动 profile 的 stt/tts/voice 段镜像过去（按 key，不覆盖已有段），与 .env/auth 镜像共用 mirror_credentials 开关，回执里报告 mirrored.voice。</p>
+<p>会话可靠性：turn lease 跨进程串行化</p>
+<ul>
+<li>6e929a969|fix(sessions): serialize turns across processes</li>
+<li>5e2be43fd|fix(sessions): harden cross-process turn lease wait and refresh</li>
+<li>19b120439|fix(sessions): revive uncontested expired turn leases</li>
+<li>f1025b2c0|fix(sessions): fence transcript writes with the turn-lease holder</li>
+<li>967391cd4|fix(sessions): stop lease refresher at turn boundary</li>
+</ul>
+<p>一批会话 turn 租约加固：跨进程并发 turn 串行化、租约等待与刷新硬化、无竞争过期租约复活、转录写入与租约持有者对齐、turn 边界停止刷新器。多进程同时操作同一会话时的写冲突和死锁风险系统性收敛。</p>
+<p>TUI/CLI 重绘修复集群</p>
+<ul>
+<li>2912093e0|fix(dashboard): redraw TUI after PTY reattach</li>
+<li>6356dc392|fix(ui-tui): redraw after session resume</li>
+<li>96e794aa4|fix(tui): redraw after terminal focus regain</li>
+<li>3bd98ec4b|fix(cli): redraw on terminal focus regain + docs for scrollback rebuild config</li>
+<li>c3d7f6eef|fix(cli): recover prompt_toolkit paint after tmux attach</li>
+<li>88a1a9fd9|fix(cli): let redraw recovery rebuild scrollback</li>
+<li>0e1cba326|fix(cli): honor persisted status bar visibility</li>
+<li>a22fbba34|fix(cli): don&#x27;t replay transcript on the session&#x27;s first benign SIGWINCH</li>
+<li>6625c72c9|fix(cli): use _suspend_output_history for interrupt marker instead of clearing _OUTPUT_HISTORY</li>
+<li>8606867eb|fix(tui): reduce status bar flicker during streaming</li>
+</ul>
+<p>一批 TUI/CLI 画面恢复问题：PTY 重连、会话恢复、终端焦点回归、tmux attach 后都要重绘；回滚缓冲可重建、状态栏可见性持久化、首个良性 SIGWINCH 不重放转录、流式输出时状态栏闪烁减少。</p>
+<p>其他：</p>
+<p>@mention 补全 agent profiles</p>
+<ul>
+<li>eca85e81d|feat(complete): offer agent profiles as @mention completions (#85799)</li>
+</ul>
+<p>composer 里输入 @ 之前只会补全路径/指令，现在也补全 agent profiles，输入 @t 这类前缀可以直接选中别的 agent。</p>
+<p>Box 生产力技能内置</p>
+<ul>
+<li>e450b09dd|feat(skills): add bundled Box productivity skill</li>
+</ul>
+<p>新增内置 Box 生产力技能：通过官方 @box/cli 操作云端内容管理——文件、文件夹、共享、搜索、元数据、Box AI、Hubs、批量操作、webhook，还有 box request 的 REST 回退。仅 OAuth 认证，SKILL.md 路由到十个分域参考文件。由 @iskysun96 的 PR #52107 抢救合并。</p>
+<p>模型目录新增 deepseek v5 pro</p>
+<ul>
+<li>0e4e8baf6|add deepseek v5 pro 0813 to model catalog (#86256)</li>
+</ul>
+<p>模型目录加入 deepseek v5 pro 0813。</p>
+<p>工具超时统一 deadline 层</p>
+<ul>
+<li>083f8a607|feat(agent): unified deadline layer — bounded execution primitive + timeout resolver (#85125 Phase 1)</li>
+<li>367f0c21e|feat(agent): resolve sequential tool deadline via timeouts.tools.sequential_call (#85125 2a)</li>
+<li>ededa8c4f|fix(agent): bound sequential tool calls</li>
+</ul>
+<p>工具执行超时/挂起问题此前是逐事件打补丁，现在统一成一层：run_bounded_async（线程定时器 deadline，事件循环被卡死也能触发，泛化自 telegram adapter 原语）、run_bounded_sync、clamp_timeout（消灭 #83220 的 time_t OverflowError 类问题）、resolve_timeout（config.yaml timeouts: 段 &gt; 遗留 env 桥 &gt; 默认）、kill_process_tree（整树终止，针对 #71148 孤儿进程类）。顺序工具调用超时接入 timeouts.tools.sequential_call。Phase 1 为纯增量；后续阶段接入顺序调用超时并加 bound。</p>
+<p>attach 加速：不等 agent 构建</p>
+<ul>
+<li>8b06f7df8|fix: attach RPCs no longer wait on the deferred agent build</li>
+</ul>
+<p>图片 attach 相关 RPC 不再等待延迟的 agent 构建，会话恢复更快。</p>
+    </section>
+    
     <section id="2026-08-14" class="day">
       <h2>Hermes 日报 2026-08-14：插件生态大爆发：plugin packs、事件总线、社区索引 + 桌面端 MCP 授权卡片</h2>
       <p><strong>本期覆盖 8 月 13 日 06:30 ~ 8 月 14 日 06:30 合入 main 的提交，共 392 个 commit（不含 merge），另有 13 个 merge。新增 81 个功能、202 个修复、0 个性能优化。</strong></p>
