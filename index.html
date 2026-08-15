@@ -22,9 +22,122 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 18 期 · 3299 个提交 · 每日自动更新 ·
+<p class="meta">共 19 期 · 3870 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-16" class="day">
+      <h2>Hermes 日报 2026-08-16：桌面端多连接 Agent 来源 + /save 会话导出 + 图片提交不再被预分析阻塞</h2>
+      <p><strong>本期覆盖 8 月 15 日 ~ 8 月 16 日合入 main 的提交，共 571 个 commit（不含 merge），另有 1 个 merge。新增 31 个功能、372 个修复、14 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端多连接 Agent 来源三阶段全部合入：本地、远程 gateway、Cloud、SSH 主机可以并存，多来源 Agent 一起用</li>
+<li>/save 升级为跨平台会话导出命令，json/md/html 三种格式，支持脱敏，聊天里直接发文档</li>
+<li>桌面端发图不再先跑视觉预分析，25 秒到 4 分钟的干等消失，发送立即开始</li>
+<li>会话管理增强：未读标记、隐藏会话、删除确认、密度模式、归档快捷键</li>
+<li>更新环节一堆 Windows 修复：hermes.exe 不再从 PATH 消失、git 残留锁自愈、浅克隆不再误报更新</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端多连接 Agent 来源（本次最大功能，三阶段全合入）：</p>
+<ul>
+<li>b54b0521d|feat(desktop): multi-connection registry — named agent sources (schema v2 + IPC + Settings UI)</li>
+<li>883b57cbd|feat(desktop): route backends by (connection, profile) — registry-scoped pool keys</li>
+<li>aff19d025|feat(desktop): multi-source agents end-to-end — sockets, roster, SDK, fan-out updates</li>
+</ul>
+<p>桌面端此前只能维护一个全局连接加 per-profile 覆盖。现在可以在设置 → Connections 里维护任意多个命名的后端来源（本地 runtime、远程 gateway、Hermes Cloud 实例、SSH 主机）并存，每个来源要求大小写不敏感唯一的设备名标签，v1 配置会自动迁移到 v2。第二阶段把后端池的键从 profile 改成 (connection, profile) 复合键：任何注册连接的 Agent 都能并发提供服务，本地/空连接保持原有裸 profile 键，单来源用户行为逐字节不变；远程连接用自己的 URL 和认证拨号，SSH 走复合键作用域的隧道。第三阶段端到端打通：渲染端 socket 注册表与主进程池共用同一套作用域键规则，roster 并发枚举每个连接的 /api/profiles 汇总成统一 Agent 列表（重名按 @name-device 规则处理），插件 SDK 新增 host.connections() / host.agents() / host.warmAgent() 等接口，多来源 Agent 可以在界面上并排使用。对普通用户最直接的感知：桌面端不再只有一个 Agent，可以同时挂本地加几个远程来源，Bot Mode 的大门也由此打开。</p>
+<p>图片提交不再被视觉预分析阻塞：</p>
+<ul>
+<li>56e5385e9|fix(desktop): stop blocking the image submit path on vision pre-analysis</li>
+</ul>
+<p>桌面端之前的发图路径会在派发 turn 之前，先用辅助视觉模型对每张附件做串行预分析。用户看到的是进度框空转 25 秒到 4 分钟，而同样的消息在 CLI 里只要约 4 秒；预分析失败被静默吞掉，窗口期切去别的会话还会让整个 turn 零 API 调用地死掉，预生成的图片描述还会污染会话自动标题。修法是把预分析整个删掉，改为在消息里引用图片路径，让 agent 在对话循环里自己用 vision_analyze 分析（有重试、有可见的工具进度、turn 立即开始）——这正是 @folder: 引用路径的既有行为，同样图片几秒就响应。原生视觉路由行为不变，只有文本模式受影响。</p>
+<p>/save 会话导出命令（跨平台）：</p>
+<ul>
+<li>26aa12337|feat: /save exports the current session as json, md, or html on all platforms</li>
+<li>ca5c04818|feat: bare /save shows a usage card instead of exporting</li>
+<li>23ad35b7f|feat: Add /export command for session export (Markdown/JSON) to CLI and Gateway</li>
+</ul>
+<p>/save 从 CLI 专属的 JSON 快照升级为跨平台会话导出：`/save [json|md|html] [filename] [redact]`，CLI 和所有 gateway 平台都能用（gateway 平台通过 adapter.send_document 把导出文件当文档发到聊天里）。加 redact 参数会先过强制脱敏通道再写文件。渲染复用已有的共享 renderers（session_export.py + session_export_html.py），文件名做了 basename 消毒防路径注入。裸 /save 不再直接导出，而是打印用法卡片（格式、文件名、redact、示例），未知格式报错并附同一张用法卡——避免用户误触导出。名字冲突的处理：会话导出统一放 /save，/export 保留为 profile 导出。为腾出 Slack 的 50 条斜杠命令配额，/platform 移进了 /hermes-only 集合，给 /save 让位。</p>
+<p>桌面端会话管理增强：</p>
+<ul>
+<li>c75d83555|feat(desktop): mark a session as unread/read with a persisted watermark</li>
+<li>fbaea9bdd|feat(sessions): generic &#x27;hidden&#x27; session flag (sidebar-hide, still resumable) (#86797)</li>
+<li>e6708af1f|feat(desktop): confirm before deleting a session</li>
+<li>a33ac1e95|feat(desktop): add session list density modes</li>
+<li>89f9375bc|feat(desktop): archive the current session via hotkey and ⌥+⇧-click</li>
+</ul>
+<p>会话可以标记未读/已读，水位线持久化，重开应用不丢。新增通用的 hidden 会话标记：意思是不在全局会话侧栏显示，但持有它的表面（插件、Bot Mode、未来的会话生命周期所有者）仍可完全恢复——与 archived/pinned 同构的通用能力，任何插件都能把自有会话藏出共享最近列表，schema 是增量列（hidden INTEGER NOT NULL DEFAULT 0），老库走声明式加列路径无需版本迁移，REST PATCH /api/sessions/{id} 也支持。删除会话前增加确认弹窗。会话列表新增密度模式。归档会话支持快捷键（session.archive 键绑定动作，默认未绑定可自定义）和侧栏会话行的 Option+Shift 点击手势，点击解析器做成纯函数单测覆盖，保证 Option+Shift 归档、Shift 置顶、Ctrl/Cmd+Shift 新窗口的修饰键优先级不打架。</p>
+<p>回复耗时与时间戳显示：</p>
+<ul>
+<li>93a9b2318|feat(desktop): show per-turn wall-clock duration in the transcript</li>
+<li>a896322b4|feat(desktop): show detailed transcript timestamps</li>
+<li>77fcc2ea3|feat(display): honor display.timestamps across desktop transcript and TUI</li>
+<li>9f78a0d37|fix(desktop): preserve turn-elapsed timer across session switches</li>
+</ul>
+<p>每条助手回复下方新增一个小耗时徽章，显示这轮 turn 用了多久（message.start 到 message.complete，成功和失败的 turn 都算），不用悬停就能看任务延迟。耗时是渲染端按会话已有的 turnStartedAt 时间戳算的，不持久化后端，所以历史会话没有徽章——和推理块耗时的行为一致。会话记录同时支持显示详细时间戳，display.timestamps 配置在桌面端 transcript 和 TUI 里统一生效。顺带修了切换会话时 turn 计时器被重置的问题。</p>
+<p>思考块折叠：</p>
+<ul>
+<li>10bf145e3|feat(desktop): collapse thinking by default</li>
+<li>2b0b4a219|feat(tui): auto-collapse reasoning blocks only when the reasoning phase ends</li>
+</ul>
+<p>桌面端思考块默认折叠。TUI 侧把 display.sections.thinking: collapsed 的语义升级成「自动」：推理流式输出时保持展开，推理阶段一结束（第一次工具调用、最终答案或新一轮开始）立刻折叠——之前 collapsed 是一律折叠，包括正在流式输出的推理，反而没有「流式时展开、结束后收起」的选项。</p>
+<p>更新环节修复集群（Windows 用户感知强）：</p>
+<ul>
+<li>92c998c86|fix(update): restore quarantined hermes.exe shims after no-op installs on Windows</li>
+<li>7fe3bf042|fix(update): self-heal stale git locks and stop false &#x27;update available&#x27; on shallow clones</li>
+<li>ed4f91c4e|fix(update): widen stale-lock self-heal to banner and desktop; align with compare-API status</li>
+<li>a525bbed0|fix(update): avoid cryptography self-lock on Windows</li>
+<li>8f5e5e49a|fix(updater): recover deferred installs on update retry</li>
+</ul>
+<p>两个 Windows 更新包装器（_run_quarantined_install 和 _run_install_repair 里的 _run_install_cmd）在调用安装器前会把 live 的 hermes*.exe shim 改名挪开，但只在失败路径改名回来。成功安装但没重写入口点的情况——uv 审计发现 editable 安装已满足就 no-op——shim 就留在 hermes.exe.old.&lt;ms&gt; 隔离区，`hermes` 从 PATH 消失，绿色更新后命令不见了。修法是把 except/re-raise 改成 try/finally，所有路径都恢复，恢复逻辑本来就会跳过安装器真正替换过的 shim。另外浅克隆（depth-1 安装）上两个连环问题：被 kill 的 fetch 留下 .git/shallow.lock，之后每次 fetch 都报 File exists，更新检查被卡死；修法是 age + git 进程双守卫的清理器，接入检查、应用和 banner 被动检查三处，桌面端也有对应实现（electron/gitlock.ts）。浅克隆上没法数 commit，只能比 tip SHA，本地 cherry-pick 会让 HEAD 和 origin/main 不同但实际已含目标——误报「有更新」；修法用 compare-API 状态恢复，ahead_by==0 即视为最新。cryptography 在 Windows 上的自锁问题也修了；更新重试时恢复被延迟的安装。</p>
+<p>子任务并发与迭代上限提升：</p>
+<ul>
+<li>ce996d405|feat(delegation): raise max_concurrent_children default 3 -&gt; 10 (+migration) (#86745)</li>
+<li>50d98fc1f|feat(delegation): raise subagent iteration cap default 50 -&gt; 250 (+migration) (#86506)</li>
+<li>dc2fe99ec|feat(delegation): mark max_iterations-truncated subagent results for the parent (#86641)</li>
+</ul>
+<p>delegation.max_concurrent_children 默认从 3 提到 10：之前批量分派（比如同时审 N 个 PR）被切成 3 个一组的慢速块，现在默认 10 并行，位于高成本告警阈值（&gt;10）之下，默认不会触发警告；每个子任务独立消耗 token，下限仍 1、无上限，用户可自行调。delegation.max_iterations（每个子 agent 的工具调用预算）默认从 50 提到 250：叶子 agent 光侦察就要 15-20 轮，旧预算经常干到一半被截断、返回「completed but unfinished」的摘要，250 给真正的工作留出完成空间。两条都带配置迁移：恰好 pin 在旧默认值 3/50 的配置自动抬升，显式改过的值保留。被 max_iterations 截断的子任务结果会打上标记让父任务知道。</p>
+<p>CLI 启动提速与其他性能：</p>
+<ul>
+<li>ee1731b13|perf(cli): re-export decomposed command modules lazily, ~60ms off every CLI start</li>
+<li>bee0d45dd|perf(desktop): pause background UI work while unfocused</li>
+<li>471272103|perf(desktop): pause decorative animations when unfocused</li>
+<li>62eefff69|perf(desktop): bound long-running app resource use</li>
+<li>7e439dbb1|perf: parallelize provider model-list fetches in model picker</li>
+<li>473490a2e|perf(cli): stop per-keystroke config re-reads in slash completers</li>
+</ul>
+<p>main.py 拆解后把 sessions/update/dashboard 命令面用 eager from-import 再导出，导致每次 hermes 调用（包括 hermes --version）都要付 update_cmd 的依赖链（jwt、click、cryptography）。改成 PEP 562 模块级 __getattr__ 懒加载后，实测 Windows 11 / Python 3.11 / 7 次热运行中位数：import hermes_cli.main 从 253ms 降到 196ms（-22%）。桌面端失焦时暂停后台 UI 工作和装饰动画，长任务资源占用设上限；模型选择器并行拉取各 provider 的模型列表，斜杠补全不再每次按键重读配置。</p>
+<p>Ctrl+C 失效修复（Kitty 键盘协议）：</p>
+<ul>
+<li>165c889e5|fix(cli): stop pushing Kitty keyboard protocol that breaks Ctrl+C</li>
+</ul>
+<p>之前某个 commit 在受支持的终端（Ghostty、iTerm2、WezTerm、kitty）上同时推送 Kitty 键盘协议（CSI &gt;1u）和 xterm modifyOtherKeys level 2。Kitty 协议下 Ctrl+C 被编码成 \x1b[99;5u 而不是 \x03：prompt_toolkit 3.x 不认识这个序列，屏幕上直接漏出字面文本 [99;5u；更糟的是内核的 INTR 机制只认原始 \x03 字符，SIGINT 永远不触发，Ctrl+C 彻底失效。修法是从扩展按键序列里去掉 CSI &gt;1u，只保留 modifyOtherKeys：Shift+Enter 仍然通过 \x1b[27;2;13~ 工作（prompt_toolkit 已有映射），退出时的重置序列两边都弹出。</p>
+<p>F12 DevTools 可禁用：</p>
+<ul>
+<li>d4fa3f735|feat(desktop): add option to disable F12 DevTools shortcut</li>
+</ul>
+<p>桌面端原来用菜单 role 绑死 F12 打开开发者工具，一些场景（共享屏幕、会议、防误触）不想让人随手按出来。现在改成显式菜单项用 Ctrl+Shift+I（macOS 为 Cmd+Opt+I），新增 f12Blocked 主进程标记，设置 → 高级里加「禁用 F12 DevTools」开关。F12 默认仍可开 DevTools，开关打开后 F12 被拦；Ctrl+Shift+I 无论开关始终可用。</p>
+<p>computer-use 浏览器授权：</p>
+<ul>
+<li>48dd9c87c|feat(computer-use): user-facing authorization for cua-driver browser attachment</li>
+<li>20cf326bd|fix(computer-use): align browser authorization with live-verified cua-driver 0.19.3 contract</li>
+</ul>
+<p>computer-use 的 cua_browser_* 路线补上授权面：新增 `hermes computer-use browser-approve` CLI 命令，为用户指定的精确 (pid, window_id) 铸造 cua-driver 的五分钟一次性附加 token——token 来源是用户本人而不是模型，模型无法自行授权。approval_token 只在 existing_profile 模式下透传。computer_use.permission_mode 新增 bounded 模式：每个会话私有嵌入式 daemon 用 --capability-manifest/--approve-capability-manifest 启动，manifest 缺失直接报错；unrestricted 故意不作为配置值存在，只能走显式的 per-session YOLO 开关。配套 commit 把授权行为对齐到实测的 cua-driver 0.19.3 契约。</p>
+<p>其他值得一提的修复：</p>
+<ul>
+<li>505f289d3|feat(web): add collapse toggle for the chat side panel（网页端聊天侧栏可折叠）</li>
+<li>6fcc20268|feat(desktop): show collapsed todo running indicator（折叠的 todo 列表显示运行指示）</li>
+<li>b6726d57e|feat(desktop): per-profile scope selector in the Capabilities view（能力视图按 profile 过滤范围）</li>
+<li>2e9dcb7c5|fix(gateway): session.history ships durable row_id stamps（会话历史携带持久行号）</li>
+<li>3e8ab0610|fix(desktop): never send ordinal-only truncation — resolve durable row ids by content（桌面端截断改用持久行号而非序号）</li>
+<li>c2a50a866|fix(desktop): skip failed turns in the backend-facing user ordinal space（用户序号空间跳过失败的 turn）</li>
+<li>fe0a56ed1|fix(nemo_relay): bound plugin Relay marks so a wedged native pipeline cannot stall the agent（插件 Relay 标记加界，原生管线卡住不再拖死 agent）</li>
+<li>c9a806e9d|fix(browser): pin named sessions to their own tab on shared browsers（命名浏览器会话固定到自己的标签页）</li>
+<li>bb4f680f2|fix(browser): named browser_exec sessions compose with every backend（命名 browser_exec 会话兼容所有后端）</li>
+<li>6efab2872|feat(auth): add key_cmd credential source for custom providers（自定义 provider 新增 key_cmd 凭据来源）</li>
+<li>d2672a349|feat(gateway): optional profile param on cron.manage RPC（cron.manage RPC 支持可选 profile 参数）</li>
+<li>d275b96bf|feat(gateway): per-profile MCP server lifecycle RPCs (mcp.servers.*)（MCP 服务器生命周期按 profile 管理 RPC）</li>
+</ul>
+    </section>
+    
     <section id="2026-08-15" class="day">
       <h2>Hermes 日报 2026-08-15：/loop 循环唤醒命令 + 桌面端「在终端中打开」+ 内存磁盘压力提示</h2>
       <p><strong>本期覆盖 8 月 14 日 ~ 8 月 15 日合入 main 的提交，共 201 个 commit（不含 merge），另有 2 个 merge。新增 25 个功能、122 个修复、4 个性能优化。</strong></p>
