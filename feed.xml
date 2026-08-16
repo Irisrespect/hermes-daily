@@ -5,8 +5,50 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 16 Aug 2026 06:45:30 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 17 Aug 2026 06:47:27 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-08-17：桌面端 MCP 管理大升级：统一列表、后台健康检查、成本用量浮层</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-17</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-17</guid>
+      <pubDate>Mon, 17 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 16 日 06:30 ~ 8 月 17 日 06:30 合入 main 的提交，共 215 个 commit（不含 merge），另有 3 个 merge。新增 24 个功能、148 个修复、3 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端 MCP 管理大升级：Servers/Catalog 合并成一个列表，后台自动健康检查并提示重新登录，每台 server 显示成本与 30 天用量，支持粘贴配置导入和 hermes:// 深链安装</p>
+<p>桌面端多 gateway 连接完善：新增显眼入口，连接生命周期修复一批（事件隔离、编辑后回收后端、删除清理 renderer）</p>
+<p>桌面端会话恢复与转录加载提速：恢复改增量式，转录从固定 500 条改为 120 条 tail 页按需加载</p>
+<p>插件 SDK 增强：暴露聚焦会话状态 atom 和 busy 标志，修正&quot;运行中 ≠ 占用&quot;语义</p>
+<p>computer-use 支持 Cua Driver 0.20 并自动修复不合契约的驱动</p>
+<p>CLI/TUI 终端修复：恢复 Kitty 扩展键、IDE 终端 Shift+Enter 换行、chat -c 响亮报错</p>
+<p>重点条目：</p>
+<p>桌面端 MCP 管理大升级（本次最重磅）</p>
+<p>MCP 页面原来把已配置的 fleet 和 Nous 官方 Catalog 拆成两个 tab，已安装的条目在两个视图里重复出现，安装按钮还隔着一个 tab 切换。现在合并成一个滚动列表：上方是已配置的 server（带实时状态、开关、探测），下方是 Catalog 区，只显示尚未安装的条目。安装成功后条目自动升入上方列表；零 server 的空状态也保留 Catalog 可见。Bot Mode 的高级视图复用同一个组件，自动同步。核心 commit：37445d6dc。</p>
+<p>新增后台 MCP 健康检查：renderer 侧在 gateway 连接时以及每 30 分钟扫描一次当前 profile 已启用的 HTTP/SSE MCP server（stdio server 被刻意排除——探测 stdio 会拉起本地进程，后台定时器绝不能碰）。OAuth token 过期时弹应用内通知，带&quot;重新登录&quot;按钮直达对应 server 的认证页。通知只在状态转入需认证/错误时触发，每个 server 每个 app 会话最多一次。核心 commit：1c3fbd21a。</p>
+<p>每台配置的 server 现在显示成本与用量信息：按启用的工具 schema 估算每次调用的 token 成本（按 schema 字符数/4 估算），以及 30 天内的用量统计；启用、探测正常、有 schema 成本但 30 天零使用的 server 会挂一个低调的&quot;未使用&quot;标签。核心 commit：e22fa9076。</p>
+<p>新增&quot;粘贴导入&quot;弹窗：把用户在 MCP server README 里可能复制到的任何内容粘进去都能推断出配置——mcp.json 片段（带 mcpServers 包裹、裸 name-&gt;config 映射、单个未命名 server）、裸命令行（npx/bunx/uvx/node/docker，从包名推断 name）、claude mcp add 完整命令、纯 URL（从 hostname 推断 name）、甚至 Cursor 深链。解析器是纯函数模块带单测，预览确认后合并进编辑草稿，占位环境变量（YOUR_KEY 等）原样保留给用户填。核心 commit：1e54e0522。</p>
+<p>新增 hermes://mcp/install 深链（对齐 Cursor 的 mcp/install），文档和厂商可以放&quot;Add to Hermes&quot;按钮。带显式确认对话框：完整展示 server 名和美化打印的配置（对 stdio 命令条目给出醒目警示），确认前什么都不写入，已有同名需重命名或取消。32KB 以上的载荷直接拒绝。核心 commit：56eafcff3。</p>
+<p>桌面端多 gateway 连接完善</p>
+<p>上一期合入的多连接注册表（Settings → Connections）之前没有页面外入口，产品反馈&quot;找不到明显方式接多个 gateway&quot;。现在 profile 栏固定一个插头按钮&quot;再连接一个 Hermes gateway&quot;直达设置页连接 tab（单 profile 用户也显示），命令面板也能搜到（关键词：add gateway、remote、ssh、cloud、instances、registry）。核心 commit：34271eb06。</p>
+<p>连接生命周期修复一批：事件分发按（connectionId, profile）键控，多连接下不会串音（9caff7440）；编辑连接目标后正确回收旧的后端和 socket、删除连接时清理 renderer 次级依赖（f4c80e424、28c729e68）；registry 里&quot;local&quot;条目路由到真正的本地运行时而不是误连远程（d90595463）；过期远程连接尝试被忽略（0a6ead0e9）；缺失的命名 gateway scope 不再错误回落给主连接（45398957b）；插件 socket 连接限定到激活 profile（2eb9d2928）。另有全量多 gateway 设置指南文档（ea2daa093）。</p>
+<p>桌面端会话恢复与转录加载提速</p>
+<p>会话恢复改为增量式，打开会话不再一次性拉全部数据（60be8ef26）。转录水合从固定 500 条 REST 全量改为最新 120 条 tail 页，页满时记录&quot;可能截断+下一页偏移&quot;，向上翻页时才按需请求更早内容并去重插入，后台同步/回合后刷新/冷恢复预取都把新 tail 嫁接在已回填前缀上而不是覆盖，压缩归档行通过 includeCompacted 保留在显示历史中（577093def）。侧边栏会话改为从缓存解析（58a9062f6），profile 级刷新加固、拒绝过期刷新（4f670a3f9、4e4d37f6b）。</p>
+<p>桌面端 Skills 标签页大改</p>
+<p>Capabilities 视图围绕 Skills 标签整合：Skills Hub 选择器内嵌到已装技能列表下方（默认展开，头部带&quot;全部更新&quot;按钮），已装技能会被拒绝并 toast 提示（按名字和标识符双查）；详情面板现在能显示任意来源技能的完整内容——frontmatter 元数据逐项展示 + 完整 SKILL.md 正文（d5773bfc3）。右上角 Browse Hub 顶层 tab 移除，入口并入 Skills，旧 ?tab=hub 链接自动回退。Capabilities 的 Skills/Tools/MCP 三个标签统一跟随同一个 profile 选择器，切换后全部按所选 profile 读写；Skills 标签新增一键安装（内嵌实时 Skills Hub iframe，origin 校验后走标准安装管线）和拖拽调整面板大小（9c58a78a7、f3bf718a6）。紧凑版摘要：d5773bfc3、9c58a78a7、f3bf718a6。</p>
+<p>插件 SDK 增强</p>
+<p>插件 SDK 现在暴露&quot;当前聚焦会话&quot;状态 atom——原来只有主工作区 tab 的激活会话，多 tile 布局下点击 tile 不会更新该 atom，插件看不到用户正在看哪个会话；现在复用状态栏同一套聚焦信号，插件可以跟随用户实际查看的会话（68bd8befd）。同时暴露 busy turn 标志（0a9337d2b），并修正语义：运行中不等于占用——worker 会话运行时主会话还能继续输入，不会被一个遗留的 foreground busyRef 挡住提交（3bc52fb9d）。turn 标志跟随聚焦的聊天（28fc9d9c0）。新增 host.deleteProfile：插件可以安全地删除 profile（a15de3454）。focused 原子类型修正、契约测试一并落地（a445a8127、74b7d5da2、5fa092b48）。</p>
+<p>computer-use 驱动自动修复（Cua Driver 0.20）</p>
+<p>支持 Cua Driver 0.20 运行时契约（a403fe6f9）。修复了一个会卡死所有 computer_use 调用的问题：版本地板抬高后，旧驱动的 check-update 缓存（约 20 小时）经常在刚抬地板时回答&quot;无更新&quot;，用户被钉在不可用的驱动上。现在启动时契约检查失败会自动走标准安装路径修复一次（00c12dac6，每进程一次，修复失败暴露原始错误），显式 HERMES_CUA_DRIVER_CMD 覆盖永不自动修（覆盖是权威，且缺失的覆盖保持原样不补写，c83ea25dd），缺失二进制仍只提示安装。修复了可能无限循环的问题：第二次 start() 会抛出原始错误。Windows 驱动修复增加验证步骤（5b010f448），不可用驱动返回退出状态便于脚本判断（316274527）。另有安全提示：--yolo/-z 会把 computer_use 切到 unrestricted 守护、丢弃配置的模式上限，现在每会话会明确警告一次（3e0087abe）。桌面端 provider 选择现在持久化，刷新后不再丢失（3beea0543）。</p>
+<p>CLI / TUI 终端修复</p>
+<p>恢复 Kitty 键盘协议推送并补全扩展键别名表：上一版为修 Ctrl+C 死键去掉了 CSI &gt;1u 推送，结果 kitty 终端整个失去 Shift+Enter 和所有扩展键（kitty 已移除 xterm modifyOtherKeys 支持，只认自家协议）。现在恢复双推送（CSI &gt;1u + CSI &gt;4;2m），并补全 Esc 键、Ctrl+Backspace 向后删词、Shift+Space、Alt+Enter 换行、Shift+Tab/Ctrl+Tab、F13-F24、键区键映射等，VT100 解析器前缀缓存和终端输入模式恢复也一并修了（03bf85d83）。IDE 终端（VS Code/Cursor/Windsurf）里 Shift/Ctrl/Cmd+Enter 原来发的是 \r\n，被拆成&quot;反斜杠键+回车&quot;——多打一个反斜杠还误提交；现在发 Kitty CSI u 原子编码修饰键，macOS 终端（Terminal.app/iTerm2 默认）也接受裸 LF 作为换行（21c1fe668）。modifyOtherKeys level 2 下所有 Ctrl/Alt/Shift 组合键映射补全（b353ac39a）。hermes chat -c 找不到会话时不再静默无操作：错误写到 stderr（exit 1 不变），新增 --create-if-missing 直接建会话（a2fcac087）。</p>
+<p>其他值得知道</p>
+<p>所有工具都可中断：顺序执行路径原来只在工具返回后检查用户中断，图像生成、TTS、转录、技能同步等不轮询中断标志的工具会整个卡住回合（实测 FAL 图像生成+放大让重定向排队 40 秒）。现在统一在守护 worker 上派发、每秒轮询中断标志，中断后 3 秒协作宽限、合成取消结果、放弃 worker，图像生成工具内部也改为轮询式等待（c257e9196）。</p>
+<p>图像生成默认不再自动放大：8 月 8 日的默认放大策略（Clarity upscaler）会在每次 &lt;2MP 生成后接一遍重绘，对 GPT Image 2、Ideogram 这类靠精确文字渲染、CJK、写实细节吃饭的模型 100% 降低输出质量。现在 FAL 与 Krea 全部默认不放大，upscale 参数保留为 per-call opt-in（f06c41522）。</p>
+<p>Gemini 开启 thinking 时输出上限提到 65535：thinking 消耗计入 maxOutputTokens，全局 4096 上限会被第一轮思考吃光、内容 token 为零并在 4 次续写后中止（95190e454）。</p>
+<p>支持导入并恢复 Claude Code / Codex CLI 会话（04c61f294）；终端面包屑支持按终端 --continue（d6f02e349）；会话选择器显示生命周期状态并支持删除（933ef6947）。</p>
+<p>hermes update 的 Windows 进程扫描加了超时上限：subprocess.run 的 cleanup 在 Windows 上会无界 join 管道读取线程，冷启动 WMI 的机器上 hermes update 会卡死、单飞锁阻止重试。用 bounded_probe_run 统一修复了 gateway 扫描、dashboard 扫描、claw 探测三条调用路径（4e3de140c）。缓存的 capability 查找收窄到 LiteLLM 授权范围，非 Claude 路由绕开该查找（0038d96b7）。</p>
+<p>压缩系统落地 lean tail mode 配置项（compression.tail_mode: legacy|lean，默认 legacy，1d5fc2bc0），配套生产验证过的 summarizer 提示词升级（31ca1200e）和召回评估工具链（33242d5ee）。lean tail mode 本体（8fe9025ab）：裁剪尾部更保守，配合恢复感知的评估分支；另有机械锚点索引 + 区域圈定开关（c4bbb14e5）、摘要噪音过滤器 + FTS5 恢复模拟 + 摘要感知查询提示（7a82457ed）。</p>
+<p>hooks 新增 modify 指令：pre_tool_call hooks 现在可以在工具执行前改写参数，而不是事后用 post_tool_call 修补结果，兼容 Claude Code 的 decision/tool_input 格式（d083b8559）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-08-16：桌面端多连接 Agent 来源 + /save 会话导出 + 图片提交不再被预分析阻塞</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-16</link>
