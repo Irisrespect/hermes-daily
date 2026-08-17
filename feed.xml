@@ -5,8 +5,62 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 17 Aug 2026 06:47:27 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 18 Aug 2026 06:56:52 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-08-18：Bot Mode 跨连接升级：Create-on 选择器、多机器群聊与内置插件化</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-18</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-18</guid>
+      <pubDate>Tue, 18 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 17 日 06:30 ~ 8 月 18 日 06:30 合入 main 的提交，共 263 个 commit（不含 merge），另有 4 个 merge。新增 47 个功能、128 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>Bot Mode 跨连接升级（最重磅）：新建 Agent 可选在哪台 gateway 上创建，群聊可以坐进其他已注册连接的 bot，Bots 面板合并多源列表，同名 agent 用 @名字-设备 区分</p>
+<p>桌面端插件内联组件：消息里的 ::preview 实时渲染页面、插件可用 ::name{...} 渲染内联组件，点 widget 本身就是一次回复</p>
+<p>项目技能隔离与信任：仓库可携带项目级技能但每仓库单独信任，危险技能被安全扫描隔离，cron/API 等非交互面继承信任决定</p>
+<p>cron 连续性：context_from=&#x27;self&#x27; 让定时任务带上次输出继续跑，外部调度器漏触发会补跑</p>
+<p>新模型与供应商：Meta Muse Spark 官方 provider、CommandCode 双协议插件、Codex OAuth 上下文提到 350K/900K</p>
+<p>重点条目：</p>
+<p>Bot Mode 跨连接升级（本次最重磅）</p>
+<p>Bot Mode 之前只能玩单机：一个桌面端连一个 gateway，机器人列表、群聊全都限定在本地。现在跨连接能力落地了。新建 Agent 时多了 Create on 选择器（多连接注册表下可用）：创建、配置、描述、MCP 目录等调用都路由到所选连接的远端后端，窗口的激活 gateway 不切换；远程目标的草稿走远端 CLI 丢弃，外观和标题写进远端 profile 的 ui_meta 和资产库，重名检查也限定在目标机器的名册上。群聊现在可以坐进其他已注册连接的 bot：成员的创建/恢复会话、提交提示词、回复轮询都通过新的 requestForBot 助手按各自来源路由；远端成员描述持久化在房间记录上，水印和会话按&quot;来源限定&quot;的成员键区分，两台上同名 agent 永远不会共享状态，@名字-设备 句柄在房间 @ 里可解析，跨机器发言会带上设备徽标。核心 commit：62f376279。</p>
+<p>Bots 面板改为多源合并：活跃 gateway 的 profiles.list 行与 host.agents() 并集名册合并（hermes-agent #86875），面板显示每个已注册桌面连接里的 agent，重名带 @名字-设备 句柄；老桌面构建或名册失败时自动回退到单源列表（8236b4177）。</p>
+<p>Bot Mode 升级为桌面端内置插件：采纳 NousResearch/Hermes-Bot-Mode 插件，注册进 bundled vite glob，默认开启，设置 → 插件里可随时关掉；独立安装的旧副本不会双注册（366d8814b）。核心队友协议从 SOUL.md 注入改为提示词稳定层注入：Bot Mode 管理的 profile 里，每个会话的 prompt builder 都注入&quot;与其他 agent 通信&quot;段（包括无头的 hermes -p &lt;bot&gt; chat 会话），bot 交接不再改写用户自建的 SOUL 文件，具备 bot_mode_protocol 能力的网关走新协议，老网关保留 SOUL 追加路径（2b39e92e9）。存量 Bot Chat 会话一次性协议升级（4e22d070f），常驻 Bot Chat 会话支持能力刷新和不过期的提示词（ea4310e76）。</p>
+<p>群聊交互补齐：Discord 风格的群聊创建（72785b265）、群聊解散/删除（bd9c7d87f）、composer @ 自动补全里出现 bot 句柄（1a74e7fb4）、群聊消息正确渲染 Markdown 并走插件 SDK（cf2d28a2f、577f5cf20——修复 #88391）。</p>
+<p>SSH 跨机器 Bot Mode 修复一批：本地聊天里可以直接 @ 连接里的 bot（f89f884a5）、SSH 默认 bot 在远程 root profile 打开（30299efa3）、只列 Bot Mode agent 时不再为每台 SSH 拉仪表盘（c2c3058ec）、SSH bot 清单失败后冷却重试（4afe08f49）、SSH 连接移除后行消失（89877d10a）、本地点击后 SSH bot 仍然可见（406816211）、多源名册用活跃连接 id 分类、行键带来源限定（ece487cee）。</p>
+<p>桌面端插件内联组件与 ::preview 实时渲染</p>
+<p>之前的 ::preview 只是个&quot;点开侧栏的卡片&quot;，插件的内联渲染能力也很有限。这一波把消息内预览做成了原生组件：</p>
+<p>::preview 直接在消息内实时渲染页面，不只是打开侧栏的卡片（8425f8286）。预览编译成原生的&quot;内容自适应、跟随主题、可交互&quot;的 widget——大小按内容撑开而不是固定默认尺寸（a1fea5345、5c4f1e744），重复渲染时不再出现提供方回声导致的重复文本（d690e0220）。</p>
+<p>插件现在可以用 ::名字{...} 指令在助手消息里渲染内联组件（59b1c40cd）。更关键的是 widget 点击会真正到达 agent：框架注入一个脚本，页面可以调 window.hermes.send(&#x27;get-price eth&#x27;) 或直接放 data-hermes-send=&quot;get-price eth&quot; 按钮，点击以隐藏用户回合（display_kind=hidden）走 composer 正常发送路径——agent 醒来完成真实的一轮，持久行保留（上下文、resume、DB 审计都在），但不渲染气泡。widget 的更新本身就是回复。核心 commit：3ead0f8dc。</p>
+<p>插件新增每个插件独立的持久数据目录，插件更新、甚至卸载重装都保留数据（8f2ddc967）。</p>
+<p>项目技能隔离与信任继承</p>
+<p>在 git 仓库里开会话时，现在会从仓库的 .hermes/skills/ 和 .agents/skills/ 加载项目级技能，作为最高优先级层（项目 &gt; 本地 &gt; 外部目录），同名列优先项目层。技能是可执行的过程文档，从任意 clone 的仓库自动加载是提示注入向量，所以加载按仓库单独信任门控（hermes skills trust/untrust），未信任仓库的技能只显示一行横幅提示。核心 commit：f891d702d。</p>
+<p>信任是仓库级的一次性决定，但仓库内容每次 pull 都会变——hub 安装路径有扫描、checkout 路径反而没有。现在每个项目 SKILL.md 目录都跑与 hub 安装相同的技能守卫扫描（内容哈希缓存到 ~/.hermes/cache/project_skill_scans/，绝不写进仓库），判定 dangerous 的技能被隔离：不进索引、不进 skills_list、不吃斜杠命令（收敛到单一迭代关卡 iter_project_skill_files()），按名查看也拒绝并给出解释；扫描器自身失败时按&quot;失败即关闭&quot;处理。已用真实注入样本验证（6 条发现：提示注入忽略、欺骗隐藏、不可见 Unicode、凭据外泄等模式）。cron/API/ACP 等非交互面通过项目身份继承此前交互会话的信任决定，find_project_root() 优先从 TERMINAL_CWD 解析。核心 commit：6e22d2658。</p>
+<p>cron 任务连续性（self-context）与漏跑补跑</p>
+<p>cron 任务之前每次运行都在隔离会话里，上一轮的记忆全部丢失；context_from 机制只能引用其他任务。现在支持 context_from=&#x27;self&#x27;（任务自己的 id 等价）：任务唤醒时注入自己最近一次的输出，并带上&quot;连续性&quot;框架——定时侦察、监控类任务可以对照上次已上报的内容去重、接着上次的进度继续跑，而不是每次从零开始。用户侧暴露为 continuity 开关：hermes cron create/edit 加 --continuity / --no-continuity（ea2970274），dashboard、Bot Mode routines、TUI cron RPC 里都可以切换（0b13cafff），底层是 context_from=&#x27;self&#x27; 的表面封装（2e7a46cc2）。核心：47d7661aa。</p>
+<p>外部调度器漏触发补跑：托管部署用外部调度器（Chronos）派发，触发时刻网络一跳挂了、重试预算耗尽时，任务的 next_run_at 一直停在过去、永远没人跑它——外部提供方没有本地 tick 循环，即使网关几分钟后恢复这一天也静默丢了（野外实测连续 4 个晚上漏跑）。现在后台巡检每 5 分钟调 fire_overdue_jobs()：内置 ticker 和有 misfire_grace_minutes&lt;=0 配置的跳过（默认宽限期 10 分钟，给外部调度器自己重试的时间），超过宽限期仍过期即补触发，并记录 last_fire_error，用户能在任务上看到漏跑。核心 commit：481156139、cb1b1da21。</p>
+<p>cron 稳定性修复一批：调度器在 fd 耗尽（EMFILE/ENFILE）后曾把错误当&quot;别的实例持锁&quot;吞掉、心跳和成功标记还保持新鲜，导致零任务运行却显示正常——现在锁获取的 OSError 传播到 ticker 循环、检测 fd 耗尽尝试 gc.collect() 和提升 soft nofile 上限、指数退避，真实锁竞争（EWOULDBLOCK）仍静默跳过（815934ae5、80dc1836c）。持久状态恢复会重新武装卡在陈旧 last_status=error 的循环任务（122bfad53），一次性任务派发失败时清理 run_claim（6d85f214a、70fc5a5ee），重复任务派发失败跳过 run_claim 清理（baa1cfb89，本期唯一 perf）。</p>
+<p>桌面端构建版本失配告警</p>
+<p>hermes update 只更新源码树，桌面端 UI（包括内置插件如 Bot Mode）是编译进安装包的：终端侧更新后出现&quot;About 报新版本号但侧边栏没有新功能（比如没有 Bots 标签）&quot;的现象，用户以为更新成功了。现在通过对比打包的 install-stamp commit 与源码树（git rev-list --count &lt;stamp&gt;..HEAD -- apps/desktop）检测偏差：设置 → About 显示琥珀色警告横幅并指向更新器，macOS 原生 About 面板在版本行加后缀，hermes:version IPC 也暴露 bundleOutOfSync / bundleCommitsBehind。核心 commit：a13be6957。警告横幅里直接给出安装器链接（39c0bc80b）。</p>
+<p>新模型与供应商：Meta Muse Spark、CommandCode、Codex 上下文</p>
+<p>新增 Meta 官方模型 API（Muse Spark）provider 插件并内置（833f0e2ac、eaa3c72c3），内置 meta-ai profile 切到 Responses 协议走提示缓存（f2f6dce78、24545418e，host mandate 触发时也保留 provider-slug 改写 d4658ee6d）；OpenRouter 精选模型列表加入 Meta Muse Spark 1.2（9a862483b）。</p>
+<p>新增 CommandCode provider 插件：OpenAI 兼容端点 20+ 模型（DeepSeek、Qwen、Kimi、GLM、MiniMax、StepFun、Mimo、Gemini、GPT，默认 deepseek-v4-pro，1M 上下文），另有 Anthropic Messages 兼容 profile（默认 claude-sonnet-4-6，1M 上下文），并接入 doctor/dump/setup 表面、每个 profile 独立 base-URL 变量（26d8bf567、8800ec66d、9adc60719）。</p>
+<p>Codex OAuth 上下文档位提升：gpt-5.6（sol/terra/luna）和 gpt-5.4 的 /models 目录广告 272K，实测后端实际接受约 371K（8 月 16 日对 chatgpt.com/backend-api/codex/responses 实测四个 slug 全部通过，382K+ 被 context_length_exceeded 拒绝），调到 350K 留约 22K 余量；仅当解析到的值恰好是已知过期的 272000 时生效，目录后续修正会自动停用覆盖，gpt-5.5 和 gpt-5.4-mini 真实验证就是 272K，排除在外（522997543）。订阅 1M 档位进一步提到 900K（bab7be3ca）。</p>
+<p>插件安装安全扫描 + 技能更新保护</p>
+<p>hermes plugins install 之前直接 clone 并激活任意 Git 仓库、完全不扫描——而插件是进程内跑 Python，是比技能更危险的面。现在插件安装/更新复用 skills_guard 模式引擎（tools/plugin_guard.py）：豁免文档化的 provider 插件模式（requires_env API 密钥读取、带密钥的 HTTP 调用），保留真正的威胁信号（外部凭据库访问、反弹 shell、破坏/持久化/混淆、提示注入）。核心 commit：d44a29549。</p>
+<p>hub 技能更新保护：本地手动编辑过的技能默认跳过不覆盖，除非显式 --force（0e378e59a）。</p>
+<p>其他安全/合规项：concurrent 相同的网关审批提示合并成一次——并行工具调用命中同一危险命令门禁时，之前每个调用弹一次批准、用户要 /approve N 次而 agent 卡死；现在检测到已挂起的相同审批（命令文本+模式键集一致）就等领头事件，跟随者自动采用会话/总是决定，拒绝/超时不再重复追问（08d982850）。curator 每次技能变更（curator、agent、用户）都追加一条审计账本到 ~/.hermes/skills/.curator_ledger.jsonl，内容寻址备份在 .hermes/.curator_backups/blobs/，支持单条回滚且回滚前先拍安全快照、快照失败即中止（efe41abde、070c6a5f8）。</p>
+<p>Kanban 内存感知并发上限</p>
+<p>生产两次事故（OOF-77、OOF-30）：未配置 kanban.max_in_progress 的忙碌看板 + 1GiB 托管 VM，调度器一次放行 26-31 个并发 worker，宿主 swap-thrash/OOM 整机不可达，NAS 重启循环还掩盖问题——每次&quot;恢复&quot;后调度器立刻重新拉起无界 worker。现在未配置上限时按主机内存自动推导默认并发上限，派发前检查内存水位；ready 和 review 两条队列都先过 max_in_progress 约束再放行（1f8c05783），上限核算按主机级别记账、daemon 上限解析和 review-lane 预留一并修复（e1e472d29，OOF-30 review）。核心 commit：4beca7a94。</p>
+<p>其他值得说的一批</p>
+<p>/工作流命令：/worktree 新命令——会话中创建隔离 git worktree（.worktrees/ 下，远程 tip 为基，worktree_sync 生效），重定向 TERMINAL_CWD 和进程 cwd，未推送退出时保留；/worktree 显示当前激活树、/worktree list 列出全部，命名树跳过 hermes- 前缀走较慢的清理节奏（0043a484e）。/rollback 默认保留用户手工编辑（bd4b70925）。会话管理 CLI：hermes sessions pin/unpin/pinned——桌面端侧边栏和自动归档一直在写 durable pinned 标志，但 CLI 一直没入口，脚本化受阻；现在 CLI 可 pin/unpin 会话（35598d8e8）。</p>
+<p>delegate_task 子代理模型可选：auxiliary-models 选择器里暴露 subagent 模型（b7329647a），pinned delegation.provider 被严格执行、不再静默回落到父会话的 provider（184cddb44）；live-transcript manifest 记录模型/提供方（e3c71e052）。</p>
+<p>终端信号退出码解读：命令被信号杀死时模型看到的是裸数字（exit_code=-9 或 137，137 = OOM kill 最常见），会烧好几轮误诊；现在映射为可读说明（204302bd6）。</p>
+<p>桌面端性能：DiffusionCanvas 的 rAF 循环节流到 15fps 上限并限制并发实例（ee616b4b6）、非活跃标签页暂停扩散渲染（c776bdd24）、空闲像素蛋动画休眠（36d5dd3ae）、bot 头像时钟闲置暂停、禁用插件时拆除（ce1f5dd30、ba2fb191c）。</p>
+<p>桌面端细节：状态栏对离线 gateway 增加重连入口（ace85d63d）；远程 gateway headers 支持并穿过连接注册表、测试探测和设置 UI（fcef62ef7、b711fd051）；删除的 profile 重启后不再复活（19c68e8c9、2038d4034）；远端子 profile 走主连接的远程网关（15dd3bf58）；会话磁贴睡眠唤醒后用活动运行时 id 重新恢复（93ed11379、243352e7b、5099a65a0）。</p>
+<p>TUI：恢复 Alt+Enter 插入换行（回车的 ESC 序列按 Meta+Return 处理，普通 CR/LF 仍提交）——修复 #87066（298f66210）。</p>
+<p>web：聊天输入行不再被手机软键盘挡住，键盘内嵌滚动钉扎仅在聊天页可见时生效（67710548e、ad0242547，NS-434）。</p>
+<p>环境隔离：桌面端 Electron 注入的 Hermes venv site-packages 不再泄漏给终端子进程——跨 Python 版本时 3.11 的 C 扩展（PIL _imaging、cryptography 等）会骑到 3.13 的 sys.path 前面直接 ImportError，现在做手术式 Hermes-venv 过滤（43c463fa9）；PYTHONHOME/PYTHONPATH 继承语义收紧（850686a51、ced80b2a2、73b49f473、6e9eeb541），repo 级 junction 词法根修复（57d94dd8d、d67cd58e7）。</p>
+<p>MCP：迁移到 mcp 2.x SDK（11a9dcf56）、说 2026-07-28 stateless 协议（382060f02）、从握手版本播种 MCP-Protocol-Version 而不是最新版（77ed1bbf4）、接受两代 SDK 的 streamable-HTTP 传输 arity（2e1d724e3）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-08-17：桌面端 MCP 管理大升级：统一列表、后台健康检查、成本用量浮层</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-17</link>
