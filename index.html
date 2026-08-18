@@ -22,9 +22,59 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 21 期 · 4348 个提交 · 每日自动更新 ·
+<p class="meta">共 22 期 · 4587 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-19" class="day">
+      <h2>Hermes 日报 2026-08-19：桌面端内置浏览器大升级，Bot Mode 群聊支持图片与线程，插件可一键安装</h2>
+      <p><strong>本期覆盖 8 月 18 日 06:30 ~ 8 月 19 日 06:30 合入 main 的提交，共 239 个 commit（不含 merge），另有 12 个 merge。新增 43 个功能、116 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端内置浏览器大升级：地址栏+前进/后退、链接应用内打开、快捷键呼出、SSH 网关下端口转发直达远程 dev server</p>
+<p>Bot Mode 群聊支持图片附件、可改名设头像、真 Slack 式线程、旧对话折叠摘要、Discord 式列表行</p>
+<p>插件生态打通：hermes:// deeplink 一键安装、插件系统通知带按钮可点击直达</p>
+<p>桌面端与会话整合：统一 Sessions 列表聚合所有网关会话、Gateway+Connections 合并一页、Capabilities 按 profile 作用到自己的网关</p>
+<p>模型目录整理：Ollama 原生目录语义、目录身份跨选择器保留、自定义 base_url 生效</p>
+<p>重点条目：</p>
+<p>桌面端内置浏览器大升级</p>
+<p>之前的 in-app 浏览器只能显示打开它的页面：没有地址栏，没有前进后退，不能手动输网址（5117eb7c9 的 body 原话「The Browser tab could only show whatever opened it」）。这波补全了浏览器该有的基本形态：地址栏 + 前进/后退/刷新按钮；网页里的链接在聊天转录、url chip、终端里点击默认在应用内打开（agent 也能看到这个页面），想用系统浏览器就按住 Ctrl 点击（macOS 为 Cmd-click），非网页 scheme（mailto:、file:、自定义协议、账单/OAuth/本地媒体）仍交给系统浏览器（d48b44150）。浏览器不再只能靠聊天召唤：新增 Ctrl+Shift+L 快捷键直接呼出（macOS 为 Cmd+Shift+L），按一下重新前置当前页面而不是重置（a9a4a0407）。</p>
+<p>远程网关是这波的另一条主线：SSH 网关下，应用内浏览器会自动开本地→远程的端口转发，agent 提到的远程 dev server 地址在本地浏览器面板里能直接加载，转发租约按端口复用、15 分钟过期（0600738f6）；agent 打开的 URL 和手动输入的地址都会先做 loopback 可达性处理，不可达时保留原 URL 让面板解释（8911e2e0e）；预览 URL 也改由主进程解析——主进程知道底层传输（956642c4f）。原生浏览器手势（如系统级导航动作）也统一路由到应用内浏览器（ccabff897）。</p>
+<p>Bot Mode 群聊大升级</p>
+<p>群聊之前纯文本：composer 和线程回复框的 prompt.submit 只有文本没有附件动作，用户截图永远到不了群成员的模型（社区报告来自 Osiris）。现在群聊能发图片了：composer 和线程回复框都有附件按钮、支持 Ctrl/Cmd+V 粘贴、待发送 chip 可预览/移除、允许纯图片发送；图片压缩到长边 1568px 存进 room-log，刷新后成员仍能看到当时给他们看的图（b359db72e）。</p>
+<p>群聊管理补齐：新建时可传群头像（本地传或 image.generate 生成），建好后齿轮按钮可以改名、更换/删除头像；改名会重建房间记录（日志、水印、会话、成员、头像）并同步到每个成员本地的 groups 列表，重名直接拒绝而不是静默加后缀，历史会话按 sid 继续不丢（4349cbbb2）。消息结构升级为真正的 Slack 式线程：主输入框发消息开一个新线程（整组可见），每个打开线程有独立的「Reply in thread」回复框继续该线程——显式意图，不再靠用户消息时间差猜话题边界（旧方案本来就不可靠，任务往往要很多轮用户输入）；成员回合按线程隔离：round-robin 驱动只过滤触发线程的日志、水印按 thread::member 键区分（6abe6edee）。</p>
+<p>显示层面：每条用户消息开启一段对话，最新对话全量渲染、更早的折叠成一行摘要（开头文本、回复数、最后活跃时间），点击展开/收起，持久化模型不变、跨机器同步不受影响（8505559fa）。群聊在 Hermes Bots 名册里从「分组头+小超链接」改成 Discord 风格的单行：堆叠成员头像、群名、成员数、最新一条消息预览、相对时间、needs-you 徽章（ae5c4c167）。右键可把 bot 从名册隐藏（隐藏状态经 profile.yaml ui_meta 跨机器同步），隐藏后列表和 Active-now 条消失，头部眼睛开关在 ≥1 个隐藏时出现、可恢复（133381508）。一个 bot 现在可以挂多个群（9bea43918），群聊消息可复制（6d1e6113a）。</p>
+<p>配套修复：群聊不再丢长时运行的成员回合——7 分钟的成员运行撞上 3 分钟固定回合截止被标 (pass)、结果永远进不了房间；现在回合截止随会话可见的 inflight/running 状态延长（20 分钟硬上限），超时回合记录 stranded 基线、下一回合边界把迟到的回复收进房间，晚到但绝不丢（30fcf9580）。CLI 派生的 Bot Mode 会话（bot 间交接用 hermes -p &lt;bot&gt; chat -c &quot;Bot Chat&quot; --create-if-missing 创建的）之前永远留在全局侧边栏（用户报告五条&quot;Bot Chat&quot;加两条&quot;Agent Inbox&quot;泄漏行），现在按所有权清扫（4014eb7d5）。多群名册下新建群的重名检查改为统计全部 membership，避免次成员身份重名复活旧房间（c381aef16）。</p>
+<p>插件一键安装与富通知</p>
+<p>插件之前只能靠 dashboard_install_plugin 等非交互路径手动装。现在点 hermes://plugin/install?repo=owner/repo 链接（或设置 → 插件 → Install from Git）会打开确认弹窗：显示仓库身份和来源链接，浅克隆探测该仓库里有没有 agent 插件和/或桌面端插件组件，勾选要装的组件后一键安装——agent 侧走网关 plugins.manage install 动作，桌面端侧走新的 Electron git 安装模块，带子目录逃逸防护、60 秒克隆超时、非交互 git 环境、非安全协议警告（359e09fd6）。</p>
+<p>插件系统通知升级：ctx.os.notify 现在支持图标、动作按钮和可序列化的 activate 目标；点通知正文或按钮会聚焦窗口并导航到插件页面，activate 解析与 hermes:// 深链共用 hermes-open-target.ts——hermes://index-network/intent/1、/index-network/intent/1、{path,params} 三种写法落到同一个 hash-router 路由（73ddf6665）。</p>
+<p>主题实时预览与 macOS 磨砂玻璃</p>
+<p>Ctrl+K 命令面板里，主题行的预览之前只在选中（select）时才应用；现在高亮的行即时绘制主题（cmdk 通过 onValueChange 上报高亮行，新增 onHighlight 回调接住），预览不持久化，行变化/翻页/关面板/提交都会清掉预览恢复正常外观（40fccbf08）。修复了预览触发链路：非受控 cmdk 下回调不触发（1e3106197）、Esc 关闭后面板退出动画期间恢复被延迟（ae162f7e5）。</p>
+<p>窗口透明度新增 Glass 玻璃档位（macOS 专属，其他平台自动归一为 Clear）：原生不透明度档位会把整个窗口（含文字）一起淡掉，忙乱壁纸上低档位很难读；Glass 档保持窗口原生不透明，只把渲染层表面（聊天区和侧边栏）做薄化，透出 macOS vibrancy 材质——磨砂模糊、文字保持全对比度。档位和强度持久化到 translucency.json，即时应用到所有开着的窗口，冷启动保留（eb6f352be）。配套恢复 frost picker（vibrancy 材质即磨砂档位，四档来自 macOS 26 像素普查：14 种 Electron 材质归并为 9 种观感）、侧边栏玻璃、全范围色调和 peek（efa15b5eb）；新 macOS 配置默认选中 Glass，让值得发现的那一半先被看见（e9cefa4d7）。性能：透明度滑杆拖动会打爆主进程（每帧都发 IPC），改为防抖合并（f3bfa9ae5，本期唯一 perf）。另外水平标签页现在悬停显示关闭按钮，长标签用渐隐而不是硬裁切，渐隐色跟随主题（542e146b0）。</p>
+<p>会话与连接整合</p>
+<p>全局 SESSIONS 侧边栏之前只聚合本地 profile 和 v1 per-profile 远程覆盖，v2 registry 连接（远程/云端/SSH 网关）上的会话永远不出现——远程 API 返回了行但渲染层收到空数组（#88880）。现在 fetchRegistrySessionRows 读取每个已连接 registry 网关的会话列表（SSH 原生后端、共享远程/云主机走跨 profile 聚合带旧扁平列表回退），行带 connection_id 和归属 profile（d354af5e1）。</p>
+<p>设置页合并：Connections 并入 Gateway，变成一个 Gateways 页面，旧 ?tab=connections 深链保留在路由枚举里自动重定向、短帧内渲染避免已存书签闪断（9a85769fc）。</p>
+<p>Capabilities 视图（Skills/Tools/MCP）之前总通过窗口的活跃后端读写——把作用域切到远程拥有的 profile 时静默改错机器。现在 REST 助手接受 ProfileScope（{connectionId, profile}），SkillsView 的作用域选择器列出多连接桌面端的（profile, device）行，MCP 的 reload 跨后端作用域被扣住，避免远程误操作（d8e238691）。设置页共享同一个「Applies to」profile 作用域选择（$settingsScopeOverride nanostore），跨页面持久，少于两个 profile 时隐藏（7999ac6e3）。</p>
+<p>桌面端状态发布修复一批（Jack Lau）：profile 切换时网关、profile 指针、连接描述符之前分三次 set，nanostores 在 .set() 内同步排空监听器，中间态会让 $gateway 监听器在新后端上跑旧连接描述（d57f94a33）；网关切换三连 set 也合并成一个批次（053eb7aab）；agent 切换失败路径补上——描述符查找 reject 时切换直接失败，不再发布半套状态（20ccf88ac、d0e0951cf、4e520f085）。</p>
+<p>模型目录与供应商整理</p>
+<p>这波主要解决「目录身份在切换器/发现流程中丢失」的系统性问题：Ollama 补上原生目录语义（638b72f5e），ACP 侧保留原生供应商目录和身份（17405de9c），原生 discovery 结果能跨模型选择器传播（fa1bb88e3），修复一批边界：发现哨兵键不再漏进用户可见的 models 映射（72b7c6c8d）、命名自定义目录身份持久化（015f9990c）、空目录和自定义模型语义保留（81e813507）、带冒号的自定义供应商前缀保留（4daaf1e61）、发现来源和端点身份保留（7e61bd38c）、最终边界情形关闭（f70e9abce、7fb6b28ec、9d2ba6c65）。</p>
+<p>对用户直接可见的两个修复：插件注册的供应商（CommandCode、tencent-tokenhub 等）不在 models.dev 和 HERMES_OVERLAYS 里，之前 /model 切换报 Unknown provider，现在 get_provider 先落回 providers.get_provider_profile() 再放弃（7072fc4f8）；自定义 base_url 现在真正生效——fetch_models 之前收下 base_url 但忽略，用户配置的模型端点/代理（COMMANDCODE_BASE_URL）还是去抓公共目录，改为类级修复（c7d0f6c35），CommandCode 两个 override 之前只收 api_key/timeout、选择器每次打开都 TypeError 被静默吞掉、供应商显示零模型，现在接受 base_url（f5ea3fa9c）。</p>
+<p>hermes peer：跨机器 bot 互聊</p>
+<p>机器人之前只能跟自己机器上的队友聊（hermes -p &lt;bot&gt; chat），桌面端能通过 Connections 转发用户 @。跨网关的 bot 对 bot 没有传输层。新增 hermes peer add/list/remove/dm：dm &lt;peer&gt;[/&lt;agent&gt;] 解析远程 agent 的规范 Bot Chat 会话（按标题找、没有就创建）、走 POST /api/sessions/{id}/chat 跑一轮同步 agent 回合、stdout 打印回复——跟本地 bot 消息命令是同一形态，Bot Mode 协议原样跨机器组合；命名 profile 走对方 /p/&lt;profile&gt;/ 多路镜像；peer URL 在 config.yaml 的 bot_peers，对方的 API_SERVER_KEY 按凭据对待（6229683b6）。</p>
+<p>默认 profile 可改名</p>
+<p>hermes profile rename default &lt;name&gt; 之前直接报错。现在给默认 profile 设置展示名 display_name（纯展示，规范 id 仍是 default，解析/比较/spawn 路径不动），profile list/show/status、桌面端/仪表盘改名流程都能用（a1682376c）。</p>
+<p>TUI 引用实时上色</p>
+<p>TUI 输入框渲染一个扁平字符串，引用（@ 文件等）只能发送后才可见。现在输入时引用就用主题强调色实时高亮（光标渲染器和选区渲染器都支持），密码掩码输入不参与高亮；快速回显旁路需要走 Ink 路径重着色闭合 token（] 或第二个 / 降级路径）的场景也处理了（c1358e45d）。</p>
+<p>cron 媒体发送超时可配</p>
+<p>媒体发送超时之前是写死的。现在按标准解析顺序：HERMES_CRON_MEDIA_SEND_TIMEOUT 环境变量 → cron.media_send_timeout_seconds 配置 → 默认 300 秒（和 script_timeout_seconds 对齐；.env 保持仅存密钥），失败原因不再为空串（bc76f62c2、d9ec9dd3f）。</p>
+<p>技能安装安全扫描升级</p>
+<p>技能 hub 安装路径增加 NVIDIA SkillEvaluator 顾问扫描（可选、确定性、无密钥的 Tier 1 检查：PII、unicode 走私、脚本 lint），通过 subprocess 在隔离 bundle 上跑、解析 JSON 报告、分类 secrets 类发现（私钥、token、带凭据的连接），结果写入生成清单（183f18d53）；按 NVIDIA 评审反馈扩大为完整 Tier 1 面——license + security（严格静态规则，每次安装约 +1.2s），schema/quality 仍排除（2c2697b52）。</p>
+<p>Kanban 原生通知</p>
+<p>后台 agent 完成看板任务时桌面端弹系统通知：任务摘要 + 一键「打开看板」按钮，基于现有 /events WebSocket、按板游标去重、基线未知时安全失败、断线重连安全（a30636f81）。后续扩展到网关 watcher 的完整终止集：blocked、gave_up、crashed、timed_out、死循环检测——用户离开期间 worker 卡住是原始社区诉求；文案走看板插件 i18n（en/ja/zh/zh-hant 含英语兜底）（9aa141378）。</p>
+<p>大工具结果不再截断</p>
+<p>没有沙箱环境的会话（纯 MCP、cron、gateway）里 maybe_persist_tool_result() 拿到 env=None 直接走内联截断——实测 467K 的 MCP 结果被砍成 ~1.3K 预览且不落盘、agent 拿不到自己的结果。现在大结果持久化到 HERMES_HOME/cache/spillover（c91681c69），且所有后端统一：spillover 目录加入自动挂载/同步缓存目录清单（docker bind-mount、modal/ssh/daytona 文件同步），主机侧先写、远程引用在可读性探测成功后用沙箱内翻译路径，旧容器回退到原临时目录不回归（8a770aae0）。</p>
+<p>其他</p>
+<p>Termux 支持 apt 管理的 Hermes 安装（26466d059）；桌面端删掉 Tools &amp; Keys 页面的页内搜索框——Ctrl+K 全局命令面板已经能搜凭据，卡片保留、深链仍可展开/滚动/高亮（2d579af86）；evals 目录新增 Browser Use 模式 A/B benchmark 复刻 PR #81958 的 204 次运行测试电池（5033aedaa）。</p>
+    </section>
+    
     <section id="2026-08-18" class="day">
       <h2>Hermes 日报 2026-08-18：Bot Mode 跨连接升级：Create-on 选择器、多机器群聊与内置插件化</h2>
       <p><strong>本期覆盖 8 月 17 日 06:30 ~ 8 月 18 日 06:30 合入 main 的提交，共 263 个 commit（不含 merge），另有 4 个 merge。新增 47 个功能、128 个修复、1 个性能优化。</strong></p>
