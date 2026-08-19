@@ -22,9 +22,195 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 22 期 · 4587 个提交 · 每日自动更新 ·
+<p class="meta">共 23 期 · 4782 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-20" class="day">
+      <h2>Hermes 日报 2026-08-20：Hermes 桌面端玻璃材质、批量提问与图片生成能力集中更新</h2>
+      <p><strong>本期覆盖 8 月 19 日 ~ 8 月 20 日合入 main 的提交，共 195 个 commit（不含 merge），另有 26 个 merge。新增 44 个功能、73 个修复、2 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端窗口玻璃材质扩展到 Windows 11，半透明控制项按系统能力分化</p>
+<p>图片生成集中接入 Grok Imagine 2.0 与 OpenRouter 图片 API，目录实时化</p>
+<p>桌面端新增 Tour 引导，agent 能带着你走一遍界面</p>
+<p>clarify 提问工具支持一次问 2-5 个问题，超时自动停止追问</p>
+<p>Bot 模式默认头像改为由名字生成的确定性软体脸</p>
+<p>重点条目</p>
+<p>桌面端外观（feat ×3）</p>
+<ul>
+<li>eb5232885 feat(desktop): back window glass with Windows 11 system materials</li>
+</ul>
+<p>背景：玻璃效果此前只有 macOS 能用，因为它走的是 setVibrancy。Windows 11 22H2 有第一方对应的 setBackgroundMaterial，于是本次把模式改为按平台解析底层材质：macOS 保持 vibrancy，Windows 11 用 DWM 的 acrylic / tabbed / mica，更老的系统保持 Clear。无需第三方原生插件。效果：毛玻璃不再是 macOS 专属，Windows 11 用户也能得到系统级透明窗口。</p>
+<ul>
+<li>8a918bdc6 feat(desktop): scope the translucency controls to what each OS can do</li>
+</ul>
+<p>背景：原来的半透明面板只有一个没有标签的 0-100 滑杆，但在不同模式下含义完全不同——Clear 模式下是窗口不透明度，Glass 模式下却变成&quot;主题色调盖在材质上的程度&quot;，同一个轨道同一个读数两种含义。修复：Glass 现在有带标签的面板，Tint 保留渲染器旋钮、Fade 是真正的原生不透明度（默认 0，因为淡出玻璃窗口会淡出它的文字，那正是玻璃要避免的）；Frost 只列出系统能真正区分渲染的档位，Windows 显示三个按钮而不是两个合成效果相同的档位。</p>
+<ul>
+<li>fdf6f1d4c feat(desktop): add an Appearance toggle that disables the intro splash</li>
+</ul>
+<p>空对话页的品牌字与标语一直没有关闭开关。修复：新增 Appearance 行的 Intro Splash 开关（默认开启，所以现有行为不变）。该状态是渲染器本地状态（localStorage），不镜像进网关配置。</p>
+<p>桌面端来源与侧栏（feat ×6 + fix ×1）</p>
+<ul>
+<li>ccd30f955 feat(desktop): distinguish sources from profiles</li>
+</ul>
+<p>把&quot;来源&quot;和&quot;profile&quot;两个概念区分开，让连接管理更清晰。</p>
+<ul>
+<li>0ca744382 feat(desktop): switch sources from the Sessions rail</li>
+</ul>
+<p>可以直接从侧栏切换来源。</p>
+<ul>
+<li>7245b022d feat(desktop): route REST through registered sources</li>
+</ul>
+<p>REST 请求现在走已注册的来源路由。</p>
+<ul>
+<li>0ab0ed54f feat(desktop): clarify active and default connections</li>
+</ul>
+<p>界面明确区分当前激活连接和默认连接。</p>
+<ul>
+<li>2228bc7d8 feat(desktop): remember the last used source</li>
+</ul>
+<p>记住上次使用的来源，切换回来不用重新选。</p>
+<ul>
+<li>2c6dcf91c feat(desktop): keep large gateway registries searchable</li>
+</ul>
+<p>大网关注册表也保持可搜索。</p>
+<ul>
+<li>7b25941b0 fix(bot-mode): unwrap connections registry object so &#x27;Create on&#x27; picker renders</li>
+</ul>
+<p>修复&quot;Create on&quot;选择器不渲染的问题。</p>
+<p>图片生成（feat ×5 + fix ×1）</p>
+<ul>
+<li>ceabb030f feat(image-gen): add Grok Imagine Image 2.0 to the FAL image catalog</li>
+</ul>
+<p>FAL 图片目录新增 xai/grok-imagine-image/v2.0/text-to-image，支持编辑端点（最多 3 张参考图），1k/2k 分辨率、13 种宽高比（标准映射 3 种），schema 对照 fal.ai 的 llms.txt + OpenAPI 校准过。</p>
+<ul>
+<li>ac0a8cd28 feat(image-gen): xAI Grok image catalog goes live-driven; grok-imagine-image-2.0 selectable</li>
+</ul>
+<p>xAI Grok 图片目录改为实况驱动，grok-imagine-image-2.0 可选。</p>
+<ul>
+<li>9c6ecf2ca feat(image-gen): OpenRouter image picker lists every live image-output model; xAI edits honor dispatched model</li>
+</ul>
+<p>OpenRouter 图片选择器列出所有实况图片输出模型，xAI 编辑遵循派发的模型。</p>
+<ul>
+<li>d6e6e8b60 feat(plugins): add OpenRouter Image API surface to openrouter image_gen backend</li>
+</ul>
+<p>openrouter 图片生成后端接入 OpenRouter 图片 API。</p>
+<ul>
+<li>aba96d525 feat(image-gen): route live-catalog models to the Image API; merge picker catalogs; docs</li>
+</ul>
+<p>实况目录里的模型路由到 Image API，合并选择器目录，补文档。</p>
+<ul>
+<li>9b5e7a322 fix(image_gen): Grok Imagine 2.0 no longer upscales by default — opt-in policy restored</li>
+</ul>
+<p>背景：ceabb030f 给 Grok 2.0 目录条目设了 upscale=True，违反了 2026 年 8 月&quot;放大需主动开启&quot;的策略，还让 main 上的 test_upscale_defaults_are_all_off 变红、拖累每个 PR 的测试。修复：恢复成默认不放大、需主动开启。</p>
+<p>桌面端 Tour 引导（feat ×6 + fix ×1）</p>
+<ul>
+<li>23d88c2b0 feat(tools): tour — let the agent walk a user through the UI</li>
+</ul>
+<p>desktop_ui 工具集新增一个通用 tour 工具：发现屏幕上有什么、高亮某个元素配讲解、或者给用户一页页的引导。引导内容不写死在代码里，由 agent 现场编写，所以&quot;这个怎么用&quot;可以回答成一段逐步走查而不是一大段文字。走的是既有的阻塞式 prompt 桥（tour.request/.respond），各种连接拓扑都能用。</p>
+<ul>
+<li>018176915 feat(desktop): tour engine — highlight and narrate any DOM</li>
+</ul>
+<p>与表面无关的走查引擎 + 驱动 API：collectTourTargets 扫描任意文档的可寻址元素，标注每个选择器稳定（基于身份、重渲染后仍有效）或位置性；runTourEngine 把一个动作转成 driver.js 高亮、多步引导或单步变化。自包含、无闭包，渲染器和 webview 访客页面都能跑；弹窗用应用自身主题 token 重绘，跟随所有主题和自定义皮肤。</p>
+<ul>
+<li>0d572e063 feat(desktop): answer tour.request from the renderer</li>
+<li>ec6994053 feat(desktop): run tours inside the preview pane</li>
+<li>702d7bacc feat(desktop): name the app&#x27;s shared surfaces for tours</li>
+<li>d433a452c feat(desktop): give tours a themed spotlight and directional motion</li>
+</ul>
+<p>给引导加上主题化高亮和方向动效。</p>
+<ul>
+<li>84d81d258 fix(tour): an unanswered tour bridge no longer costs 45s per action</li>
+</ul>
+<p>修复：无人应答的引导桥不再每次动作都白等 45 秒。</p>
+<p>批量提问 clarify（feat ×9）</p>
+<ul>
+<li>bd8b658a6 feat(clarify): accept a questions batch in the clarify tool core</li>
+</ul>
+<p>clarify 工具核心新增可选 questions 参数，一次接收 2-5 个独立问题（issue #18450）。支持批量的平台回调一次拿到规范化列表并分题作答；旧回调逐个问题循环。超时后停止追问（用户走开后不再被打扰），已锁定的回答会随 timed_out 标记一起保留，未答条目的 user_response 为空。单问题路径与原先行为逐字节一致。</p>
+<ul>
+<li>e0d8a2eb8 feat(desktop): multi-question clarify card with per-question locks</li>
+</ul>
+<p>桌面端多问题确认卡片，每个问题单独锁定。</p>
+<ul>
+<li>879d6a4c7 feat(tui_gateway): batch clarify bridge with per-question locks</li>
+</ul>
+<p>TUI 网关批量 clarify 桥，带逐问锁定。</p>
+<ul>
+<li>b4526d46d feat(cli): compact multi-question clarify panel</li>
+</ul>
+<p>CLI 紧凑型多问题确认面板。</p>
+<ul>
+<li>a9b8d69a1 feat(tui): compact multi-question clarify prompt</li>
+</ul>
+<p>TUI 紧凑型多问题确认提示。</p>
+<ul>
+<li>25c651660 feat(desktop): single confirm for the batch clarify card</li>
+</ul>
+<p>桌面端批量确认卡片单次确认。</p>
+<ul>
+<li>100380bbf feat(cli): batch clarify back-navigation and answer visibility</li>
+</ul>
+<p>CLI 批量 confirm 支持返回导航、已答可见。</p>
+<ul>
+<li>96b17787c feat(tui): Tab cycles batch clarify questions directly</li>
+</ul>
+<p>TUI 用 Tab 直接在批量问题间循环。</p>
+<ul>
+<li>d9f98fe07 feat(tui): restore the earlier answer when a batch question is re-visited</li>
+</ul>
+<p>重新访问某批量问题时恢复之前的回答。</p>
+<p>Bot 模式（feat ×4）</p>
+<ul>
+<li>a77ee88ce feat: Bot Mode avatars default to deterministic blob faces drawn from the agent&#x27;s name</li>
+</ul>
+<p>新 agent 默认得到由名字生成的确定性软体脸（同名同脸，永远不变）。说明：输入名字时脸会实时跟随；Randomize 重掷种子、Lock 锁定当前脸（之后改名不变，Unlock 恢复跟随名字）；六种剪影（round/organic/boxy/nub/cloud/sun）可在锁定主特征位置的同时单独钉住；经典几何形状仍一键可用，已有 bot 不受影响。</p>
+<ul>
+<li>cb0fd836a feat: Bot Mode blob avatars gain 4 new silhouettes via blobatar 2.0.0</li>
+</ul>
+<p>通过 blobatar 2.0.0 新增 4 种剪影。</p>
+<ul>
+<li>97b41f8cf feat(bot-mode): group chats accept PDFs, files, and drag &amp; drop</li>
+</ul>
+<p>群聊支持收 PDF、文件和拖拽。</p>
+<ul>
+<li>8e5f55f83 feat(hermes-bots): add a collapsible group activity view</li>
+</ul>
+<p>机器人组会话新增可折叠活动视图。</p>
+<p>其他值得一看（feat ×8）</p>
+<ul>
+<li>73243b0d2 feat(config): per-provider reasoning_echo opt-in for custom providers</li>
+</ul>
+<p>自定义 provider 可逐 provider 开启 reasoning_echo。</p>
+<ul>
+<li>cd3f9b64d feat(skills): add --yes/-y flag to hermes skills uninstall</li>
+</ul>
+<p>hermes skills uninstall 支持 -y/--yes 免确认。</p>
+<ul>
+<li>60e9ed12c feat(tools): close_preview so the agent can dismiss the pane it opened</li>
+</ul>
+<p>open_preview / read_preview 能驱动页面，但此前没法关面板。新增 close_preview，agent 可以关掉自己打开的预览面板。与其它桌面 UI 工具同享 desktop_ui / session-source 门槛。</p>
+<ul>
+<li>7f73978ee feat(desktop): close preview tabs on preview.close</li>
+</ul>
+<p>收到 preview.close 时关闭预览标签页。</p>
+<ul>
+<li>74f99af47 feat(desktop): agent-applied layout presets — apply_layout joins the desktop_ui toolset</li>
+</ul>
+<p>agent 可直接套用桌面端布局预设（apply_layout 加入 desktop_ui 工具集）。</p>
+<ul>
+<li>a6bada232 feat(mcp): per-server oauth.user_agent for token-endpoint requests</li>
+</ul>
+<p>MCP 支持每服务器自定义 OAuth user_agent，用于 token 端点请求。</p>
+<ul>
+<li>1abc7ce8f feat(models): add Nemotron 3.5 Lightning 30B-A3B to NVIDIA NIM picker</li>
+</ul>
+<p>NVIDIA NIM 选择器新增 Nemotron 3.5 Lightning 30B-A3B 模型。</p>
+<ul>
+<li>d5a9c2ba6 feat(nix): home-manager module, shared with the NixOS module</li>
+</ul>
+<p>Nix 新增 home-manager 模块，与 NixOS 模块共享。</p>
+    </section>
+    
     <section id="2026-08-19" class="day">
       <h2>Hermes 日报 2026-08-19：桌面端内置浏览器大升级，Bot Mode 群聊支持图片与线程，插件可一键安装</h2>
       <p><strong>本期覆盖 8 月 18 日 06:30 ~ 8 月 19 日 06:30 合入 main 的提交，共 239 个 commit（不含 merge），另有 12 个 merge。新增 43 个功能、116 个修复、1 个性能优化。</strong></p>
