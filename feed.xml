@@ -5,8 +5,248 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 20 Aug 2026 06:44:00 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 21 Aug 2026 06:54:21 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-08-21：Hermes 桌面端主题系统大更新、Agent 可操作页面、CLI 精简与免密网络层</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-21</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-21</guid>
+      <pubDate>Fri, 21 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 20 日 ~ 8 月 21 日合入 main 的提交，共 318 个 commit（不含 merge），另有 20 个 merge。新增 58 个功能、161 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端主题系统集中更新（GitHub 主题、强调色一键重建、Glass 默认开启、强调色选择器插件）</p>
+<p>桌面端 Agent 现在能看见并真正操作你打开的页面（真实输入驱动 + 操作覆盖层 + 增量传输）</p>
+<p>桌面端交互细节：侧栏未读数、Markdown 表格拖拽调宽、更新一次覆盖多个目标、未聚焦面板虚化</p>
+<p>CLI 精简：/help 排版 + Ctrl+P 命令面板、/status 显示推理/审批/上下文、/model 模糊过滤</p>
+<p>配置增强：agent.max_turns 默认不限轮数、运行时停顿护栏、墙钟运行预算</p>
+<p>免密网络层升级：新装免 key 即可用网络搜索、免密层变五厂商轮询容灾</p>
+<p>重点条目</p>
+<p>桌面端外观与主题（feat ×6 + fix ×3）</p>
+<ul>
+<li>f29861242 feat(desktop): ship the GitHub themes, with Nous blue on top</li>
+</ul>
+<p>背景：桌面端主题列表此前是自研的少量主题。修复/新增：把 VS Code 的 GitHub 主题经 converter 转进来入库（另含 Catppuccin / Everforest / Solarized），并把 Nous 品牌蓝放在最上面，主题库明显扩充。</p>
+<ul>
+<li>6dbd7d11d feat(desktop): re-seed any theme&#x27;s accent from one colour</li>
+</ul>
+<p>背景：改主题强调色需要逐处手动调整，很繁琐。新增：任意主题的强调色都可以从一个颜色一键重建，输入一个主色即可派生整套强调色配置。</p>
+<ul>
+<li>98bac5feb feat(desktop): an accent picker plugin, off by default</li>
+</ul>
+<p>新增：强调色选择器插件（默认关闭，需在设置里手动开启），提供图形化的颜色拾取入口。</p>
+<ul>
+<li>be3166607 feat(desktop): glass ships on, tuned per appearance and platform</li>
+</ul>
+<p>背景：玻璃材质此前默认关闭。新增：Glass 默认开启，并按深/浅外观模式和不同平台分别调优渲染参数。</p>
+<ul>
+<li>83fac2cf2 feat(desktop): one theme list in the palette, with a mode toggle inside it</li>
+</ul>
+<p>背景：调色板里主题选择分散、深浅模式分开。改进：合并成一个主题列表，深浅模式切换内嵌在里面，找起来更省事。</p>
+<ul>
+<li>50e2f970c feat(desktop): keep midnight, and retint themes that shade their accent</li>
+</ul>
+<p>保留午夜主题，并为会压暗强调色的主题重新着色，避免强调色被主题吞掉。</p>
+<ul>
+<li>ddb305c60 / 6a3a1f411 fix(desktop): mermaid 缩放覆盖层修复（给像素尺寸、修复折叠成零高度）</li>
+</ul>
+<p>Mermaid 图表缩放覆盖层此前可能折叠成零高度或没有明确尺寸，本次修复后正常显示。</p>
+<ul>
+<li>db72b4148 fix(desktop): scrollbars stop carrying the theme accent</li>
+</ul>
+<p>滚动条不再跟着主题强调色走，视觉更干净。</p>
+<p>桌面端 Agent 操作页面（feat ×4）</p>
+<ul>
+<li>c57581cd0 feat(tools): drive_preview and annotate_preview — the agent can use the page it opened</li>
+</ul>
+<p>新增 drive_preview / annotate_preview 工具：Agent 能真正操作它打开的预览页，而不只是看。这是&quot;Agent 能用它打开的那个页面&quot;的关键一步。</p>
+<ul>
+<li>c358a6a57 feat(desktop): drive the preview with real input, not synthetic events</li>
+</ul>
+<p>预览页用真实输入驱动，而不是合成事件，交互更接近真人操作，避免页面不响应合成事件。</p>
+<ul>
+<li>f262e684d feat(desktop): an overlay that shows what the agent is doing to the page</li>
+</ul>
+<p>新增覆盖层，实时显示 Agent 正在对页面做什么（点击、输入等），让用户能看见 Agent 的操作过程。</p>
+<ul>
+<li>0fd3b61ea feat(desktop): durable element handles, and a delta instead of the whole page</li>
+</ul>
+<p>元素句柄持久化 + 页面只发增量而不是整页，跨转场稳定且传输更省。</p>
+<p>桌面端交互细节（feat ×6 + fix ×3）</p>
+<ul>
+<li>bf4f5e17f / 508b3cf65 feat(desktop): show unread count on the sessions sidebar toggle</li>
+</ul>
+<p>会话侧边栏开关上显示未读数，未读数来自共享状态表，多窗口保持一致。</p>
+<ul>
+<li>145cd763c / e361e70b3 feat(desktop): drag markdown table columns to resize; keep widths across sessions</li>
+</ul>
+<p>Markdown 表格列可以拖拽调宽，列宽还能跨会话、跨轮次保持，不用每次重调。</p>
+<ul>
+<li>bd5b221a6 feat(desktop): updating now updates every target — remote backends, other gateways, and the app itself</li>
+</ul>
+<p>点更新会一次更新所有目标：远程后端、其他网关和桌面端本体（云端管理卡除外），本机不用逐个手动更。</p>
+<ul>
+<li>9c12d2d6c feat(desktop): unfocused session panes recede</li>
+</ul>
+<p>未聚焦的会话面板自动虚化退后，让当前焦点更突出。</p>
+<ul>
+<li>2473e5685 fix(desktop): stand the terminal overlay down when its tab loses focus</li>
+</ul>
+<p>终端覆盖层在标签页失去焦点时收起，避免挡住界面。</p>
+<ul>
+<li>693d6341b fix(desktop): expose group deletion from roster rows</li>
+</ul>
+<p>名单行上暴露群组删除入口。</p>
+<ul>
+<li>ad7a14a53 fix(desktop): renamed Bot Mode agents stay @-taggable by their new name</li>
+</ul>
+<p>改名的 Bot 模式 agent 仍能用新名字 @ 提及。</p>
+<p>桌面端连接与稳定性（fix ×5）</p>
+<ul>
+<li>617002171 fix(desktop): remote-gateway desktop stops lying after disconnects</li>
+</ul>
+<p>修复远程网关桌面端断开后的虚假状态：断线后名单保留、派生失败记录日志、主机密钥变化停止无限重试墙，不再&quot;假装还连着&quot;。</p>
+<ul>
+<li>d431f6801 fix(desktop): corrupt backend-ownership.json no longer erases records of live backends (#89298)</li>
+</ul>
+<p>损坏的 backend-ownership.json 不再抹掉在线后端的记录，避免后端状态误丢。</p>
+<ul>
+<li>cce042790 / b7b6ee011 fix(desktop): authenticate gated file downloads like REST</li>
+</ul>
+<p>受控文件下载按 REST 同样鉴权，统一授权逻辑。</p>
+<ul>
+<li>c25aa35e1 fix(desktop): keep peer windows on shared gateway</li>
+</ul>
+<p>共享网关上的对等窗口保持连接。</p>
+<p>CLI 与命令（feat ×4）</p>
+<ul>
+<li>05b4ab0ce feat(cli): declutter /help + Ctrl+P command palette (C-04/C-05)</li>
+</ul>
+<p>/help 排版精简，新增 Ctrl+P 命令面板，命令查找更方便。</p>
+<ul>
+<li>9bdff6ab6 feat(cli): /status shows reasoning, approval mode, and context usage (C-02)</li>
+</ul>
+<p>/status 现在显示推理模式、审批模式、上下文用量，状态一目了然。</p>
+<ul>
+<li>645f85c2f feat(cli): rotating task-oriented composer placeholder (C-09)</li>
+</ul>
+<p>输入框占位符按任务轮换提示，给不同用法一点引导。</p>
+<ul>
+<li>e931081a4 feat(cli): type-to-fuzzy-filter the /model picker model list</li>
+</ul>
+<p>/model 选择器支持输入模糊过滤模型列表，模型多了也好找。</p>
+<p>配置与运行控制（feat ×5）</p>
+<ul>
+<li>c32119b12 feat(config): default agent.max_turns to unlimited; accept inf/infinity/null spellings</li>
+</ul>
+<p>agent.max_turns 默认改为不限轮数，并接受 inf / infinity / null 写法。</p>
+<ul>
+<li>504628286 feat(config): resolve_turn_limit — first-class &#x27;none&#x27;/&#x27;unlimited&#x27; for agent.max_turns</li>
+</ul>
+<p>增加 resolve_turn_limit，agent.max_turns 原生支持 none / unlimited。</p>
+<ul>
+<li>449471c33 feat: runtime stall guards — identical-call loop breaker and continue-intent recovery (agent.stall_guards)</li>
+</ul>
+<p>运行时停顿护栏：识别重复调用的死循环并在相同调用连续触发时注入提示拦截（不阻塞调用），continue 意图时能恢复，避免 agent 卡在死循环里。</p>
+<ul>
+<li>803397ecc feat: wall-clock run budget — wrap-up injection at 80% and deadline-scaled stale timeouts (agent.run_budget_seconds / --run-budget)</li>
+</ul>
+<p>墙钟运行预算：按真实时间而非轮数控制，进度到 80% 注入收尾，超时按截止时间缩放，长任务更可控。</p>
+<ul>
+<li>761990b78 feat: identical re-calls enter context as reference stubs, not duplicate payloads</li>
+</ul>
+<p>相同的重复调用以引用桩进入上下文，而不是重复塞完整内容，省 token。</p>
+<p>免密网络层（feat ×4）</p>
+<ul>
+<li>96c2fd3c0 feat: web search/extract now work keyless on fresh installs via Parallel + Exa free tiers</li>
+</ul>
+<p>全新安装无需填 API key，网页搜索/抽取走 Parallel + Exa 免费档即可用。</p>
+<ul>
+<li>4ea69d9d2 feat: keyless web tier becomes a 5-vendor round-robin ring (adds Tavily, Firecrawl, Keenable)</li>
+</ul>
+<p>免密网络层变成五个厂商轮询容灾环，新增 Tavily、Firecrawl、Keenable。</p>
+<ul>
+<li>d1eefe6ac feat: keyed web backends get a one-shot keyless rescue on failure — never sticky</li>
+</ul>
+<p>有 key 的后端失败时会临时降级到免密救援一次；下次请求仍先打有 key 的后端，不会粘在免密上。</p>
+<ul>
+<li>f08d3e400 feat: hermes tools lets Exa/Parallel users pick the free keyless or paid keyed endpoint</li>
+</ul>
+<p>Exa / Parallel 用户可选择免密免费档或付费 keyed 端点。</p>
+<p>更新与安装（feat ×1 + fix ×5）</p>
+<ul>
+<li>5dd221d44 feat: desktop updates no longer re-apply local source edits (--keep-stash)</li>
+</ul>
+<p>桌面端更新默认不再重放本地源码改动：本地改动会被 stash 起来、不灌回工作区，避免被自动重放。</p>
+<ul>
+<li>ee6a9f832 / dbc2a9c8e fix(updater): carry acquisition age through scripts; preserve holder age across handoffs</li>
+</ul>
+<p>更新器在脚本间传递获取年龄、跨交接保留持有者年龄，避免更新状态错乱。</p>
+<ul>
+<li>2b1bff624 fix(update): Windows Desktop updates finish instead of parking on &quot;Updating Hermes&quot; (#90937)</li>
+</ul>
+<p>Windows 桌面端更新能正常完成，不再卡在&quot;正在更新 Hermes&quot;界面。</p>
+<ul>
+<li>0723cb6c0 fix(update): don&#x27;t reinstall the editable package when the pull can&#x27;t affect it (#90967)</li>
+</ul>
+<p>拉取不影响内容时跳过对可编辑包的重复重装（也避开 Windows file-lock 报错），更新流程更顺。</p>
+<ul>
+<li>044acf2bf fix(update): gateway auto-restart no longer dies on stale cached modules after the pull</li>
+</ul>
+<p>网关自动重启不再因拉取后的过期缓存模块而死掉。</p>
+<p>其他亮点（feat ×3）</p>
+<ul>
+<li>f309f92d3 feat: hermes worktree list/prune — attended reclaim for accumulated worktrees and merged branches</li>
+</ul>
+<p>新增 hermes worktree list/prune 命令，主动回收累积的 worktree 和已合并分支。</p>
+<ul>
+<li>188d47919 feat(computer-use): expose screenshots for chat delivery</li>
+</ul>
+<p>computer-use 截图可直接用于聊天投递。</p>
+<ul>
+<li>e69b8e561 feat: consolidate &#x27;hermes version&#x27; into &#x27;hermes --version&#x27;, remove the subcommand</li>
+</ul>
+<p>hermes version 子命令并入 hermes --version，减少一个命令入口。</p>
+<p>relay（feat ×6 + fix ×20）</p>
+<ul>
+<li>3683e7004 feat(relay): live-card ops — native draft streaming + task cards over the relay (gateway half) (#85796)</li>
+</ul>
+<p>relay 实时卡片操作：原生草稿流式 + 任务卡片（网关侧）。</p>
+<ul>
+<li>918dd8a26 / 88300217c / c4ae7f7a3 feat(relay): load / activate / initialize dynamic plugin records</li>
+</ul>
+<p>relay 支持加载、激活、初始化动态插件记录。</p>
+<ul>
+<li>31a4b8503 feat(relay): block-formatting hints on relay text egress (rich/markdown blocks)</li>
+</ul>
+<p>relay 文本输出带块格式化提示（富文本/Markdown 块）。</p>
+<ul>
+<li>85b89451f feat(relay): flat in_channel continuable cron surface on the relay lane</li>
+</ul>
+<p>relay 通道上提供扁平、可续的 cron 表面。</p>
+<ul>
+<li>另有 20 条 relay 下的 fix，多为 relay 通道稳定性与边界修复。</li>
+</ul>
+<p>Bot 模式（fix ×13）</p>
+<ul>
+<li>3c5fb284e fix(bot-mode): group-room UX cluster — Shift+Enter newlines, open-at-latest, late replies harvested (#89884, #89835, #89545)</li>
+</ul>
+<p>群聊房间交互集中修复：Shift+Enter 换行、打开即最新、迟到的回复也能被收集。</p>
+<ul>
+<li>3752948bb fix(bot-mode): recreating a same-name group mints fresh member sessions</li>
+</ul>
+<p>重建同名群时会生成全新的成员会话，不残留旧状态。</p>
+<ul>
+<li>1179f148e fix(bot-mode): group-chat command approvals surface in the room too</li>
+</ul>
+<p>群聊里的命令审批也会在房间里显示出来。</p>
+<ul>
+<li>c757f99e6 fix(bot-mode): group-chat members&#x27; clarify questions surface in the room and are answerable (#90694)</li>
+</ul>
+<p>群聊成员的 clarify 提问会显示在房间里并可回答。</p>
+<ul>
+<li>另有 9 条 bot-mode 下的小 fix。</li>
+</ul>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-08-20：Hermes 桌面端玻璃材质、批量提问与图片生成能力集中更新</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-20</link>
