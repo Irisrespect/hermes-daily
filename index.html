@@ -22,9 +22,54 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 24 期 · 5100 个提交 · 每日自动更新 ·
+<p class="meta">共 25 期 · 5293 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-22" class="day">
+      <h2>Hermes 日报 2026-08-22：更新器重做 + Bot Mode agent 间直聊，cron 与桌面端失败诊断齐升级</h2>
+      <p><strong>本期覆盖 2026-07-23 ~ 2026-08-22 合入 main 的提交，共 193 个 commit，其中 merge 8 个</strong></p>
+<p>## 本期概览</p>
+<p>数据窗口：2026-08-21 06:30 ~ 2026-08-22 06:30（合入 main 口径，incremental）</p>
+<p>193 commits（不含 merge）+ 8 merge | feat 32 / fix 103 / perf 9</p>
+<p>## 更新链路重做</p>
+<p>更新器这期做了系统性改造，解决带未合并提交的分支在更新时冲突的问题。</p>
+<ul>
+<li>带未合并提交的分支现在可以原地合入（91096bb2f），不再直接停下来报冲突</li>
+<li>新增 --switch-branch 参数（4fad27a10），可以把未合并分支移出合并路径，配合配置里的 updates.parked_branch_strategy（70151dd54）控制合并策略</li>
+<li>新增 hermes update --plan（0aecadc17）：只读盘点的计划模式，先列出当前状态与将要执行的动作，再决定是否真更新，不会上来就动文件</li>
+<li>更新完成输出结构化收据 + 事后舰队版本核验（1d74833d8），各机器是否真对齐一目了然</li>
+</ul>
+<p>## Bot Mode：agent 间直聊</p>
+<ul>
+<li>新增 message_agent 工具（e26d91dc1）：Bot 聊天里 agent 之间可以发结构化私信，消息格式专为 Bot Chat 设计，不再只有人和 agent 对话</li>
+<li>群聊房间持久身份（c6745da72）：房间状态通过网关全量 fan-out 同步到所有连接，跨连接不丢房间</li>
+</ul>
+<p>## 桌面端失败诊断</p>
+<ul>
+<li>失败的轮次明确指出是哪个环节出错（后端/网关/工具），并给出可操作的恢复动作（98f6fc549）</li>
+<li>配对修复：错误卡片尊重分类器的重试判定 + 失败会话身份（334bcbac9）、无路由线程渲染不崩溃（892790f98）、动作改名 Copy error details（50f1e414b）</li>
+<li>注：同窗口内曾有 Nous 支持链接的 feat（e3d46bb5f）但随即被 revert（3903428a7），最终 tip 上不存在，不计入</li>
+</ul>
+<p>## cron 增强</p>
+<ul>
+<li>bot-chat 投递目标（a2da0ab79）：cron 输出可以直接投到 bot 的聊天</li>
+<li>cron agent 带记忆运行（ef04d846e）：和其他 agent 一致，不再冷启动失忆</li>
+<li>每任务推理强度覆盖（4e1dd1a74）：job 定义里可单独设 reasoning_effort</li>
+</ul>
+<p>## 模型目录扩充</p>
+<ul>
+<li>Bedrock 加入 OpenAI GPT-5.6 家族 Sol/Terra/Luna（16476fad1），支持 OpenAI Responses 模型格式（e5b96fcb1）</li>
+<li>glm-5.3 替换 glm-5.1 进 OpenRouter 和 Nous Portal 目录（907da145b）</li>
+<li>OpenCode Free 全免 key（28a9b6c56）：不用配环境变量，opencode-free 在所有模型选择器都能看到（2a2307e68）</li>
+</ul>
+<p>## 性能与稳定性</p>
+<ul>
+<li>桌面端空闲渲染器不再被无限 CSS 动画烧 CPU（443d4387b，#53902）</li>
+<li>spinner 改纯合成器绘制，不再每 tick 改 DOM（765e3a2f8 等一批）</li>
+<li>浏览器自动化：认证控制代理（5df1d0e11）、扩展控制器动作（c9fd5223f）、带权限门的产物端点（1977c3d2e）</li>
+</ul>
+    </section>
+    
     <section id="2026-08-21" class="day">
       <h2>Hermes 日报 2026-08-21：Hermes 桌面端主题系统大更新、Agent 可操作页面、CLI 精简与免密网络层</h2>
       <p><strong>本期覆盖 8 月 20 日 ~ 8 月 21 日合入 main 的提交，共 318 个 commit（不含 merge），另有 20 个 merge。新增 58 个功能、161 个修复、0 个性能优化。</strong></p>
