@@ -22,9 +22,105 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 26 期 · 5388 个提交 · 每日自动更新 ·
+<p class="meta">共 27 期 · 5417 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-24" class="day">
+      <h2>Hermes 日报 2026-08-24：桌面端修复集中落地——Bot Chat 不再分裂、模型设置跟随活动 profile、更新失败防护与 Windows 启动器修复</h2>
+      <p><strong>本期覆盖 8 月 23 日 06:30 ~ 8 月 24 日 06:30 合入 main 的提交（采集窗口口径，incremental），共 29 个 commit（不含 merge），另有 2 个 merge。新增 1 个功能、19 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端多 profile 语义修复：模型设置、设置作用域、Messaging 全部改为跟随活动 profile，不再误读 primary 的值</p>
+<p>Bot Chat 分裂 bug 修复：registry 查找失败改为 fail-closed，桌面端更新后再也不会凭空 fork 出新的 forever chat</p>
+<p>更新系统加固：venv 被占用时拒绝更新而非警告后继续安装，桌面端已持有生命周期时不再并发拉起 gateway</p>
+<p>Windows 启动器修复：启动器改放托管二进制目录，不再被 update 的 autostash 冲掉；卸载时也会清理</p>
+<p>Gateway 新增控制 socket：identify/status 本地查询动词落地，配套权限和并发加固</p>
+<p>重点条目：</p>
+<p>桌面端（6 条 fix 集中落地）</p>
+<ul>
+<li>Bot Chat 查找失败不再分裂出新的 forever chat（87b645f52）</li>
+</ul>
+<p>之前 findExistingCanonicalChat() 会把所有查找错误吞掉并返回 null——和&quot;这个 bot 还没有 Bot Chat&quot;完全无法区分。桌面端更新后后端刚刚重启的那个窗口期，一次瞬时 RPC 失败就会让 createCanonicalChat() 直接走到 session.create，凭空造出一个全新的 Bot Chat，而真正的那个（数据完好、只是隐藏）还占着 canonical 标题。用户看到的现象是：每次桌面端更新后，bot 丢失了全部上下文。</p>
+<p>修复改为 fail-closed：registry 查询失败直接抛错，两条打开路径都弹出&quot;请重试&quot;toast，session.create 永远不会在未知归属状态下触发。</p>
+<ul>
+<li>模型设置跟随活动 profile，不再读 primary 的值（680b11503）</li>
+</ul>
+<p>ModelSettings 把 scopeProfile=null（&quot;跟随活动 profile&quot;的语义）直接传给 Hermes API helper，而 helper 把 null 解释成&quot;目标是 primary/默认后端&quot;而非&quot;跟随活动 profile&quot;。结果：非默认 profile 激活时（例如本地 profile 用 LM Studio），模型选择器显示的是 primary 的 providers，LM Studio 不可见。</p>
+<p>修复：null 转成 undefined 再调用 API helper，profileScoped() 正确回退到应用级活动 profile，并补了回归测试验证 helper 收到的是 undefined 而不是 null。</p>
+<ul>
+<li>设置作用域请求永远不会意外指向 primary（c942cd9ea）</li>
+</ul>
+<p>设置页的&quot;Applies to&quot;存储用 null 表示&quot;跟随活动 profile&quot;，但 API helper（profileScoped/capabilityScoped）把 null 解释为&quot;目标 primary/默认后端&quot;。所有把原始 override 直接传给请求的页面，在没有设置 override 时都静默读写 primary——写入通过其他路径落在对的 profile，读取却重绘成 primary 的值，于是 profile 的模型改动看起来像被回退了（#90549 类问题）。</p>
+<p>修复在接缝处关掉整个类：新增 $settingsRequestProfile computed——请求形态的 scope（string | undefined，永不 null），文档化标记为交给 API helper 的唯一正确值。</p>
+<ul>
+<li>Messaging 保持活动 profile（abd7f75b8）</li>
+</ul>
+<p>与上面同类：Messaging 相关设置请求同样跟随活动 profile，不落在 primary 上。</p>
+<ul>
+<li>Anthropic OAuth 登录在模型选择器里重新可见（4ec57d56a + 4f0e466e5）</li>
+</ul>
+<p>桌面端专属 picker 过滤只认 active_provider、model.provider 和 API key 环境变量。用 OAuth 登录 Anthropic 的用户（Hermes device flow 或 Claude Code 凭据）被静默隐藏——即使 list_authenticated_providers() 在构建时接受了同样的凭据。</p>
+<p>与 CLI 的 ambient token（gh → copilot）不同，OAuth access token 只有在交互式登录后才存在，它的出现本身就是明确的用户配置。修复为 anthropic slug 加窄豁免（model_switch.py 的发现路径已有等价特例），picker 过滤也接受 pool-only 条目，认证列表和模型选择器两处恢复显示。</p>
+<ul>
+<li>严格路由身份校验（38ce2d755）</li>
+</ul>
+<p>对显式 registry 资格改为权威校验：只有当前精确 ID 被接受，空白、畸形、未知、退役的声明全部 fail-closed，不做端点推断。真正无修饰的 legacy 描述符限制到共享 full-envelope URL/Cloud/SSH matcher，拒绝零或多匹配，并规范化 SSH host/user 身份。关闭 #90048。</p>
+<p>更新系统（4 条 fix）</p>
+<ul>
+<li>venv 被占用时拒绝更新，不再把安装器跑一半（83864c0b5）</li>
+</ul>
+<p>#87331 的剩下半边：hermes.exe（或兄弟 shim）无法被改名到一边时，旧行为是打印警告然后照常运行安装器——安装器在同样的锁上跑到一半死掉，把 venv 卡在版本之间。</p>
+<p>修复引入 strict quarantine：任何 shim 重命名重试全部失败，就在安装命令执行之前中止（已成功的改名回滚），抛 ShimQuarantineError。更新依赖同步传 strict_quarantine=True，更新边界把错误变成拒绝：写 update-incomplete 标记、exit 2（receipt net 记为 refused）、绝不 ZIP 回退。修复后的 repair 安装保持 warn-and-try 行为不变。</p>
+<ul>
+<li>桌面端管理生命周期时，不再并发拉起 gateway 冷启动（4ccc4b693 + f4067774a）</li>
+</ul>
+<p>4ccc4b693：残留的自启动条目不能证明用户想要独立 gateway 运行。当桌面端当前监管该安装的控制平面时，updater 不得拉起一个竞争的 messaging daemon；serve 不算 gateway 等价。</p>
+<p>f4067774a 在此基础上：控制平面判定从子串匹配改为解析器得出的 _hermes_holder_subcommand——`-m dashboard chat`、`kanban --preserve-cache` 这类 argv 不再被误读成控制平面（#90778/#91869 类）。新增 live E2E（真实进程 + 真实 spawn ledger）：受监管的 serve 持有生命周期、被杀掉的 spawner（孤儿）不持有、dead serve 条目被排除、空 ledger 不持有；Windows wine2e lane 也有真实注册 ledger 抑制冷启动计划的验证。</p>
+<ul>
+<li>拒绝文案措辞修复（0c435f460）</li>
+</ul>
+<p>footgun linter 把 prose 里的 &quot;venv open (&quot; 误匹配成裸 open() 调用，导致拒绝消息文案被误伤，重写措辞。</p>
+<p>Windows（2 条 fix）</p>
+<ul>
+<li>hermes 启动器改放托管目录，不再被 update 冲掉（679e9cd29）</li>
+</ul>
+<p>安装器此前把 hermes/hermes-acp 启动器复制到 hermes-agent\bin（git 工作树内部）并把这个目录加进 PATH（#84452）。更新命令的 pre-pull autostash（git stash push --include-untracked）会把这批未跟踪、未忽略的副本扫下盘；桌面端 updater 停止重放 stash 之后（--keep-stash 机制），没有任何东西恢复它们——结果是每个走桌面端更新的安装里，新终端的 hermes 命令全部失效。</p>
+<p>修复：启动器改放到托管二进制目录（%LOCALAPPDATA%\hermes\bin），离开 git checkout。</p>
+<ul>
+<li>卸载时清理启动器（5d5179d7a）</li>
+</ul>
+<p>每种卸载模式都会删除代码 checkout，但托管 bin 目录里的启动器在 checkout 之外存活——卸载后 hermes 解析到一个 venv 目标已消失的启动器，报错比 command-not-found 更难看。remove_windows_bin_launchers 现在在每种卸载模式下删除两种启动器形式（.exe/.cmd），锚定默认 Hermes root，防止 profile 会话把清理重定向到 profiles\&lt;name&gt;\bin。卸载本身从 launcher 运行时该 exe 被强制锁住不可删除但可改名（_quarantine_running_hermes_exe 依赖的同一个事实），此时走改名回收路径。</p>
+<p>Gateway（feat + 5 条 fix）</p>
+<ul>
+<li>gateway 自持控制 socket——identify/status 动词（60b626914，本期唯一 feat，#92091 step 1）</li>
+</ul>
+<p>gateway 启动时创建本地控制 socket（Unix domain socket 位于 $HERMES_HOME/gateway.sock，长路径有 pointer-file 回退；Windows 用命名管道），应答版本化 JSON 动词：</p>
+<ul>
+<li>identify：pid、profile、hermes_home、code_sha/code_version（#91283 stamp 现在可实时查询）、自我声明的 supervisor 类型、启动时间</li>
+<li>status：进程自己应答的实时运行状态 payload</li>
+</ul>
+<p>绑定紧跟 PID-file O_EXCL 认领之后（进程成为其 HERMES_HOME 权威 gateway 的瞬间），干净关闭时移除；后继者在绑定前清掉陈旧 socket。严格非致命：绑定失败只是消费者走旧路径。从 #92447 的 post-merge review 来的加固（7a54ab22e）：bind 用 umask 0o177（即使 chmod 前也绝不 world-connectable）、动词 handler 跑在 executor（state 文件读不阻塞 adapter 事件循环）、多个 gateway 应答同一 home 的 identify 时按 pid 去重、v1 wire contract（一连接一请求）文档化；实测权限 600、identify 4.3ms、20 并发查询健康。</p>
+<p>配套：67aac4d86 修复 CI 的 pytest tmp root 超过 sun_path 长度导致测试 home 全部走回退路径、两个测试还假设 in-home 绑定的问题——测试改按解析后的绑定位置断言，回退路径在 gettempdir() 太深时优先 /tmp；d1c84fc5d 给控制 socket 上了 live Windows named-pipe E2E（wine2e lane）；530028c21 的 pipe E2E 对比服务器自报 pid 并 tree-kill uv trampoline。</p>
+<ul>
+<li>工具网关：环境变量配置的本地后端不再被预检查，declined 会记住（8b86097a6 + 4edb24276）</li>
+</ul>
+<p>#92665 的后续，关掉 #92647 指出的两个缺口：</p>
+<ul>
+<li>SEARXNG_URL / CAMOFOX_URL 现在在 _get_gateway_direct_credentials() 中算直接 web/browser 配置，env-only keyless 本地设置不再被预检查、而是直接选中</li>
+<li>提交 checklist 时未配置的工具记录进 tool_gateway_declined_tools（新的 known root key），之后切换 Nous 模型不再预检查它们；以后选入会清除 decline；取消（Ctrl-C/ESC）不记录任何东西</li>
+<li>has_direct 标签在检测到 SearXNG/Camofox 时点名标注；tool-gateway.md 文档新增 enablement-checklist 章节</li>
+</ul>
+<p>4edb24276：无密钥本地后端在 Tool Gateway checklist 里不做预检查。</p>
+<ul>
+<li>修复 get_gateway_eligible_tools 的三/四元组解包崩溃（ce9ddd35e）</li>
+</ul>
+<p>get_gateway_eligible_tools 返回 3 元组/4 元组时解包崩溃，修复 arity 问题。</p>
+<p>测试与工程（6 条）</p>
+<ul>
+<li>测试修复：f93593d16 为 gateway 工具可用性测试补充 browser-use 作为显式非 Nous 选项的用例；0b01599ee 修复本分支两个 Linux-lane CI 失败；fd760435c 让 botocore stub 在 Windows 上无懈可击、消除 vendored-import 不稳定；0605279b3 为 Windows 守卫 os.geteuid()（ACP launcher 测试）；另有 d1c84fc5d、530028c21 两条 gateway 测试（wine2e named-pipe E2E、pipe E2E 自报 pid 对比）已并入第 12 条详述。</li>
+</ul>
+<p>格式与杂项：8b09a9df8 / d49d495c2 为 merge 时自动跑 npm run fix 的格式提交（#92718 / #92714）；aa24d8780 / 2a379a167 为 salvage 贡献者 email 映射（chore）。</p>
+    </section>
+    
     <section id="2026-08-23" class="day">
       <h2>Hermes 日报 2026-08-23：更新器 ZIP 兜底修复（不再删桌面构建）+ 桌面端一键 Send Diagnostics</h2>
       <p><strong>本期覆盖 2026-08-21 ~ 2026-08-23 合入 main 的提交，共 95 个 commit，其中 merge 4 个</strong></p>
