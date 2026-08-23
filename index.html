@@ -22,9 +22,51 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 25 期 · 5293 个提交 · 每日自动更新 ·
+<p class="meta">共 26 期 · 5388 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-23" class="day">
+      <h2>Hermes 日报 2026-08-23：更新器 ZIP 兜底修复（不再删桌面构建）+ 桌面端一键 Send Diagnostics</h2>
+      <p><strong>本期覆盖 2026-08-21 ~ 2026-08-23 合入 main 的提交，共 95 个 commit，其中 merge 4 个</strong></p>
+<p>## 本期概览</p>
+<p>数据窗口：2026-08-22 06:30 ~ 2026-08-23 06:30（合入 main 口径，incremental）</p>
+<p>95 commits（不含 merge）+ 4 merge | feat 2 / fix 54 / perf 1</p>
+<p>## 更新器修复：ZIP 兜底不再删桌面构建</p>
+<p>更新器的 ZIP fallback 是之前 Windows 更新删掉桌面构建（win-unpacked）的元凶（呼应 #87331/#83846），这期修了一整批：</p>
+<ul>
+<li>ZIP swap 现在保留已构建的桌面应用（01c14ad7f），apps/desktop/release 不再被兜底路径删除</li>
+<li>收紧 fallback 触发条件（eac3f645e）：依赖安装失败、工作树不干净都不再走 ZIP fallback，避免带病覆盖</li>
+<li>venv 占用方识别从真实参数解析器取值（c02cac00c），且把网关祖先进程也算进判断，防误判</li>
+<li>holder classifier 同步修正，value-flag 从真实解析器派生（7d6db4efb）</li>
+</ul>
+<p>## 桌面端：Send Diagnostics 一键报障</p>
+<ul>
+<li>错误卡片上新增 Send Diagnostics（8f30e9c77）：一键打包脱敏调试信息上传，日志按敏感度分级脱敏，报障不用手动翻日志；配套审批与脱敏等级修正（0a9a449a3）</li>
+</ul>
+<p>## Bot Mode @mention 改由 agent 决定</p>
+<ul>
+<li>@mention 中间件只识别谁被艾特，不再代替 agent 投递（729782d05），回复与否由 agent 掌握 message handling</li>
+</ul>
+<p>## 稳定性：state.db 修复集群</p>
+<ul>
+<li>修掉无界修复循环填盘（27d661e17）：修复有界、备份原子化、磁盘保护按剩余空间比例</li>
+<li>未限定的 SQLite 损坏 fail-closed（50bbcbf2b），不再带病运行</li>
+<li>FTS 自修复恢复通用损坏匹配（987064caa）；损坏指纹含回滚日志、排除提交计数器（5777e68b3 / 8779b782b）</li>
+</ul>
+<p>## 桌面端 Nous Cloud 报错可读化</p>
+<ul>
+<li>OAuth 票据边界 503、后端不可达、agent 返回 503（#85335）都有可读错误与恢复界面（d0ea5f172 / 23140a730 / 274158ec1），cloud 下线浮层带 Portal/Discord 按钮（a9ddd0f0b）</li>
+</ul>
+<p>## 其他修复</p>
+<ul>
+<li>终端环境缓存按会话 key 隔离，防跨 profile SSH 泄漏（a270c4ade）</li>
+<li>Windows 更新后恢复专用 CLI 启动器（9782275b2），启动器布局不变（a08b90919）</li>
+<li>Discord 超 25 模型的提供商列表跨选择菜单渲染（ab3e2f563）</li>
+<li>桌面端重复 toolCallId 不再产生，修复中毒缓存尾部（40f3e58f6 / 9f8dca34d）</li>
+<li>CI 测试 worker 按核数设置（0012dd1e0）</li>
+</ul>
+    </section>
+    
     <section id="2026-08-22" class="day">
       <h2>Hermes 日报 2026-08-22：更新器重做 + Bot Mode agent 间直聊，cron 与桌面端失败诊断齐升级</h2>
       <p><strong>本期覆盖 2026-07-23 ~ 2026-08-22 合入 main 的提交，共 193 个 commit，其中 merge 8 个</strong></p>
