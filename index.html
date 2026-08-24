@@ -22,9 +22,155 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 27 期 · 5417 个提交 · 每日自动更新 ·
+<p class="meta">共 28 期 · 5895 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-25" class="day">
+      <h2>Hermes 日报 2026-08-25：HUD 游戏覆盖模式、/review 独立审核命令全端落地、Bot Mode 并发与失败码大改造</h2>
+      <p><strong>本期覆盖 8 月 24 日 06:30 ~ 8 月 25 日 06:30 合入 main 的提交（采集窗口口径，incremental），共 478 个 commit（不含 merge），另有 42 个 merge。新增 34 个功能、329 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端 HUD 新增游戏覆盖模式：全屏游戏时 HUD 变成游戏内聊天框，聊天记录常驻不淡出</p>
+<p>/review 命令在所有界面落地：独立审核 subagent 全权限调查 PR/代码/文档，结果回报发起会话</p>
+<p>Bot Mode 大改造：profile 回合锁防并发竞争、类型化失败码、重试策略、中继 TTL、bot 跨连接互发消息</p>
+<p>更新系统防漂移：兄弟 profile 配置随舰队一起迁移，更新计划升级为重启工作清单</p>
+<p>语音链路直连：桌面端直接用 profile 的 STT/TTS 密钥，不再经音频中继；Codex 默认窗口回退 272K 省用量</p>
+<p>重点条目：</p>
+<p>桌面端（HUD、浏览器、快捷键、主题）</p>
+<ul>
+<li>HUD 游戏覆盖模式（3c1964441）</li>
+</ul>
+<p>全屏应用（尤其游戏）占据屏幕时，HUD 自动变成游戏内聊天框：空闲状态条退到可瞥见的低透明度，聊天记录在游戏期间一直保持打开、不再按定时器淡出——你可以在战局间隙回头翻聊天记录，而不是只能看到&quot;恰好还在新鲜&quot;的那几秒。</p>
+<p>检测逻辑是对同一个窗口枚举（read_window_below 用的）做纯遍历：进入覆盖模式要求游戏真的在你眼前（窗口化的应用盖在上面会否决），保持状态只要求游戏还存在（你点击 HUD 打字会让游戏失焦、其他窗口浮上来，旧逻辑就在用户真正开始互动的那一刻把覆盖模式给关了）。最后状态在 did-finish-load 时重放，避免 HUD 打开时已经全屏游戏的场景丢掉唯一一条状态消息。</p>
+<p>覆盖条本身为&quot;住在别人的窗口上&quot;重做：无条件浅色-on-深色——主题的近黑正文墨色在深色游戏画面上不可读，且任何&quot;按条件切换亮色&quot;的方案都会出现求值为 false、黑字配黑底的时刻；HUD 薄片在任意主题下都是深色衬底，白色永远正确，而自己绘制亮色表面的内容（clarify 问题、审批卡、代码块、表单控件）通过重指向墨色变量回到主题配色。</p>
+<ul>
+<li>内嵌浏览器支持多标签（8a8f74e78）</li>
+</ul>
+<p>URL 标签页以前是单例——每个链接都导航到同一个浏览器，想同时保持两个页面打开是不可能的，标签条上的&quot;+&quot;也从不出现。现在浏览器标签页是带独立 id 的容器：链接仍然落在你正在看的那页（agent 一次开五个页面不会留下五个标签），&quot;+&quot;按钮按需新建标签；标签自动用当前页面标题命名，否则三个标签都叫&quot;Browser&quot;等于没命名。&quot;+&quot;还从会话专属按钮升级为 pane 能力，任何能自我复制的 pane 类型都能贡献一个。</p>
+<ul>
+<li>Ctrl+L 从任意位置聚焦 composer（28b758d5c）</li>
+</ul>
+<p>Ctrl+L 此前只在终端或预览有选中时才生效。现在新增 bubble 阶段窗口回退：未被认领的按键把焦点移到 composer——和浏览器地址栏快捷键的行为一致。已有持有者保持优先级：选择处理器在捕获阶段认领按键、用户重绑的动作标记事件已处理、有焦点的终端且无选中时 Ctrl+L 仍是清屏（composerFocusBlockedBySurface）。Windows 用户按键为 Ctrl+L。</p>
+<ul>
+<li>旧 Nous 配色回归为 Nous Alt（253dde4b1）</li>
+</ul>
+<p>此前内置 Nous 主题被替换成 GitHub 主题 fork（#90587）。旧玻璃+奶油配色保留在自己的名字下，默认主题不变，想用旧配色的直接选 Nous Alt。</p>
+<ul>
+<li>Windows HUD 白屏修复（433f518ca）</li>
+</ul>
+<ul>
+<li>完成的 /goal 芯片不再粘在 composer（0a171fffe）</li>
+</ul>
+<p>/goal 状态栈在每次会话打开时水合目标指示器。已结束的目标 status=done 永久留在 DB，所以每次挂载都重新创建&quot;✓ Goal done&quot;芯片——8 秒驻留只应用于实时完成事件，不应用于重新水合；在 Bot Mode（一个永不结束的会话）里，完成浮层永远不消失。applyGoalStatusText 新增 hydrate 标志：水合阶段把终止态目标当作无目标处理、丢弃残留的 done 芯片，实时事件保留 8 秒驻留行为。</p>
+<ul>
+<li>registry 连接支持 OAuth 登录（3dc77acdc）</li>
+</ul>
+<p>桌面端 registry 连接新增 OAuth 登录（#92194），并在浏览源上保留已选的 profile。</p>
+<ul>
+<li>Bot 群聊 IME 合成回车不再误发消息（7e67f64fc）</li>
+</ul>
+<p>macOS 中文拼音输入法下，在群聊 composer 里按 Enter 确认候选词，草稿被当作消息直接发出——GroupMentionInput 的 onKeyDown 只检查 event.key === &#x27;Enter&#x27; 且 !event.shiftKey，没有 IME 守卫（核心 composer 有 isComposing + keyCode 229 守卫 #44135）。修复把同样的守卫补到 bots 插件三个 Enter 处理器：群聊 composer+回复框（被报告的 bug）、GroupClarifyCard 自由文本回答输入、skill-hub 搜索输入（同样会半路触发）。</p>
+<p>语音（client-direct voice + 回复路由修复）</p>
+<ul>
+<li>桌面端语音直连：直接用 profile 的 STT/TTS 密钥，不再音频中继（10f0d2278）</li>
+</ul>
+<p>双向最低跳数语音路径（桌面 + 远程网关）：麦克风音频直接送到 profile 的 STT 服务商，回复文本在桌面端用 profile 的 TTS 服务商合成——桌面↔网关链路只携带文本（聊天流本来就带）。没有第二套密钥存储：GET /api/audio/voice-config 走认证 REST 通道，用 transcription_tools/tts_tool 完全相同的解析链返回解析后的 provider/model/language/key，密钥只在渲染进程内存里存活。</p>
+<p>服务端托管类 provider（本地 whisper、edge、command/plugin）或缺少凭据时解析为 {mode: relay} 回落老路；xAI OAuth 保持 relay（bearer 刷新在服务端）。voice.client_direct 开关默认开启；听写（dictation）优先尝试 client-direct，返回 null 时保持原中继不变，provider 拒绝会浮出提示。语音播放走 client-direct 作为最高档，WS 中继和 POST 回退仍在下面。</p>
+<ul>
+<li>语音回复用连接网关的 TTS，不再拨到本地后端（c012a364e）</li>
+</ul>
+<p>speak-stream WebSocket 用裸 v1 getConnection/getGatewayWsUrl 解析 URL，它只回答 PRIMARY 后端。当 registry 远程连接跑在一台也装了本地 Hermes 的机器上（常见情况——安装器永远装完整 agent），语音回复拨的是本地后端、撞上未配置的 TTS，而聊天（connectionScoped REST）正确地走远程——用户看到&quot;configure STT/TTS&quot;提示，但远程网关其实已配好语音。修复：PCM socket 改走 (connectionId, profile) bridges 的 openSecondary 路径解析，绝不用注册表 mint 已写入的 backend-namespace profile 覆盖 URL（SSH remoteProfile 别名、sharedRemote 作用域）。这是最后一个自己拼音频 URL 的地方。</p>
+<p>/review 命令（独立审核 subagent 全端覆盖）</p>
+<ul>
+<li>/review 命令：独立审核 subagent 在每个界面可用（12395e57b）</li>
+</ul>
+<p>/review 读取最近 10 条聊天消息加可选指令，派生一个全权限后台 subagent（异步委托轨道），调查被引用的工作（PR、代码、文档），完整审核结果作为普通异步委托完成重新进入发起会话，主 agent 可以据此行动。</p>
+<p>实现：agent/review_engine.py 共享引擎（快照、简报、auxiliary.review 凭据解析、派发、笔记格式化）；tools/delegate_tool.py 内部凭据覆写（永不面向模型），走与 delegation.provider pin 相同的凭据系统；auxiliary.review 配置块（provider/model/base_url/api_key/api_mode），provider auto + 空 model 时继承主模型。覆盖 CLI process_command、gateway run.py dispatch + slash_commands handler（绑定审批会话 key 让完成路由回来）、TUI/Desktop（tui_gateway/server.py）、CommandDef registry（Slack 上仅 /hermes 可用，限流）。</p>
+<ul>
+<li>review 槽位进所有辅助模型选择器（65c58651b）</li>
+</ul>
+<p>桌面端、dashboard、CLI 的辅助模型选择器都出现 review 槽位，可以给审核选独立模型。</p>
+<ul>
+<li>/review 简报携带项目上下文与父技能（23fb949f2 + 22381edc1）</li>
+</ul>
+<p>/review 简报嵌入工作区的项目上下文文件；同时携带父会话已加载的技能——审核 subagent 一出生就带着和主 agent 相同的工作区视线。</p>
+<ul>
+<li>每个 subagent 的 prompt 嵌入工作区项目上下文文件（7526bd39a）</li>
+</ul>
+<p>不只 /review——所有 subagent 的 prompt 都嵌入所在工作区的项目上下文文件。</p>
+<p>Bot Mode / bots（#93091 系列 + 跨连接互发）</p>
+<ul>
+<li>per-profile 回合锁：并发投递排队而非竞争（ac3f9a2dc）</li>
+</ul>
+<p>Bot Mode 每个 profile 一把回合锁：同一 profile 的两条并发消息不再竞态交错处理，而是排队按序投递。</p>
+<ul>
+<li>类型化失败原因码（64eb6bb7f + c584d15cd）</li>
+</ul>
+<p>bot 回合与中继回复带类型化失败原因码（#93091 item 1），A2A 调用时类型化失败原因能到达发送方 agent（#93091）——失败不再是一个笼统的错误，发送方能知道具体为什么。</p>
+<ul>
+<li>bot 回合重试策略：瞬时失败恢复原会话，上下文溢出先压缩再恢复（b274b346d）</li>
+</ul>
+<p>#93091 item 5：瞬时失败 resume 到原回合继续，上下文溢出时压缩历史再恢复后续。</p>
+<ul>
+<li>中继排空推送通知 + 轮询兜底 + 信封 TTL（9c829f965 + b96369212）</li>
+</ul>
+<p>Bot relay 的中继排空改为推送通知驱动，带轮询兜底；信封 TTL + 离线快速失败（item 2）——消息在中继里呆太久就过期，目标离线时快速失败而不是挂起。</p>
+<ul>
+<li>后台 bot 失败桌面端显示&quot;需要关注&quot;徽标（d4f426792）</li>
+</ul>
+<p>#93091 item 3：后台 bot 回合失败，桌面端对应 bot 上出现 needs-attention 徽标，不用盯着日志才知道出事了。</p>
+<ul>
+<li>每条桌面端连接上的 bot 可以互相发消息（d3e087fd8）</li>
+</ul>
+<p>连接即对等集：连到桌面端的每个网关（本地、远程 URL、SSH、Hermes Cloud、docker）现在都具备 message_agent 可达性。桌面端用已有的持久 socket 中继——每个连接做 roster 同步、信封 drain/deliver/reply 循环——跨连接 DM 与本地 DM 完全一致，回复也正常。顺带修复遗留 SOUL gate bug：profile 的 SOUL.md 带旧插件追加协议时，注入/执行门控按&quot;协议段非空&quot;而非&quot;managed-install&quot;判定，这些 profile 会静默丢失 message_agent 工具，现在不再误伤。</p>
+<ul>
+<li>被回收的 bot 聊天自动恢复（d5281f598）</li>
+</ul>
+<p>被 reclaim 的 bot 聊天在下次发送时自动重新恢复自己，不再报 stale-id 错误（此前 bot 聊天被回收后下一次发送就会撞上游离 ID）。</p>
+<p>21b. 远程 bot 操作按连接路由（9b7ab9d65）</p>
+<p>远程连接的 bot 操作不再按默认/前台连接路由，而是按 bot 所属的连接处理——跨连接的 bot 操作落到正确的网关。</p>
+<p>更新系统（防漂移 + 重启工作清单）</p>
+<ul>
+<li>兄弟 profile 的配置随舰队一起迁移（706f33d42）</li>
+</ul>
+<p>共享 checkout 服务所有 profile，但 hermes update 只迁移活动 profile 的 config.yaml——兄弟 profile 留在旧 config 版本，直到（正确重启的）网关撞上新代码读不了的配置形状——最后一个未被吸收的 Phase-2 重启群审计残留（#20438 最早，2026 现场 #79048：sibling 停 v33 而代码是 v37）。</p>
+<p>修复：_migrate_sibling_profile_configs() 对每个兄弟 profile home，用 ContextVar HERMES_HOME 覆写（绝不 os.environ）作用域化配置读写，检查版本后跑非交互安全迁移；需要交互确认的设置留给 profile 自己下次交互会话（与 gateway-mode 同一契约）；损坏的 profile 跳过不阻塞整轮扫描，覆写必然重置。Sabotage 验证 + 真实漂移文件 live E2E：v12→v38、v25→v38 落盘，provider 保留，#81946 人格重置迁移在兄弟 profile 上正确应用，未配置过的 profile 不动，活动 home 不动，第二轮幂等。</p>
+<ul>
+<li>更新计划变成重启工作清单（18b7fc82b）</li>
+</ul>
+<p>策略表此前是观察性的：restart_via 是显示字符串，四个平台重启分支各自重新发现目标——计划看到的 runtime 可能被漏掉且零信号（#88654 类，结构性）。修复：restart_via 变成机器可读机制 id（systemd|launchd|desktop|manual），策略表即数据，显示用 describe_restart_mechanism 派生；match_runtime_outcomes() 对账每个计划内 runtime 与重启阶段的记账（restarted/stopped/failed/unaccounted），report_unaccounted_runtimes() 是静默漏掉的绊线；更新命令重启阶段后对账计划，outcomes 落进 receipt（runtime_outcomes），任何未对账 runtime 像 STALE/DOWN 舰队行一样升级报错（exit 1）。Sabotage 验证 + 本机真实舰队 live E2E。</p>
+<ul>
+<li>Desktop 和 dashboard 读更新收据而非推断成功（8804e7835）</li>
+</ul>
+<p>#91277 Phase-1 bullet 3：桌面端和 dashboard 从更新收据（receipt）读真实结果，不再靠&quot;看起来没事&quot;推断更新成功。</p>
+<p>模型</p>
+<ul>
+<li>Codex GPT slug 默认回退 272K 窗口（63a9c26fb）</li>
+</ul>
+<p>8 月 16 日那次把 gpt-5.4/5.6 Codex OAuth 上下文自动抬到实测验证的 900K，结果烧掉了根本没要更大窗口的用户的订阅用量（窗口越大每次请求输入 token 越多）。回退：基础 Codex slug（gpt-5.6-sol/terra/luna、gpt-5.4）默认回到广告的 272K——便宜的限额是默认；模型选择器为每个实测验证的 slug 合成显式 &lt;slug&gt;-900k 变体（如 gpt-5.6-sol-900k），选它才 opt-in 900K 窗口。真按 272K 强制的 slug（gpt-5.5、gpt-5.4-mini）不生成变体。-900k 后缀是 Hermes 侧专用：模型 id 上线路前剥除（主传输 + 辅助 Responses 适配器），计价把变体别名到基础条目。</p>
+<p>重连与稳定性</p>
+<ul>
+<li>桌面端断线重连不再丢事件（87631bd8a）</li>
+</ul>
+<p>tui-gateway 新增带序号的事件回放：服务端每个会话单调 seq + 512 帧回放环（64 会话 FIFO 淘汰），两个新 RPC——session.events.since（回放比水位更新的帧，报告 latest_seq + truncated 让客户端发现缺口）和 session.events.stats（遥测）。客户端每会话记录 seq 水位，任何一次成功重连后 fire-and-forget fetchReplay() 通过正常派发路径补漏事件；recordSeq 忽略非递增 seq，过期回放永远不能回退水位；macOS 唤醒跳过 visibilitychange 的 Electron 失焦场景有焦点触发重连 nudge。回放失败按设计吞掉：无损恢复是对旧有损重连的升级，不是新的失败模式。</p>
+<ul>
+<li>MCP 中毒连接恢复 + stdio 死进程快速失败（2f33833de）</li>
+</ul>
+<p>修复四类中毒连接（#81051、#77765、#84132、#81995），SuspectableBackend 廉价标记/惰性验证契约：察觉中毒从不做 I/O，下一个调用者付一次健康探测（清除怀疑或强制重连）——单一 teardown-vs-keepalive 竞态或 auth-lock 损坏不再能永久 park 一条连接，park 保留给真正耗尽重连预算的连接。keepalive 失败先标记怀疑再请求重连；auth 类永久失败在先前已证明过的会话上走 suspect+reconnect 而非立即 park。快速失败（#81995）：stdio 子进程 pid 在 spawn 时跟踪，在途 RPC 与子进程监视器任务竞争，死子进程立即以可重试超时失败，不再等满 300 秒；刻意 teardown/reconnect 也会立刻失败在途调用，而不是让它们挂在垂死传输上。</p>
+<p>其他</p>
+<ul>
+<li>BlueBubbles 附件读取移出事件循环（f5a9ba9ee）</li>
+</ul>
+<p>perf：BlueBubbles 消息附件读取从事件循环挪走，避免阻塞。</p>
+<ul>
+<li>cron 一次性任务支持显式 re-arm（a0ca7c192）</li>
+</ul>
+<p>cron 一次性任务可以显式重新武装，不用重建 job。</p>
+<ul>
+<li>gateway.ping 心跳线上契约（9a71cb95c + 9153be2a5）</li>
+</ul>
+<p>gateway 新增 gateway.ping 心跳线上契约；JsonRpcGatewayClient 带心跳和 socket 代际失效——连接换代时旧 socket 的响应/事件不再被误认成新连接。</p>
+    </section>
+    
     <section id="2026-08-24" class="day">
       <h2>Hermes 日报 2026-08-24：桌面端修复集中落地——Bot Chat 不再分裂、模型设置跟随活动 profile、更新失败防护与 Windows 启动器修复</h2>
       <p><strong>本期覆盖 8 月 23 日 06:30 ~ 8 月 24 日 06:30 合入 main 的提交（采集窗口口径，incremental），共 29 个 commit（不含 merge），另有 2 个 merge。新增 1 个功能、19 个修复、0 个性能优化。</strong></p>
