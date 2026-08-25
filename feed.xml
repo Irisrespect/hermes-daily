@@ -5,8 +5,121 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 25 Aug 2026 06:44:35 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 26 Aug 2026 06:51:24 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-08-26：MCP 目录大扩充五十多个官方远程服务器、桌面端钥匙串弹窗终于可关、web 搜索提取加 TTL 缓存</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-26</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-26</guid>
+      <pubDate>Wed, 26 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 25 日 06:30 ~ 8 月 26 日 06:30 合入 main 的提交（采集窗口口径，incremental），共 113 个 commit（不含 merge），另有 4 个 merge。新增 22 个功能、59 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>MCP 目录大扩充：34 个官方远程服务器 + 最终轮 18 个 + Better Stack/Railway + Cloudflare 官方 API + Grafana Cloud，全部 live-probe 实测验证</p>
+<p>桌面端钥匙串加密改为可选：macOS 默认不再碰 Keychain，启动弹密码框的毛病彻底消失，设置里可一键切回</p>
+<p>web 搜索/提取加 TTL 结果缓存：20 分钟内重复查询直接走缓存，并发 subagent 只付一次供应商费用</p>
+<p>cron 失败去重：同一 job 同一错误签名只通知一次，新增 incidents 命令可 ack</p>
+<p>TUI 启动提速：npm&gt;=10 下不再每次启动都重跑 npm install</p>
+<p>重点条目：</p>
+<p>桌面端（钥匙串、浏览器标签页、vibe hearts、剪贴板、HUD）</p>
+<ul>
+<li>OS 钥匙串加密改为可选，不再每次启动弹密码框（6a6e16fa5）</li>
+</ul>
+<p>Electron safeStorage 会把每个应用的密钥（&#x27;Hermes Key&#x27;）存进 macOS 登录钥匙串；当默认钥匙串被锁、缺失或损坏时，桌面端每次启动都会弹出一个阻塞式的 &quot;Keychain Not Found&quot; / 密码对话框，想正常打开应用都不行。现在钥匙串加密改为显式 opt-in，默认关闭：默认路径完全不调用任何 safeStorage API（包括 isEncryptionAvailable——这个调用本身也会碰钥匙串），密钥以 0600 权限的明文文件保存。首次启动做一次性迁移：旧 safeStorage 数据能解密的解密成明文文件，解不开的标记为缺失（后面按不存在处理）——坏钥匙串最多提示一次，不会每次启动都弹。设置 → Gateway 里有开关（五个语言都加了），切换时会把所有已存密钥就地重新编码（v1 connection.json、v2 connections.json、native-oauth-tokens.json 三类存储全覆盖）。影响最大的就是 macOS 用户：每次打开桌面端都要输入钥匙串密码的场景没有了。</p>
+<ul>
+<li>内嵌浏览器标签页可右键交给系统浏览器（26777a417）</li>
+</ul>
+<p>内嵌浏览器标签页的右键菜单新增一项：把当前页面交给操作系统默认浏览器打开。about:blank 等非页面标签保留菜单项但置灰。想快速跳到本机浏览器的场景不用再复制 URL 了。</p>
+<ul>
+<li>vibe hearts 爱心特效终于有关闭开关（93acc22a9）</li>
+</ul>
+<p>浮动爱心之前一直开着、没有任何关闭开关；设置里 Appearance 的 Message Reactions 看起来相关，但那只管消息行的 tapback，管不到爱心。现在在它旁边新增独立的 Vibe Hearts 偏好项（默认开），不想要特效的直接关掉。</p>
+<ul>
+<li>Windows 编辑菜单 Paste 不再被剪贴板探测误伤（5400fb88e）</li>
+</ul>
+<p>右键菜单打开时，桌面端会先跑一次 renderer 端 readClipboard() 探测，探测到文本才启用 Paste。但菜单动作走的是 webContents.paste()——和 Ctrl+V 完全同一条 Chromium 路径，由主进程自己解析系统剪贴板。Windows 上 Win32 clipboard.readText() 桥可能返回空而粘贴实际可用，于是 Paste 一直置灰，看着像坏了。修复改为 fail-open：去掉探测门禁和 clipboardHasText 字段，打开可编辑菜单也不再做那次 IPC 往返；剪贴板为空时粘贴是无害空操作，与 Chromium 自身菜单行为一致。</p>
+<ul>
+<li>HUD 毛玻璃不再在回合运行期间冻结窗口（321d5c76b）</li>
+</ul>
+<p>毛玻璃 frost 和可读性 scrim 之前跑在两个不同门控上：scrim 只管聚焦，而调用方把 frost 放宽到&quot;最近或持有时&quot;——整个回合都是。结果 composer 失焦时思考，就会抬一块没有 scrim 的裸毛玻璃，浅色主题下是白板配无条件白字。修复把 frost 收回到 scrim 的门控上，并在窗口自身焦点变化时重跑；还顺带处理了&quot;点走别的应用不触发 focusout，scrim 走了 frost 还在&quot;的问题。</p>
+<ul>
+<li>会话列表与侧栏修复（02c7ae956、90ee4460c）</li>
+</ul>
+<p>会话列表 REST 改走活跃 profile，侧栏 recents_profile 经 SSH 别名翻译，远程连接的会话信息不再张冠李戴。</p>
+<ul>
+<li>其他桌面端小修复（b637ee0fc、e3b5512b7、5ef1409f5）</li>
+</ul>
+<p>页面内路由导航时 UI 缩放保持不变（不再回到默认缩放）；模态上下文菜单保持在对话框内部；窗口枚举失败时说出原因而不是吞掉错误。</p>
+<p>MCP 目录大扩充（34 官方 + 18 扫尾 + Better Stack/Railway + Cloudflare + Grafana）</p>
+<ul>
+<li>34 个官方远程 MCP 服务器入库（753f362a2）</li>
+</ul>
+<p>对标竞品目录（Perplexity Computer、Manus、Claude、ChatGPT connector）的一次大补强，限定为通用 MCP 客户端真正能连的端点，每个条目都做了 live-probe：无认证服务器验证 initialize 握手，OAuth 服务器按 RFC 9728 解析 protected-resource metadata 到 AS metadata 的 registration_endpoint（真 DCR 才收）。分类：无认证 7 个（deepwiki、context7、microsoft-learn、exa、aws-knowledge、wolfram、telnyx）、API key 3 个（github PAT、perplexity、telnyx）、OAuth 2.1 + DCR 24 个（canva、zapier、monday、clickup、todoist、dropbox、wix、miro、calendly、ramp、plaid、fireflies、neon、prisma-postgres、postman、globalping、semgrep、attio、close、apify、cloudinary、parallel-search、twelve-data、indeed 等）。探明只支持预注册 app 的（Box、Slack、HubSpot、Zoom、PagerDuty、Brex、Docusign、Stack Overflow、Google Workspace）主动剔除。注意：同窗口内的 refine commit（3e570dd42、88369af1c）按&quot;只收原始工具面、不做服务端 meta 层&quot;的策略又裁掉了其中一部分条目（github、perplexity、telnyx、exa、parallel-search，以及 zapier、wix、apify、ramp 等），所以这 34 个是入库时的初始名单，最终目录保留数以现网目录为准。</p>
+<ul>
+<li>最终轮再补 18 个（9a3732571）+ Better Stack 和 Railway（99f5aec73）</li>
+</ul>
+<p>最后一遍全量扫描又验出 18 个可用的远程 MCP 入库；Better Stack（日志与监控）和 Railway（部署平台）带 OAuth+DCR 实测通过后加入。</p>
+<ul>
+<li>Cloudflare 官方 API MCP 入库（90fd9a838）</li>
+</ul>
+<p>Cloudflare 官方托管远程 MCP（mcp.cloudflare.com/mcp）进目录：整个 Cloudflare API（DNS、Workers、R2、KV、D1、Zero Trust、WAF、Pages 等 2500+ 端点）通过两个 Code Mode 工具 search()/execute() 暴露，固定 ~1k-token schema 占用；HTTP transport + 原生 MCP OAuth 2.1 with DCR，无需安装。post_install 文档说明 scoped OAuth 授权、headless/CI 的 bearer-token 路径和各产品专用服务器。</p>
+<ul>
+<li>Cloudflare 固定 ?codemode=false，工具搜索看到全部端点（53015d3eb）</li>
+</ul>
+<p>Cloudflare 服务器默认的 Code Mode 表面本身就是一层工具发现层（search/execute 两个元工具），叠在 Hermes tool_search 下会变成两层搜索、且表面只有不透明的 2 个工具。固定 ?codemode=false 后约 3300 个 API 端点各自注册为带完整 JSON Schema 的工具，实测 tools/list 返回 3,320 个工具，Hermes 自己的渐进式披露直接搜索完整目录——一层、信息全量。post_install 记录了取舍和如何切回 Code Mode。</p>
+<ul>
+<li>Grafana Cloud MCP 入库（56f94faae、95668f5ea）</li>
+</ul>
+<p>Grafana Cloud 远程 MCP 进目录；同时修复 Atlassian 目录条目 404 的问题，并对 Grafana 条目做防御性 curation。</p>
+<ul>
+<li>MCP 安装不再清空用户的工具排除列表（45b35f962、054cba271、fb1ec36a4、965689d13、3a1a3a1c8）</li>
+</ul>
+<p>一批 MCP 工具过滤修复：工具选择 UI 保持在 exclude 模式不再冻结 include 列表；重装 MCP 不再把用户手配的 exclude 列表清掉（加 4 个 curation 缺口修复）；tools.include: [] 被当作显式空白名单对待；目录探测失败时保留先前的工具过滤而不是把它清空；exclude 模式安装路径不再播报探测公告。Cloudflare 条目配了精选 exclude 列表 + glob 工具过滤器 + default_excluded manifests，避免单条目拖垮整个目录。</p>
+<p>web 搜索/提取 TTL 结果缓存</p>
+<ul>
+<li>重复搜索 20 分钟内直接命中缓存（04603fc04）</li>
+</ul>
+<p>相同的（归一化 query + provider）搜索在 20 分钟 TTL 内直接走进程内 memo；并发的完全相同的查询做 single-flight，多个并行 subagent 扇出时只付一次供应商请求，而不是 N 次。请求的 limit 分桶到 10/20/50/100，近似请求共享同一条目，调用方按自己要的数量从桶里切片。相同 URL 的重复提取走磁盘缓存——之前 cache/web 全文库只写给 read_file 翻页用、从不读回，现在加了个小 JSON 侧表索引把读回接上；CLI、gateway、cron、subagent 共享同一份。命中缓存也会重新跑正常的截断管线，所以每次调用传的 char_limit 依然生效。两个缓存都挂在所有安全门槛（secret-URL、SSRF、策略、provider 解析）之后、付费供应商调用之前——命中只跳过网络请求。只有成功响应才进缓存，rescue 兜底响应永不缓存（一次性救援必须保持一次性）。配置项：web.cache_enabled（默认开）、web.cache_ttl_minutes（默认 20，夹在 1-1440）。</p>
+<ul>
+<li>cache_exempt_hosts：开发中站点永远实时抓取（ba9fc55e1）</li>
+</ul>
+<p>Vercel preview、ngrok 隧道、预发布域名这些开发中的站点是公开 DNS，本地开发永不缓存的规则管不到它们。新增 web.cache_exempt_hosts 名单：列出的主机永远实时抓取。支持精确、&quot;*.wildcard&quot; 或域名后缀匹配，标签边界感知（mysite.dev 覆盖 preview.mysite.dev 但绝不覆盖 evilmysite.dev）。存储和读取两侧都检查，所以加豁免立即生效，连之前已缓存的条目也会被绕过。</p>
+<ul>
+<li>缓存边界修复（f0381ee4a、8adef09be）</li>
+</ul>
+<p>本地开发 URL 永不进提取缓存；提取缓存只在策略 + provider 门槛之后才服务命中，rescue 与 format/provider 相互隔离。</p>
+<p>cron 失败去重：同一个错误只通知一次</p>
+<ul>
+<li>持久化事故 + ack CLI（9de5460c1）</li>
+</ul>
+<p>cron 的失败通知以前是每次运行都 ping：一个固定失败的 job 每天反复打扰。现在加了持久化事故存储（共用 executions.db 里的 cron_incidents 表），按&quot;同一 job + 同一错误签名&quot;跨运行分组：一旦被确认（ack），该签名的失败就不再每次运行都发 ping。生命周期 detected → alerted → reviewed → closed，closed 是签名级的终止态；sha256 签名对 job_id + 归一化错误取，错误脱敏截断后存储，带失败类型分类。调度器在失败投递路径上记录事故，精确签名已 ack 时抑制每次运行的失败 ping（正常失败路径和处理中抛错的重试路径都覆盖）。事故存储自身出错绝不影响 cron 运行或投递（best-effort）。新增 CLI：`hermes cron incidents [--state ...]` 和 `hermes cron incidents ack &lt;id&gt;`。钉钉按钮/评论视图、HMAC 令牌、owner 审核启动等留作后续切片。</p>
+<p>更新系统修复（Windows 网关不再中止更新、macOS 网关重启）</p>
+<ul>
+<li>Windows 上运行中的网关不再中止 hermes update（36f142341）</li>
+</ul>
+<p>Windows 的预更新并发实例门禁以前只要发现任何进程持有 venv 的 hermes.exe shim 就 exit 2 中止——包括网关自己：它几秒后就会被 _pause_windows_gateways_for_update() 暂停、更新完成后由重启阶段拉回来。于是跑着网关的用户每次更新前都得手动 taskkill 一轮。修复后门禁把网关运行时从中止列表里过滤掉，确认没有别的并发才放行。分类委托给 canonical shlex 分词 + profile 识别匹配器（桌面端预检豁免和 venv 持有者守卫共用同一套），门禁豁免和暂停机制不会漂移。不是网关的进程（REPL、dashboard、桌面端主体等）依然会被拦。</p>
+<ul>
+<li>launchd 网关被踢出后重启而不是静默跳过（bee489d56）</li>
+</ul>
+<p>更新流程开始前 launchd 管理的网关如果已经被挤下线，以前会静默跳过，现在会把它拉回来再继续。</p>
+<p>TUI 启动提速：不再每次启动都跑 npm install</p>
+<p>npm&gt;=10/11 写的精简隐藏 lockfile 会省略声明字段（version/dependencies/dev）还多出 extraneous，导致几乎每个包都被判定为&quot;变了&quot;；workspace 链接条目（&quot;link&quot;: true、路径在 node_modules/ 外）又不会被部分 --workspace 安装物化——两个原因叠加，检查永远返回 True，hermes --tui 每次都重跑 npm install 还把 package-lock.json 弄脏（#84617）。修复：只比较双方都用非空值记录的键（resolved、integrity 等），缺失条目检查忽略 workspace 链接条目和非 node_modules 路径，extraneous 视为 npm 运行时注解；真实不同步（lockfile 提升而 node_modules 落后）依然能检出。涉及 commits：def7bdc63、4d66def30、a96bad8e7、0c47cd526、76d8f876f（后几个是收敛到 scoped closure 和 workspace closure 的微调）。</p>
+<p>Docker：共享容器身份</p>
+<p>终端环境支持声明共享容器身份（7a67bd07a）：同一容器环境可以跨会话复用而不必每个会话重建。共享容器键随后接入 profile 级解析器 + MEDIA 交付链路（82b32f32e），配置声明键（f5200a4c1），digest 后缀身份标签保证不同键永不碰撞（d736f5d53），持久化容器改为 profile 作用域而非 per-session（15f7b7293），守卫 Docker sandbox MEDIA 路径翻译失败时给出警告（a15533b64），session 作用域 sandbox 的 MEDIA 交付解析修复（d4f31a8f3）。</p>
+<p>memory：压缩前检查点契约（防归档失败静默丢数据）</p>
+<p>上下文压缩是有损的。把会话证据归档到外部持久存储的部署，以前无法保证归档真的发生了：MemoryManager.on_pre_compress 设计上吞掉 provider 失败，归档失败会静默退化成数据丢失。新增 opt-in、provider 无关的检查点契约（1104ffe0b）：provider 宣告 pre_compress_checkpoint_api_version=1；version 0 保持历史 best-effort hook 语义不变。memory_manager 探测 supports_pre_compress_checkpoint() 能力，on_pre_compress(require_checkpoint=True) 会把检查点 provider 的失败传播出来——fail-closed，没归档就中止压缩。后续修复把这个门禁绑到每个压缩权限点（8cc379b52）和回合后微压缩（1ee524f77），并收尾 review 跟进（70d0b1fff）。文档记录契约（3c31c4488）。</p>
+<p>browser 快照不再调 LLM 总结</p>
+<p>web_extract 早就弃用辅助 LLM 改成确定性截断存储了，但 browser 快照的超大无障碍树还在走辅助 web_extract 模型，把一个死掉的 aux 槽位留在所有配置/选择器界面里（a75ea37dc）。修复：超大快照一律按行边界截断、全文树存到 cache/web、附 read_file 指针（截断之外的元素引用在文件里），LLM 路径整个删掉；同时移除 auxiliary.web_extract 槽位（config 默认值、CLI、网关、dashboard REST、桌面端 + web 的 AUX_TASKS、四种语言文案全部清掉）。快照阈值也可配置了（6ce7ab8bf）。效果：更快、不花 LLM 钱、少一层要配的模型。</p>
+<p>computer_use：全屏抓取引导模型去交互巷道</p>
+<p>全屏截图不带元素树，模型看着图不知道点哪里。CaptureResult 新增 note 字段浮在工具摘要里，告诉模型需要操作时改调 capture(app=&#x27;&lt;AppName&gt;&#x27;) 或 capture(app=&#x27;desktop&#x27;)（ce9b9a635）；schema 描述区分 app=&#x27;screen&#x27;（合成全屏图）与 app=&#x27;desktop&#x27;（带可点元素的外壳面）。显式屏幕捕获也改走 get_desktop_state（aeac98222）。</p>
+<p>Signal 长消息所有投递路径都分块</p>
+<p>Signal 适配器加了 8000 字符上限分块，但 hermes send / cron standalone / MCP 发送路径没接上，长消息被 signal-cli 整条拒绝（48f69e51d）。现在三个路径都走共享 truncate_message() 分块（上限常量从适配器模块导入，两条路径不会漂移）；cron 投递也分块而不是截断（cbc8d1804）。回归测试用 sabotage A/B 验证过。</p>
+<p>terminal 环境后端插件化</p>
+<p>第三方沙箱供应商可以在独立插件里注册终端后端（048491078）：TerminalEnvironmentProvider ABC 带声明式分类标志（is_remote/is_container/skip_container_guards/cache_path_base/strip_env_keys/session_isolated_when_nonpersistent），历史上所有 frozenset-of-names 分类点都改为查注册表；线程安全注册表，内置后端名保留不可覆盖；PluginContext.register_terminal_environment_provider() 与 register_browser_provider 对齐。</p>
+<p>系统提示精简与一致性</p>
+<p>系统提示删掉约 1.2K token 的 Nous Subscription 大块（4032a15ad）；系统提示不再引用会话用不到的工具/技能，hermes-agent skill 始终保持（3733e4aff）；memory provider 的 system_prompt_block 按 toolset 配置门控（b45b02857）。背景审查 agent 强制&quot;先读后写&quot;握手（a70d2ffce、610e2e02f）。</p>
+<p>平台与工具修复</p>
+<p>Teams：SDK 未绑定时不再调用 App()（f84f94b49），请求受支持的转写内容格式（7c5c99439）；Telegram：网络闪断后 send 等待重连再报错，不再误报 Not connected（6c1bfff65）；NVIDIA：消息准备从 deepcopy 换 copy-on-write、工具消息 schema 修复（b95f3a520、fc05cfb58）；tool-search 批量栅栏、列表截断、源索引修复（62b2d7802）；gateway 会话级 Docker sandbox MEDIA 路径解析（1fac44086）；fallback 层暴露 provider 切换并恢复主 provider（5908c577f）；skills 评审标记跨上下文保留（335c60ecd）；系统提示重建时绑定会话 cwd（cbd8de8ad）；OpenViking 身份操作与 URI 迁移一致性（4387e0396、fc4c2f456）。另外：过期的 BFL FLUX 3 促销核心工具移除（订阅用户仍可走 video_gen/FAL 用 FLUX 3，76e306c45）；安装树跳过父目录加固时输出警告日志（8b48f621c）；Gemini 文档更新到最新模型（eaf6545ab）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-08-25：HUD 游戏覆盖模式、/review 独立审核命令全端落地、Bot Mode 并发与失败码大改造</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-25</link>
