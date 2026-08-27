@@ -22,9 +22,65 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 30 期 · 6350 个提交 · 每日自动更新 ·
+<p class="meta">共 31 期 · 6618 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-28" class="day">
+      <h2>Hermes 日报 2026-08-28：桌面端群聊停止按钮、远程 SSH 更新引擎、MiniMax H3 Max 视频生成、企业微信流式回复</h2>
+      <p><strong>本期覆盖 8 月 27 日 ~ 8 月 28 日合入 main 的提交，共 268 个 commit（不含 merge），另有 8 个 merge。新增 27 个功能、160 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端群聊轮次可以手动停止，有真正的 Stop 按钮了</p>
+<p>桌面端新增 Managed updates 区块，可按连接管理远程 SSH 后端的更新</p>
+<p>FAL 视频生成器新增 MiniMax H3 Max，支持文生视频和图生视频</p>
+<p>execute_code 支持会话持久内核，同一会话变量跨调用保留</p>
+<p>企业微信原生流式回复上线，回复边生成边推送</p>
+<p>重点条目：</p>
+<p>桌面端（26 条 scoped fix + 4 条 feat(desktop)，加上关联的 update/browser 修复占本期大头）</p>
+<p>群聊轮次停止按钮：群聊回合进行中，桌面端新增真正的 Stop 按钮，可以中断正在运行的这一轮，不用再干瞪眼等它跑完。配套提交（1b575c65a）给群聊回合实现了真正的停止原语，修复了此前停止按钮是摆设的问题（#91868、#94569、#94570）。</p>
+<p>远程 SSH 更新引擎：桌面端新增 Managed updates 区块，可以按连接管理远程 SSH 后端的更新。更新引擎从 #93042 提取（6170fff19），已接入主进程（65335549a），并由 Managed updates 区块驱动逐个连接的 SSH 更新（bc4eea777）。配套修复了更新相关的一批问题：暂停 SCM 监督的 Windows 网关服务后再改 venv（790e1eb6b）、Windows 步骤执行前先分配（91c475bf5）、停滞的 Windows 更新树静默（dc91b6b52）、恢复停滞的 Windows 桌面端交接（80be4890f）、update.log 增长计入看门狗进度（50d3c53f6）、Windows 恢复令牌不再算作 fleet 运行时（71823be9d）、windows.ps1 归一化为 LF（266d8ce2b）、步骤空闲看门狗默认提到 10 分钟（7a1aafb4e）、gitignored 用户文件也会阻止 ZIP 覆盖（e64db7698，含 --ignored=matching 模式修复 f3cbb262c）、&#x27;Already up to date&#x27; 修复路径也跑配置迁移（53057f2bc、bf5ff5107）、中断的网关重启在新进程恢复（5609ccbec、f9135c189、ccdd7f41e、f0045c538、b2c011364）、aborted-fetch 的 tmp_pack 残留清理（df3d41ee6）、更新后 fleet 检查防 PID 复用（5d7ed70ee、2812d6121）、Windows 网关重启结果喂给 fleet 协调（de2a9de78）。</p>
+<p>更新后白屏修复：桌面端更新后白屏的问题——现在会显示可见错误页并自动重载，不再一片空白（4bc84d049，#95575）；错误页内联脚本做了转义加固，避免 script-tag 逃逸（c9d7b22e0）。</p>
+<p>只读恢复旧对话：桌面端可以用只读方式恢复之前存储的完整对话记录（9faa68538，#94724）；旧的 NULL-profile 历史对话一次性补回 owner 归属（01f7ce5b7）。</p>
+<p>Bot 模式模型选择器：Bot Mode 的模型选择器现在总会收敛，不再反复重挂组件（911978da6，#95279）；切换模型受统一确认处理器约束（61b6788dd）；刷新后模型若离开目录则自动切换（0fa98d6a1）。</p>
+<p>Mistral Voxtral STT 修复：桌面端直连 STT 时，Mistral Voxtral 的 JSON 响应现在能正确解包（bc737576b）。</p>
+<p>Bot 群聊空回复友好化：群聊收到空回复时显示友好的 (empty) 提示（f05fec356）;合成的 (pass) 后保留实质回复（8d412e67b）。</p>
+<p>会话识别修复：会话行现在按 (profile, id) 识别——两个 profile 里的孪生会话不再互相折叠、错路由（db127f750，#92454）；远程 SSH 孤儿回收在远端 lockfile 结构不一致时失败关闭（3ee0c6222）；远程会话恢复后保留 owner（f54d01547）；点击 Bots 面板时 bot 聊天保持焦点（253b9d78c，#96062）；窗格/条带折叠时保留恢复标签（584f3a748，#91223）；Show earlier 正常工作的转录预算上限修正（a24c12d14）。</p>
+<p>新手势：browser_exec 行用开头的 # 注释作为标题，与 CLI/TUI 一致（65974a3e7，#96093）。</p>
+<p>企业微信（国内平台，优先）</p>
+<p>原生流式回复：企业微信适配器支持原生流式回复——回复边生成边推送，每轮隔离不串话、去重安全投递、交互边界清晰（2ecb54455）；默认开启 WeCom 流式配置（81aa4f18a）；流式时消除重复和拆碎的气泡（9faa953cd）；send_message 跨 loop 派发到活跃 WeCom 适配器（42dc0dea7）；/approve-/deny 直接发送确认只作用于原生流式适配器（7105657f2）。</p>
+<p>视频生成</p>
+<p>MiniMax H3 Max：FAL 视频生成器新增 MiniMax H3 Max 模型，支持文生视频（t2v）和图生视频（i2v）两种模式（b0563d5ad）。</p>
+<p>工具与内核</p>
+<p>execute_code 会话持久内核：execute_code 新增 session 模式内核（kernel_mode: session）——同一会话内多次调用共享同一个 Python 内核，变量、import、状态跨调用保留，长流程不用每次重新初始化（b39d76d90，#94647）。</p>
+<p>浏览器真实 Chrome 配置：浏览器工具新增真实 Chrome 配置文件模式（local_browser）——经用户同意后复制默认 Chrome 配置，用真实登录态浏览，通过 agent-browser 拷贝 + browser-use CDP 驱动（830e4a29b、1f4d095fd）；Windows 上文件占用时锁感知复制（42046b452）；local_browser 保持在私有 URL 策略和现有 local 会话内（0f56937cd）；Windows 真实 profile 在浏览器仍在运行时快速失败（931bf613b）。</p>
+<p>工具 schema 精简：四个核心工具 schema 大幅瘦身，每次调用消耗的 prompt token 显著下降：delegate_task 简化到 tasks-only 接口 + 深度推导委派（1201 → 773 tok/call，−36%，9dfbde19d，#96424）；clarify 精简 schema + 单一 questions[] 接口（880 → 335 tok/call，−62%，7d6c6ae4a，#95907）；terminal 诚实 schema + env 传递 pager 默认值 + 统一 notify 参数（837 → 670 tok/call，−20%，1dc552d5d，#95937）；browser_exec schema 精简（803 → 663 tok/call，−17%，A/B 门控，dfff42d3d，#96300）。</p>
+<p>技能</p>
+<p>publish-site 网站发布：新增 publish-site 技能，支持把网站发布到 GitHub Pages / Cloudflare Pages / Netlify Pages，带版本管理（5c57e7754）；该技能移动到 optional-skills 目录（034c6ac77）。</p>
+<p>AgentMail 重写：AgentMail 可选技能重写为 CLI 优先（14320d18d）。</p>
+<p>插件系统扩展：插件现在可以在所有网关平台注册原生平台处理器（272f4e4ab）；Telegram 插件可用 ctx.register_telegram_handler 注册 PTB handler（c96f83025）；平台 handler 已接入 a2a、buzz、qqbot 适配器（34393c32a）。</p>
+<p>平台集成</p>
+<p>Slack 链接展开控开关：Slack 适配器新增链接展开（unfurl）控开关（aeaa0c784），媒体字幕遵循开关（b91845c2a）、流式回复期间保留（91dbd7a6f）、原生平面强制字符串 unfurl 旋钮（5521265de、634d9c3f4）、消息 ts 先 claim 再富集避免重复回合（708f84c47、39a5838f0）；网关导向的 unfurl_links/unfurl_media 盖戳到出站帧元数据（cc2fb4627、be5c75165）。</p>
+<p>语音便签 STT 恢复：修复语音便签转文字失效——补上媒体 MIME 声明、voice 消息类型和 CDN 下载 UA，语音消息重新能转成文字（29033a3fd，#95274）。</p>
+<p>Gemini 3.x 多模态：Gemini 3.x 的 functionResponse.parts 现在支持内嵌图片，多模态工具结果能直接返回图像（2673d5f5b）。</p>
+<p>cron 与调度</p>
+<p>卡死的周期任务可恢复：周期任务卡死在 error 状态无法再次调度的问题——现在这类任务可以重新恢复调度（ba4c2d525）；对 schedule=None 的防御加固（939dec134）；保留周期任务的 manual_run_at 意图（7e64a4830）。</p>
+<p>后台常驻与网关</p>
+<p>WS-only 服务器：桌面端启动路径移除 FastAPI/uvicorn，改走精简的 WS-only 服务器（434ea57eb、71e2924c5、27e700e79、213f0a694、9ee94d7d4、49442c7b7）——桌面端启动更轻。配套的 ws-only 修复含 opt-in 门控、loopback 失败关闭、真实 v15 握手测试。</p>
+<p>配置与 CLI</p>
+<p>config set/unset 保配置：配置文件出现非法 YAML 时，config set/unset 以前会把用户覆盖项清空，现在会明确拒绝失败关闭并保留原配置（77d4d23fb）；写配置被拒时干净地报错（93a29d110）；有损十进制值保留为字符串（6defe7eb6）。</p>
+<p>模型目录</p>
+<p>新免费模型：GLM-5.3-Flash 加入 z.ai 和 OpenCode Go 选择器（a9611f3c6）；minimax-m3:free 加入 OpenRouter（6607f7067）；Inkling 免费模型加入 OpenRouter 目录（51df117de）；明确指定的免费 OpenRouter 模型不再被忽略（a65ad1563）；elephant-alpha 从目录移除（ab80a3851）。</p>
+<p>压缩与状态</p>
+<p>state.db 加固：state.db 的 synchronous 现在所有平台都可配置（ef29fc63d）；已有数据库 journal_mode 被翻成 WAL 时告警（d5d42b96e）；配置 journal_mode=delete 被磁盘 WAL 覆盖时告警（9aeb582e3）；journal-mode 探测/恢复走 _connect_repair_durable（db63afb9d）；损坏修复后重新应用配置的 journal mode（786e65bf4、e40f1be75）；委托状态持久化屏障（7e6eda7bb、6548177eb、4a8b4d43a）；guest 持久化屏障也应用 database.synchronous（4882184e9）。</p>
+<p>压缩可靠性：会话轮转把当前轮拆开时去重当前轮行（80ab7d2b1）；停滞的摘要沿 fallback 链重试（2c6938dc3，#78981）；未发布的 stall-fallback fence 以 WARNING 呈现（6151e59d6）；锁跳过时保留终端生命周期（36ae32524）；抑制重复完成通知（7a21bfe68）。</p>
+<p>网关与心跳</p>
+<p>网关心跳加固：loop watchdog 自身的心跳不再冻住它监视的 loop（f39931afd）；stale-heartbeat wedge 判定与 loop 调度见证互锁（a1c83ef90）；单次 tick-socket 缺失不能授权 wedge kill（ca4a9ec68）；_stop_loop_liveness_guards 里解除心跳写入器（8a32baafc）。</p>
+<p>状态库与孤儿清理：跨后端心跳门控孤儿清理（cae58be1f）；TUI 网关在兄弟后端持有时保留持久行（39f1e1881）；会话上限关闭时保持桌面端 liveness 租约（51e67babc）。</p>
+<p>其他值得注意</p>
+<p>企业微信相关还有：send_message 跨 loop 派发（42dc0dea7）；原生流式的每轮隔离、去重安全投递（2ecb54455 同上）。</p>
+<p>发布：本期含 release v0.20.6（2026.8.27，5fc308a70）。</p>
+<p>MCP：stdio MCP 子进程注册进 spawn ledger 并回收孤儿（e1e72f109，#61514）；MCP 调用中途 fast-fail 处也能发重连信号（8aae2ea53）；stdio children liveness 检查反相修正（98fce8e52、2663117f7）。</p>
+    </section>
+    
     <section id="2026-08-27" class="day">
       <h2>Hermes 日报 2026-08-27：桌面端新增舰队 profile 栏，更新系统不再杀进程树</h2>
       <p><strong>本期覆盖 8 月 26 日 ~ 8 月 27 日合入 main 的提交，共 342 个 commit（不含 merge），另有 3 个 merge。新增 19 个功能、216 个修复、1 个性能优化。本期是典型的大加固期：桌面端独占 167 条，围绕多网关连接归属、更新器改造、macOS 权限体系三块集中发力。</strong></p>
