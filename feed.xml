@@ -5,8 +5,66 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 28 Aug 2026 06:42:50 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 29 Aug 2026 06:45:00 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-08-29：应用内提示默认开启、HUD 可拖到第二屏、execute_code 输出溢出自动保存、远程内核会话持久化</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-29</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-29</guid>
+      <pubDate>Sat, 29 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 28 日 ~ 8 月 29 日合入 main 的提交，共 203 个 commit（不含 merge），另有 6 个 merge。新增 22 个功能、112 个修复、2 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端应用内提示（in-app tips）默认开启，界面安静时指点你没发现的功能</p>
+<p>桌面端 HUD 可以拖到第二个显示器了</p>
+<p>execute_code 输出太长时全文自动保存，不丢内容还能继续读</p>
+<p>docker/SSH/modal 远程代码执行内核支持会话持久化</p>
+<p>一张损坏图片不再让整个会话永久卡死</p>
+<p>重点条目：</p>
+<p>桌面端（25 条 scoped fix + 10 条 feat(desktop)，本期最大头）</p>
+<p>应用内提示默认开启：桌面端新增应用内提示气泡（in-app tips），循环指向你可能还没发现的功能——一个强调色气泡 + 箭头 + 目标轮廓，不抢焦点、不挡操作、没有遮罩（baaf30499）。它只在应用真正安静时说话：没有流式输出、没有弹窗、窗口聚焦、距离上次按键几秒之后；按目录顺序走而不是随机，一条提示指向的东西不存在就直接跳过。提示节奏按小时而不是分钟：首次进入应用先等 5~10 分钟（不会一打开就弹），之后每 6 小时冷却一条，跨启动持久——大约一天一条，几周走完整个目录（198a69421）。系统默认开启（4bd279336，#96831），提示和引导教程（tours）都可以在 设置→外观 里关闭（1acd5bb02，#96835）——关掉后 Agent 的 tip 调用会在桥接层被丢弃、教程请求会被明确拒绝，不会出现&quot;关了你还在演&quot;的尴尬。配套：给应用主要界面加了稳定的 data-tour / data-tip-arrow-only 句柄，重构渲染后箭头和轮廓不会认错目标（46512ee1d）；idle 轮换与 Agent 提示拆分开关（035798269）；提示工具让 Hermes 可以指向界面上的一件事（911c6c50d）。</p>
+<p>HUD 拖到第二块屏：修复组合输入条（HUD）拖不到第二块显示器的问题——此前 Composer 拖动用的是渲染器 CSS 像素增量，落在 AppKit 当前显示器钳制内，跨屏永远追不上光标（Windows 混合 DPI 下还会漂移）;现在改在主进程跟踪 OS 光标、解除钳制，可以正常拖到别的显示器（e60983a69）。</p>
+<p>Bot 空聊天有身份：bot 的空白会话不再一片空白——占用 chat.empty 槽位、用 bot 的头像和名字给空对话署名（e4bd1a0a7）；插件可以为它拥有的空会话起标题（45176219a）。新建的 bot 聊天会限定到 bots workspace（ebb20910f）。</p>
+<p>插件 SDK 拓宽：把 Bot Mode 之前手搓的原语导出成 SDK——Panel 主从布局、SessionStatusDot、ColorSwatches、RowButton、DisclosureCaret、formatAgo、translateNow、未读 store 等，下一个插件不用重复造轮子（4fcd16e22）。</p>
+<p>Bot 栏一批修复：点击 bot 行回到它已打开的标签页，而不是重新打开一个已关闭的 Bot Chat（008bc186c、7c910793b）；切换聊天时 Bots 主页不再闪白（6f8be6151）；主区域不再被 Bot Mode 盖住（35b53af10）；bot 聊天共享核心未读、去掉分支栏（67854b50b）；bot rail 三个潜在 bug 和死代码清理（d7f6ef8a1）；两个随窗口生命期增长的 bot-rail 缓存加上限（716564531）；roster 重开时重新拉取而不是用空闲快照（6ac193e02）；#93080 错路由修复——空会话的身份通过 focus store 解析（e4bd1a0a7 内文）。</p>
+<p>会话切换提速：切换会话的后台回填从 10 帧压缩到 2 帧，切换更快（a792d0794）；已知历史为空时保持加载器不闪退（d22964851）；未经验证的暖会话先不放上视图（b6eb17d01）。</p>
+<p>MCP 相关：MCP 健康检查和命令面板统一走 getServers（9f2ab334c）；损坏的 mcp_servers 配置条目直接丢弃而不是崩溃（13afe9e9e）；远端 registry 为主时&quot;This device&quot;能力选择仍能落到本机（fe576ba48）；This-device Default 保持在本地源（76da7ff08，#97038）。</p>
+<p>代码执行</p>
+<p>输出溢出自动保存：execute_code 执行结果超过长度限制时，截断输出的完整全文自动保存——本机保存到 cache/exec、远程内核存到 kernel tmpdir，返回结果里直接带文件路径和 read_file 用法提示（ae8c97603，#97043）。配套修复：limits 报错文案改为直接教用户用 spillover 而不是只给一个 50KB 上限数字（585723126，#97048）。</p>
+<p>远程内核会话持久化：docker/SSH/modal 远程代码执行后端新增会话持久化（remote kernel host），远程内核状态跨调用保留（5f75ec197，closes #96873，#96991）。</p>
+<p>会话临时目录移出内存盘：终端会话临时根目录默认不再放 RAM 内存盘 /tmp（Linux tmpfs 吃内存、重启即失），改到 ~/.hermes/cache/terminal（托管、72 小时自动清理，gateway 每小时清理 + 进程内 sweep；hermes_bg_* 三元组按组老化，活服务器的 .log 保护 .pid）。解析顺序：terminal.temp_dir &gt; TMPDIR/TMP/TEMP &gt; HERMES_HOME/cache/terminal &gt; /tmp 兜底（95cf7dc9e）。配套新增 terminal.temp_dir 配置项可手动重定向（d7be3f649，#97182）。</p>
+<p>Agent 稳定性</p>
+<p>损坏图片不再卡死会话：#69078 的永久卡死类——xAI 返回 &quot;Invalid PNG image&quot; 时（重放历史里重新序列化的图片部分损坏），旧分类器只认识 Anthropic 的 &quot;exceeds max dimension&quot; 和 &quot;model does not support images&quot;，于是落入通用不可重试 400：收缩路径、剥离路径都不触发，毒图片留在历史里，之后每一轮（哪怕纯文本）都同样失败——会话只能删除。现在新增 FailoverReason.image_corrupt 语义拆分，两条恢复层：剥离图片后重试 + 保持历史完整（8aeb3f6ee、a3177d057、d61411d13，#69078）；Kimi/Moonshot 的 &quot;failed to decode image&quot; 400 同样剥离图片（cd72689e0）；&quot;media exceeds size limit&quot; 归类为 image_too_large（b3f4f5077）；通用图片拒绝可恢复（98a84783c，yoma）。</p>
+<p>413 恢复按字节衡量：413 本质是字节超限错误，但恢复循环用 token 估算（图片按固定 token 价，图片主导时就永远算&quot;没进展&quot;）——实测某会话两张 vision_analyze 结果 5.6MB 占请求体 96.6%，token 估算却只有 ~3K/80K，于是每次尝试都报 no_progress，预算烧完、会话在 13% 上下文占用时永久卡死。改为按字节衡量压缩进度后可以真实释放图片字节（b855f86bc，#97160 关联）。</p>
+<p>传播与防御：图像损坏重试时保持 canonical history 完整（a3177d057）；剥离图片时丢弃 api_content 副作用文件、清理未配对工具结果（f0ac2c8f1、e1762bd30）；图片嵌入前先验证 PNG 完整性、截断图片直接拒绝（765142d94、ad0e83062）；Pillow 缺失时图片校验优雅降级（4029a24f0）。</p>
+<p>上下文估算锚定真实用量：上下文大小检查不再用 chars/4 + 固定 1500 token 图片成本重估整个历史，而是以 provider 返回值里的 usage.prompt_tokens（系统提示 + 工具 schema + 历史的精确真值）做锚点，只估算上次响应之后新增的消息——误差窗口从「整个对话」缩小到「最后一轮」，每次响应自我修正（d3a1c4651）。</p>
+<p>长期会话拾取新工具：压缩（compaction）提交边界会重建动态工具 schema——开了新工具/改了配置之后，永不结束的长期会话在压缩时终于能用上（c30ac90a9，#97073）。</p>
+<p>skills 与工具</p>
+<p>skill_manage 批量原子操作：skill_manage 工具改为 operations[] 批量接口——一次提交可以跨多个技能做多步操作，全部原子执行、任一失败整体回滚（含跨技能回滚）；同一文件在批内被重复破坏性操作（双重写/删、整篇重写后 patch）直接拒绝；patch 链保持合法（72874b067，#97295）。</p>
+<p>skills-guard 收紧：os.environ.get() 读取豁免环境变量转储模式、os.getenv 密钥读取记 medium（d6a21bc4e）；内联注释和 docstring 的 os.environ 误报处理（54909d41b）；良性技能模式的 CRITICAL/HIGH 误报减少（42e614945）；sed 标志变体捕获、插件代码里的内容契约散文豁免（8c098e9e8）；shell-write 与散文绕过缺口关闭（f2f61e0a4）；agent-config 持久化模式不再阻塞 meta-skills（e22b8b66c，#92021）。</p>
+<p>A2A</p>
+<p>客户端工具默认关闭：A2A 客户端工具改为配置门控——默认禁用、需要显式开启，未配置的安装每次调用省约 561 token（3340bbbda，#97421）。</p>
+<p>Profiles 与 Cron</p>
+<p>删除的 profile 不再复活：setup_logging 和 ensure_hermes_home 会在 hermes profile delete 之后 mkdir profiles/&lt;name&gt;，空壳重新出现在 profile 列表和桌面端 Bot Mode——现在删除写入墓碑（tombstone），被墓碑的家目录拒绝 mkdir/bootstrap，列表/服务跳过（7e3452245）；exists/backfill 尊重墓碑、命名 home 检测收紧（af2dc685f）；命名 profile 检测锚定真实 Hermes home（35328345d）；cron 的 mkdir 站点全部扩宽已删 profile 保护（0dc936716、84d29488e）——定时任务不会再让已删 profile 回来（000d22b9d，#97137 关联）。</p>
+<p>路径显示</p>
+<p>Windows 路径不再混用分隔符：display_hermes_home 在 Windows 上渲染 POSIX 分隔符，工具 schema 和用户可见消息里出现 ~/AppData\Local\hermes 这种混搭路径——改为反斜杠渲染（a641644f1，#97137）。</p>
+<p>Gateway 与多 profile</p>
+<p>gateway 不再阻塞事件循环：热路径移出事件循环 + ASYNC lint 门槛防回归（c0ff25a1f）。</p>
+<p>handoff 多 profile 修复：多 profile 安装下 /handoff 三个同族 bug——watcher 只轮询根 store，/handoff -p profile 写的状态没人读、CLI 60 秒超时；完成时可能从错误 profile 的 bot 投递（fc5fdb8c2）。</p>
+<p>安装</p>
+<p>Node 门槛精确化：Node 24.0–24.10 之前能通过门槛、却在 npm EBADENGINE 时挂掉——现在门槛阶段直接拦下（15eb5caf7）；预发布 Node 工具链拒绝（4d08f5158）；不兼容的系统 npm 拒绝（3e1629009）；npm gate 与 manifest 范围对齐（902cd0514）；Node PATH readiness guard 保留（4572dbf09）；门槛警告里写明支持的 Node 版本线（ad4adbbfe）。</p>
+<p>uv 锁定同步：tier-0 锁定同步不再被 UV_NO_CONFIG 绊倒（c9fa2bba4）；锁定 uv sync 保留项目配置（6da0ae1cf，#82446）。</p>
+<p>模型</p>
+<p>qwen3.8-flash 可选：OpenRouter 和 Nous portal 模型列表新增 qwen3.8-flash，显式 1M 上下文（新家族 slug 否则落到 qwen 131072 通用兜底）（48d252806）。</p>
+<p>TUI</p>
+<p>-q 种子交互会话：hermes chat -q &quot;...&quot; 在真实 TTY 上现在以该提示作为第一轮开启正常交互会话，字面提交、不做斜杠命令路由/! 分发/$(...) 插值/文件拖放重写；自动化场景（非 TTY、kanban worker、cron、管道、A2A）保持原来的回答即退出，新增 --oneshot 显式保留旧行为（a5c7eed5f）。</p>
+<p>压缩与性能</p>
+<p>压缩快速摘要通道：受保护的快速摘要车道（guarded fast summary lane）（213ae08e7）；非压缩辅助调用跳过 dict 拷贝（699bfcd02）。</p>
+<p>压缩可靠性：请求显式 max_tokens 时不强制 wire cap（1564a9748）；计时钩子传播到受保护调用 worker（d24e6a34d）；restore 的 TOCTOU 关闭（e078b2fe7）；stall-fallback 竞争的 attempt 归属（61cd299c6）；布尔快速上限拒绝、漂移快速控制收敛、有效快速路径认证（358198345、7568dd551、372c4cdfc）；上下文压缩工具调用修剪（c7761573f、93f4dc756）。</p>
+<p>其他</p>
+<p>TUI 恢复：模型切换失败后恢复（dbb985459）、失败恢复竞态关闭（258d0283b）、失败构建恢复交接加固（4e860c093）。</p>
+<p>macOS：TCC 解释器锚点重落地（aa72df4b4）、环境 scrubbing + EACCES 拒绝 + 标记路径归一（37bccf343）、锚点别名失败加固（0976ceaa9）。</p>
+<p>其他发布：本期桌面端 tip 系列合计 10 条 feat(desktop)，是今日最大功能面；另有 Hermes Agent 自身提交的 sanitizer 清理（225fa13bd）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-08-28：桌面端群聊停止按钮、远程 SSH 更新引擎、MiniMax H3 Max 视频生成、企业微信流式回复</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-28</link>
