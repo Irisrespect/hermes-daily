@@ -5,8 +5,56 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 29 Aug 2026 06:45:00 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 30 Aug 2026 06:48:47 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-08-30：看板整体导出导入可迁移、/btw 边车问答上线、三大新模型平台接入、todo 支持嵌套子任务</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-30</link>
+      <guid isPermaLink="false">hermes-daily-2026-08-30</guid>
+      <pubDate>Sun, 30 Aug 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 8 月 28 日 ~ 8 月 29 日合入 main 的提交，共 125 个 commit（不含 merge），另有 2 个 merge。新增 21 个功能、57 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端看板可以整体打包导出/导入，跨机器迁移不丢数据</p>
+<p>/btw 边车问答上线，问问题不打断当前对话；/background 改名 /bg</p>
+<p>Nebius Token Factory、Ramp Router、腾讯 hy4-preview 三个新平台接入</p>
+<p>todo 工具支持嵌套子任务，任务列表变成层级树</p>
+<p>网关会话数据库 39 个只读操作脱离写锁，并发不再互相堵</p>
+<p>重点条目：</p>
+<p>桌面端（10 条 scoped fix + 3 条 feat(desktop) + 2 条 feat(kanban)，本期最大头）</p>
+<p>看板整体导出/导入：`hermes kanban boards export|import` 可以把整个看板打包成 portable archive（.tar.gz）跨机器迁移——任务、评论、链接、历史、附件全在一个包里（3150e444b）。两个关键细节：看板数据库是 WAL 模式，普通文件拷贝会丢 -wal 侧车文件里还没落盘的数据、复制中途 dispatcher 提交还会撕裂，所以导出走 SQLite 在线备份 API；行里存着机器本地状态（认领人、worker PID、绝对路径、订阅任务事件的网关会话），原样搬运会让导入的看板&quot;被另一台电脑上的进程认领&quot;，所以导出时全部剥离、导入时再剥离一次（归档本身是不可信输入）。导入永远落成新看板，slug 冲突自动加后缀，绝不合并或覆盖已有看板；源机器上是目录/git worktree 工作区的任务先进 triage 待认领（3150e444b）。配套 REST 端点 POST /boards/{slug}/export 和 POST /boards/import 让桌面端和 dashboard 驱动迁移，走文件路径而不是字节流（5e550838f）；桌面端看板切换器补上导出/导入/重命名/删除入口——重命名之前埋在&quot;设置…&quot;里形同缺失，现在有自己的入口；删除是归档不是销毁（移到 boards/_archived/，toast 提示路径），default 看板后端拒绝删除（72cf8d1fa）。</p>
+<p>看板切换器崩溃修复：重命名和设置对话框常驻挂载（关闭后仍挂载），因为 null board 的 `board!.slug` 非空断言被 React Compiler 提升到渲染期解引用，导致切换器每次渲染都崩（d9d1ee835）——在组件体内安全解析 slug 后修复。</p>
+<p>预览文件卡片下载按钮：桌面端收到的任何交付文件，预览卡片上都能直接点下载保存——通过认证后端桥走本地/远程连接都可以（3b362acf4，#97816）。配套：::preview 内联预览在远程/URL 连接上不再退化成卡片——改走 mode-aware fs 桥读取（57746cbb8，#97829）；MEDIA: 交付的非媒体文件（PDF、数据文件）统一进预览管线拿文件卡片，而不是退化成死链接式&quot;打开&quot;锚点（fae063fc7，#97812）。</p>
+<p>文件保存原子化：网关文件下载（Save 对话框覆盖已有文件）中途断流时，旧实现先截断再删除目标文件，原文件直接没了；现在先写同目录随机名 .part 临时文件，成功再同卷重命名覆盖，失败时原文件完好（a7e7de640）。</p>
+<p>流式助手文本保留：message.complete 携带空文本时桌面端不再清掉已流式渲染的助手文本，坏 hydration 不再破坏已显示内容；空白修复、watermark 克隆、并发非空胜出合并、批量追加统一进一个原子化的 SessionDB 事务，失败整体回滚（24e54b55f，#95514）。</p>
+<p>HUD 修复：HUD 链接（如 OAuth）之前试图在透明覆盖层画 webview 导致变砖，现在交系统浏览器打开、挂上下文菜单、跳过预览 tile 停靠（178c23fb2）；Linux X11 上 ignore-mouse 无法恢复，pointer-events:none 的可见横条会吞掉澄清选项和链接点击，现在固定横条和悬浮提示可正常接收点击（240790af6）；窗格标签页关闭按钮预留空间，避免关闭按钮盖住内容（447217b4c，#96880）。</p>
+<p>项目树不再闪烁：根目录不可读时反复重探测导致项目树闪烁，停止在重探测期间反复重渲染（2a36a7157）；不再把陌生人的 cwd 认成当前选中会话的工作区（0401e0888）。</p>
+<p>命令与交互</p>
+<p>/btw 边车问答：新增 /btw 命令——问一个跟当前会话有关的边车问题，不打断正在进行的对话。它用后台一次性辅助调用（默认主模型，可用 auxiliary.side_question.* 配置）从只读的会话快照里找答案：实时会话的历史、消息交替、prompt 缓存全都不动，当前回合照常继续运行（74a95a3dd）。随后升级为复用后台评审的 cache-parity fork：与父会话同运行时/凭证、字节一致的系统提示词和工具集、共享 session_id 预热缓存——完整上下文几乎零成本回答，工具全部在派发层拒绝（578f85cfb）。面覆盖 CLI、网关全平台（17 个 locale 的 i18n）、TUI、Discord 原生斜杠、桌面端。/background 改名 /bg（旧名退休），语义不变：后台开一个全新独立 agent 会话（74a95a3dd）。</p>
+<p>/busy 命令网关化：/busy 从 CLI-only 扩展到网关平台，带子命令 status/queue/steer/interrupt 和 handler 冒烟测试（c64feb23f）；busy 模式按 profile 生效——某个 profile 忙不影响其他 profile（8d1d193f1）；非 profile 级 /busy 变更后实时文本模式正确重推导（0d02f0d1d）。</p>
+<p>Slack 的 /insights 路由到 /hermes（ce22b689c）。</p>
+<p>平台与模型</p>
+<p>Nebius Token Factory：新增 provider——Nebius 的 Token Factory 模型服务，请求 verbose 模型元数据（13bad590f、49f5b6a9b），文档同步（a8e11d21c）。</p>
+<p>Ramp Router：新增 Ramp Router（router.com）provider 插件——OpenAI Responses 兼容的 LLM 网关，把请求路由到 OpenAI/Anthropic/xAI/Fireworks 等上游，带服务端回退和消费控制。api.router.com 按域名强制 codex_responses 模式（该主机没有 chat/completions 端点，404），模型目录运行时实时拉取（key 作用域，不做硬编码回退列表），请求带 Hermes-Agent User-Agent（804f8b473、ceb54f5a5）。配套 supported_reasoning_efforts 可覆写（804f8b473 内文）。</p>
+<p>腾讯 hy4-preview：新增 hy4-preview 模型 + TokenPlan 计费方案 provider，进模型选择器（0fb5cab0d、f7c79efba）；修复 main 的 1_048_576 上下文重复条目（ac5c8f58d），文档覆盖 Tencent TokenPlan + hy4-preview（360761c8c）。</p>
+<p>路由与代理修复：Ramp Router 相关 docs 说明 chat-completions 现在是 Router 上的兼容 shim 而非 404（ca3060b70）；Ollama URL 启发式容忍畸形端口（c87058983）；严格 OpenAI-compat 端点省略 Ollama 专属 think=false（31f0336da）；Nebius effort 路由改走规范 clamp_effort（原手写映射把阶梯反了，b954547e7）；caps warmer 加 pytest 守卫 + fail-open efforts 查表加 debug 日志（1c5ee5815）。</p>
+<p>todo：嵌套子任务</p>
+<p>todo 工具支持层级任务列表：条目可选 parent 字段指向另一条目 id 即成为子任务（b6bd681e8）。父 id 自引用丢弃、悬空引用和环自动清理；合并模式可设置/清除 parent；压缩后注入把树缩进渲染，父任务还有未完成子任务时保持可见；平铺重排对嵌套列表跳过（平移动会拆散父子）。Schema 成本约 45 token。桌面端 TodoItem 携带 parent、todoTree DFS 渲染，输入框状态栏子任务行带缩进显示。</p>
+<p>系统提示词重构</p>
+<p>默认身份重写为行为规范：把默认 identity 从散文改成行为规格——回答规模规则、命名禁令、反谄媚（anti-sycophancy）、按需深入（earned depth）；刻意删掉&quot;探索节俭&quot;行（模型本来就探索不足，约束反而有害）（f89f0a2ea，#97926）。系统提示词里的会话时钟改成两行：锚定真实会话开始时间 + 重建日行——会话跨天重建时不再出现日期漂移（11b98a142，#97930）。全套提示词瘦身：平台提示词 7 个最重的压缩，全表 −657 token（e387cbc0a，#97899）；桌面端提示词减肥 442→307（9d9f44d63，#97850）；记忆/技能指引 537→255 served、每调用省 282 token（a2e19d484，#97760）；skills 段清理（5241df3d4，#97918）；平台提示词真实性核对 + 全平台语音气泡转码（ccc367dce，#97873）。</p>
+<p>技能与工具</p>
+<p>新增三个技能：decision-questionnaire（可选技能，把卡住的决策变成异步问卷——只问收件人和期望结果，草拟&quot;最重要优先&quot;的发现问卷带答案占位，来源 mattpocock/skills 的 to-questionnaire，MIT）（b1ff8722a）；setup-wizard-generator（可选技能，生成 bash 安装向导，引导人工完成手动步骤：打开 dashboard URL、捕获值（密钥隐藏输入）、幂等写 .env/GitHub secrets、逐阶段确认，模板库 vended 原样 + bash -n 验证）（7b17d02a0）；grill-me（新内置技能，写代码前对抗式计划审查——一次一个问题带一个推荐，编码前解析完整决策树，四阶段：理解→技术决策→边界情况→综合，集成 plan/subagent-driven-development/requesting-code-review）（21f86655b）。</p>
+<p>grill-me 改名风波：grill-me 一度改名 plan-interrogation 并吸收了 frontier-rounds 面试机制（bfeeb5025），随后按维护者决定恢复 grill-me 原名、保留内容升级（2c232761e）；归类到 optional-skills（71c823bbf）。</p>
+<p>skill 管理修复：skill_manage patch 失败不再死胡同——错误明确给出恢复路径（old_string 必须是精确原文文本），模型不会盲目重试或逃逸到 write_file 整文件重写毁掉无关内容（4f4e778db）；旧&quot;冗余完全一致字符串守卫&quot;及其空测试删除（10e93c6ab）；回滚恢复失败时技能目录和快照都保留——之前先删技能目录再恢复，恢复失败连快照一起删，技能彻底消失，现在先改名旁置、恢复成功才删，失败则改回，最坏是半应用批次而不是技能丢失（1315e65a5）；批量失败结果携带失败操作的指导 payload（file_preview、hints）（62e8126c6）。</p>
+<p>性能</p>
+<p>会话数据库读操作脱离写锁：网关所有 agent 共享同一个 SessionDB，以前 39 个只读查询全拿全局写锁，并发回合的持久化全被读查询堵在锁后面排队（0534f1033）。现在纯读方法走 WAL 只读连接池、不拿锁（非 WAL 安装逐字节回退原路径），配合 gate 防止该类问题回归——延续 #90734 的架构修复，这次把 LOCKED 读也清掉。</p>
+<p>缓存与上下文</p>
+<p>LiteLLM Anthropic 代理 400 修复：带工具的会话在 LiteLLM Anthropic 代理后不再 400（1d8946b40，#89886）。Bedrock 按 placement 从服务端 cachePoint 拒绝中恢复（88a78ecc9）；超长 caller prompt_cache_key 不再 400 Chat Completions 请求（3951ead83）；缓存前缀切分不再产生纯空白文本块（f0d5f1298）；OpenCode Go 路由保留配置的 1h TTL（d51d66e86）；每响应 session id 的缓存作用域隔离不变式测试（6f689d0b0）。</p>
+<p>Vertex 凭证缓存修复：服务账号文件轮换后旧凭证被签名键控缓存卡住（56a262331）；stat 签名不能当凭证身份——改 content-digest 缓存键（913b91043）；恢复被 tuple 缓存键误杀的 ADC→SA 重试（ef4cd77ff）。</p>
+<p>安全性</p>
+<p>Teams Bot Framework 附件下载鉴权：Bot Framework connector 附件下载需要鉴权白名单门控，超媒体上限流式下载、token 刷新进程锁（2f01ec9fa、c23d40af1、0eff6bc20）——未鉴权的附件下载会被拒绝。</p>
+<p>其他</p>
+<p>更新器忽略无关的过渡态 SCM 服务（d5632392c）；opencode 密钥无关目录实时对着 Zen relay 校验（d9d6112aa）；MCP OAuth 锁范围收窄（9a1eef7a2）；user-stories 新增 65 个社区故事（067e58238）；流式内容增量列表形状归一化（23bae43cf）；只统计实质性辅助进度（7ff70f170）；CLI 交互窗格渲染 Ghostty 级宠物（fac3c6233）、Unicode 占位符门控到 kitty/Ghostty（d88975852）、宠物刷屏移出 import 路径（9f90cd438）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-08-29：应用内提示默认开启、HUD 可拖到第二屏、execute_code 输出溢出自动保存、远程内核会话持久化</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-08-29</link>
