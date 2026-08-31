@@ -22,9 +22,170 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 34 期 · 7097 个提交 · 每日自动更新 ·
+<p class="meta">共 35 期 · 7226 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-01" class="day">
+      <h2>Hermes 日报 2026-09-01：桌面端不再误杀健康网关、Group Chat 群聊高可用、子代理失败状态修正、Buzz 线程化</h2>
+      <p><strong>本期覆盖 8 月 31 日 ~ 9 月 1 日合入 main 的提交，共 140 个 commit（不含 merge），另有 1 个 merge。新增 12 个功能、87 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端启动不再误杀健康独立网关，孤儿清理与网关保护并存</li>
+<li>bot 模式 Group Chat 群聊高可用：权威网关挂了，房间由参与网关接管继续跑</li>
+<li>子代理失败不再被误报成&quot;已完成&quot;，CLI 和 gateway 都显示清晰错误</li>
+<li>Buzz 回复默认进线程，补齐编辑/删除消息实现流式输出</li>
+<li>压缩系统 14 条修复、cron 多 profile 隔离大修</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端：启动不再误杀健康网关</p>
+<ul>
+<li>1ec4b569f fix(desktop): don&#x27;t reap the healthy standalone gateway on Windows desktop startup</li>
+<li>c26762d60 fix(desktop): keep the orphan sweep unconditional; guard the probe fix with a mutation-checked test</li>
+<li>9488950a9 fix(gateway): build reaper exclusion from raw registration records</li>
+<li>之前桌面端启动时的孤儿清理器用破坏性探测（get_running_pid + 直接回收）判断哪些网关该被清理：注册记录只要 liveness 校验没过（启动时间对不上、argv 漂移、锁抖动），记录的 PID 就进不了排除名单，正在正常服务的独立网关会被 TerminateProcess 硬杀、无 drain。现在排除证据改为读原始 pidfile + 锁记录（无校验副作用），非破坏性探测只作为运行时状态兜底（get_running_pid 仍保留给 runtime-status fallback）。对清理名单来说这是严格更安全的：最坏情况是某个过期记录让一个进程多活一轮清扫，而校验误判则会杀掉活网关。配套把 web_server.py 里&quot;注册失效就跳过清理&quot;的开关去掉了——孤儿回收保持无条件执行，同时健康的独立网关得到保护。带 mutation-checked 回归测试：把探测改回 get_running_pid() 会直接让测试失败。</li>
+</ul>
+<p>桌面端：多 profile 会话操作不再串台</p>
+<ul>
+<li>18f429a89 fix(desktop): scope every session mutation to its owning profile</li>
+<li>桌面端侧边栏的会话变更（删除/改名等）之前只在 request.profile 里带上属主 profile，Electron 主进程用它对后端做 ROUTING，但后端实际收到的请求并没有被 profile 作用域限定——后端从 ?profile=（DELETE）或 body.profile（PATCH）选目标库。于是非主 profile 的变更静默落到主 profile 的 state.db：删除会话乐观消失、切换 profile 后原样冒回来，在&quot;All Profiles&quot;视图和远程主后端（注册的远程网关当 primary）场景最明显。现在每个会话变更都作用到会话自己所属的 profile 库。</li>
+</ul>
+<p>桌面端：bot 列表点击不再打开过期会话</p>
+<ul>
+<li>714930f25 fix(desktop): a bot roster click no longer opens a stale finished session (#90102)</li>
+<li>前端点击 bot 列表行的快捷方式无条件信任持久化的会话磁贴桶（Local Storage hermes.desktop.sessionTiles.v2）：如果磁贴里记录的会话在官方注册表已解析不到（被替换的旧行、重新铸造的 canonical chat、已结束的隐藏会话），每次点击都会打开这个过期会话，且被记成该区域的活动窗格——行的点击目标永远卡在旧会话上，而预览/年龄显示的是活会话，清 Local Storage 只能好到下一次点击。修复后点击目标按权威注册表解析，过期会话不再被打开。</li>
+</ul>
+<p>bot-mode：Group Chat 群聊高可用</p>
+<ul>
+<li>e730deedd feat(bot-mode): Group Chats survive the authority gateway dying — log replication and fenced takeover</li>
+<li>cbc67b939 feat(bot-mode): add durable Group Chat authority and replay</li>
+<li>cc4b5ba1f feat(bot-mode): replay pages carry authority lineage; pin byte-bounded replay</li>
+<li>93c7089f7 feat(bot-mode): run same-gateway Group Chats without Desktop</li>
+<li>e7433910e feat(bot-mode): add scoped cross-gateway Group Chat transport</li>
+<li>之前 bot 模式群聊是单点：主持房间的权威网关一挂，房间直接死掉，参与者全部失联。本轮实现完整的副本+接管机制：</li>
+<li>每个参与网关在自己的 root state.db 里持久化房间有序日志副本（hosted_room_replicas.py），按页复制（ingest_page），拒绝序列空洞和权威纪元回退，幂等写入。</li>
+<li>权威网关挂掉后，参与网关 promote_replica() 在本地以纪元+1 继续主持房间，发出带血统证明的 authority.claimed 事件；旧权威（stale owner）在所有复制点被 fence；回归的旧权威观察到新纪元会主动让位（authority.lost 自 fence），从机制上消除脑裂写。</li>
+<li>回放页（read_events pages）现在携带权威戳（authority.gateway_id + epoch），复制方连回放状态都能据此 fence 旧权威；回放页大小按 UTF-8 字节计数（回归测试专门防 LENGTH(TEXT) 退化）。</li>
+<li>同网关卡上的群聊不再强制要求桌面端在跑；跨网关群聊传输按 profile 作用域隔离。</li>
+<li>桌面端配套把群聊里每个成员的持久 hold 状态也渲染出来（a9c783f21），带规范的 resume 指引和主题安全的文案。</li>
+<li>适用场景：一个 bot 群聊由多个 profile/网关卡参与时，任何一个网关下线，房间都能由其他参与方无缝接管，不会整个房间消失。</li>
+</ul>
+<p>delegation：子代理失败状态修正 + 错误透明化</p>
+<ul>
+<li>5a134383f fix: failed subagents now surface a clean error to the user (CLI + gateway)</li>
+<li>1b6ea1a2c fix(delegation): report failed children as failed, not completed</li>
+<li>ec02d5179 fix(delegation): report provider-failed subagents as failed, not completed/max_iterations</li>
+<li>5ce8f7155 fix(delegation): report schema-invalid child results as failed, not completed</li>
+<li>c05d04fff feat(delegation): surface config-level model_not_found notice in delegation batch reports</li>
+<li>8557e0a48 fix(tools): surface config-level model_not_found notices in delegation batch reports</li>
+<li>delegate_task 派出的子代理状态判定之前只看返回摘要非空就标 completed：子代理中途死了（provider 404/400、HTTP 524、超时、崩溃）时，错误文本被当正常输出，批处理报告显示 &quot;✓ status=completed&quot;；provider 拒绝（如&quot;不是有效模型 ID&quot;）还被误报成 &quot;TRUNCATED: hit max_iterations&quot;。平台关掉 tool_progress 时（Telegram/Slack 默认），人类根本看不到任何失败痕迹。</li>
+<li>本轮在单点判定（delegate_tool.py 的状态决定点）全面改写：result.failed 强制置为 failed 状态，错误随条目携带；新增共享的 format_subagent_failure_line() 把 traceback → 异常消息渲染成一行可读错误；exit_reason 如实派生（failure→error、interrupted→interrupted、completed→completed、只有真正的迭代预算耗尽才→max_iterations）。output_schema 校验失败（包含常见空 {} 回退）同样报 failed 而不是 completed——消费者（orchestrator、批处理 ✓/✗ 图标、子代理生命周期映射）不再接受违约判定当成功。</li>
+<li>配置级模型错误单独处理：配置的 Subagent Model 被 provider 拒绝（HTTP 400 &quot;not a valid model ID&quot;）时，批量里每个子代理都在干活前死掉，但原因被埋在各自块里。现在批量报告渲染器（多任务 fan-out 和单任务两个变体）检测到「错误/摘要匹配 model_not_found 短语且命中的正是当前配置的模型」时，在报告顶部输出一条可行动提示：指出配置的模型 + provider，引导去 Settings → Advanced → Subagent Model（hermes config get delegation.model）。该提示懒加载配置、任何错误都 fail open（不出提示），避免把过期任务失败误归因到当前模型。</li>
+</ul>
+<p>Buzz：回复线程化 + 流式输出</p>
+<ul>
+<li>972f0314d feat(buzz): compose thread-topology cluster — reply_in_thread opt-out, NIP-10 root anchoring on all send paths, _PLATFORM_DEFAULTS tier</li>
+<li>34c10f83c feat(buzz): implement edit_message and delete_message so replies can stream</li>
+<li>66fa6e41c fix(buzz): reply in-thread instead of flat channel posts</li>
+<li>cbeb925f0 fix(buzz): reply into the existing thread instead of nesting a new one</li>
+<li>09cbce43e fix(buzz): preserve stable thread roots</li>
+<li>b3af0b686 fix(buzz): keep progress messages in thread</li>
+<li>a74080437 fix(buzz): resolve @mentions to member pubkeys so agent-to-agent pings work</li>
+<li>1885a40ad fix(buzz): preserve literal mentions and exact UUID targets</li>
+<li>线程化：Buzz 适配器之前回复全部平铺在频道里。现在默认回复进线程：系统提示、进度气泡、最终结果都锚定在同一个线程根上（NIP-10 root anchoring 覆盖 send/send_image/standalone send 全部路径），不再层层嵌套新线程、线程根保持稳定。想退回平铺可以用 platforms.buzz.reply_to_mode: off 或 BUZZ_REPLY_IN_THREAD=false（env），网关的进度回复锚点也会一起抑制（#75082 #95842）。</li>
+<li>提及解析：@提及现在解析成成员公钥，agent 之间的 ping 真正送达（之前文本 @ 不触发分发）；字面提及和精确 UUID 目标保留；回复式提及（NIP-10 回复自己的消息算提及）也处理了。</li>
+<li>流式输出：Buzz 之前没实现 edit_message/delete_message，网关的流式输出（先发一条部分消息、随 token 到达反复编辑）在 Buzz 上退化——base stub 返回 success=False，所有回复只能等整轮结束一次性交付，回合再长也干等。现在补齐两个消息操作（buzz-cli 已有 messages edit/delete 基础），回复可以边生成边更新。注意一个实现细节：每次编辑 buzz-cli 报新事件 id，但编辑目标保持原 id，流消费者按目标 id 归并。</li>
+</ul>
+<p>compression：压缩系统 14 条修复</p>
+<ul>
+<li>087cc49a2 fix(compression): refresh lease in-transaction before publish; arm cooldown on split failure</li>
+<li>8d567ccd2 fix(compression): stop work at the total deadline</li>
+<li>892f756b8 fix(compression): tear down cancelled workers with bounded grace and discard superseded attempts (#97488)</li>
+<li>19a59e9c9 fix(compression): transiently-blocked no-op is a soft defer, never exhaustion (#97488)</li>
+<li>a6549922b fix(compression): stamp durable backoff rows with strategy and failure kind (#96775 #97488)</li>
+<li>1f2bd9e76 fix(compression): stamp _DB_PERSISTED_MARKER after in-place batch compaction commit (#98450)</li>
+<li>027b339e7 fix(compression): persist stall-interrupted backoff on pre-commit cancel (#96775)</li>
+<li>ad925a08d fix(compression): scope worker-teardown grace to the total-ceiling path</li>
+<li>de4155b1b fix(compression): report total ceiling expiry accurately</li>
+<li>0bcad4519 fix(compression): preserve fallback before worker start</li>
+<li>c0787c8ec fix(compression): release idle-timeout lease promptly</li>
+<li>dc71fb37e fix(compression): guard the split-failure cooldown call like sibling strikes</li>
+<li>452f6b7de fix(compression): route-aware stale-thinking charge parity between compaction trigger and tail walks (#84371)</li>
+<li>64cc87e66 fix(compression): keep estimate seam positional-compatible for monkeypatched estimators</li>
+<li>上下文压缩 worker 的生命周期一批修复：到达总截止时间就一定停止工作（之前 deadline 到了可能继续跑）；被取消的 worker 用有界宽限拆掉并丢弃被取代的尝试（#97488）；临时被阻塞的 no-op 按软延迟处理而不是耗尽重试（不消耗背压配额）；每次尝试的背压行持久化策略和失败类型（#96775 #97488）；预提交取消时保留被中断的退避；原地批量压缩提交后正确打 _DB_PERSISTED_MARKER 避免重复压缩（#98450）；发布前在事务内刷新租约、split 失败时武装冷却；空闲超时立即释放租约；stale-thinking 计费在压缩触发与 tail 扫描之间保持一致（#84371）。压缩是长会话最关键的后台机制，这批修复让它在高压/取消/中断场景下更可预期。</li>
+</ul>
+<p>cron：多 profile 隔离大修</p>
+<ul>
+<li>82d7a1300 fix(cron): profile isolation — systemd filter + heartbeat guard</li>
+<li>51e377d55 fix(cron): deliver each profile&#x27;s cron via its own adapter in multiplex</li>
+<li>a07370abd fix(cron): reserve shared adapters for the default profile only</li>
+<li>e70371751 fix(cron): treat a live multiplexer as gateway-alive for satellite profiles</li>
+<li>07f6518b6 fix(cron): retain profile secret scope through delivery</li>
+<li>d5d061377 fix(cron): profile_routes rescue for satellite-profile delivery preflight</li>
+<li>dfa5004a0 fix(cron): preserve profile context during session DB init</li>
+<li>edd6ad53a fix(cron): resolve multiplex home-channel chat id from the owning profile&#x27;s secret scope</li>
+<li>43ca78aa4 fix(cron): keep SessionDB kwargs-free in the context-preserving worker</li>
+<li>多 profile（multiplex）下 cron 之前会串台：#98790 复现——profile B 检查&quot;Gateway is running, cron jobs will fire&quot;时数到的是 profile A 的网关进程（systemd 枚举没过滤 profile，违背了&quot;只数本 profile PID&quot;的 docstring），心跳也只看 A 的 ticker，于是 B 的任务实际不会触发但界面谎报 OK。本轮修复：</li>
+<li>systemd 进程过滤只统计本 profile（profile-scoped systemd filter），心跳 guard 只看自己的。</li>
+<li>投递时每个 profile 的 cron 走自己的 adapter（multiplex 下不再所有消息挤共享连接），共享 adapter 只预留给默认 profile；卫星 profile 的投递 preflight 由 profile_routes 兜底。</li>
+<li>卫星 profile 把存活的 multiplexer 算作网关在线（之前误报&quot;未安装 gateway&quot;并拒绝退出码 78 的 install 建议）；投递过程保留 profile 的 secret scope（home-channel chat id 从属主 profile 的 secret scope 解析）。</li>
+<li>会话 DB 初始化时保留 profile 上下文；context-preserving worker 不再给 SessionDB 塞 kwargs。</li>
+</ul>
+<p>worktree：推送的 open-PR 分支工作树自动回收</p>
+<ul>
+<li>3a351a966 feat(worktree): pushed open-PR lanes reclaim their disk; cron tick prunes worktrees</li>
+<li>worktree 磁盘泄漏的最大来源是&quot;已推送的 PR 分支&quot;类：managed 安装用单分支 refspec 拉取，推送过的分支永远没有 refs/remotes/* 记录，被误判成&quot;未推送&quot;而永久保留（实测报告机 33 个保留树里 24 个是这类，约 18GB）。现在每次清扫对每个干净树做一次懒 git ls-remote：分支头与 origin 完全一致 → 该 checkout 冗余 → 回收树、保留分支引用（且被孤儿分支清理豁免）。有分歧/无法验证的树继续保留。启动清扫和 hermes worktree prune/list 都生效。</li>
+</ul>
+<p>state.db：0 字节损坏文件隔离</p>
+<ul>
+<li>a071fc80d fix(state): quarantine 0-byte truncated state.db and record store provenance (#97568)</li>
+<li>state.db 被截断成 0 字节（崩溃/断电/写中断）时 SQLite 打开直接报错，连带 record store 一起挂。现在启动检测到 0 字节库先隔离（不覆盖原文件、可排查），record store 也补了来源追溯。数据安全向加固。</li>
+</ul>
+<p>photon：iMessage 已读回执</p>
+<ul>
+<li>9744fc0c9 feat(photon): support iMessage read receipts</li>
+<li>d63f996a7 feat(photon): read-receipt toggle, receipt-type alias, docs</li>
+<li>photon（iMessage 桥）支持已读回执，默认开启；想保持 Delivered 状态可用 PHOTON_READ_RECEIPTS=false 关掉（声明在 plugin.yaml optional_env）。适配器同时丢弃 read 和 read_receipt 两种内容类型（#91759 别名覆盖），并补了回归测试和 photon.md / environment-variables.md 文档。</li>
+</ul>
+<p>openviking：默认使用用户记忆</p>
+<ul>
+<li>823bcc887 feat(openviking): use user memory by default</li>
+<li>新连接设置不再隐式套一个 Hermes peer，也去掉了 peer 提问；显式 peer 设置保留，记忆路径与捕获的客户端身份保持一致。附 setup/config/request/recall/session 回归测试和升级指引。</li>
+</ul>
+<p>delegation 相关杂项修复</p>
+<ul>
+<li>5a4dbdec2 fix(delegation): subagent process notifications stay suppressed when the container key collapses</li>
+<li>容器键坍缩时子代理进程通知保持抑制，不泄漏到错误的会话。</li>
+</ul>
+<p>其他值得注意的修复</p>
+<ul>
+<li>a90be562f fix(web): stop mirroring env-backed provider keys into model.api_key (#88990)：POST /api/model/set 之前把 ${VAR}/key_env 的环境变量明文解析结果写进 model.api_key 落盘到 config.yaml，每次重新应用还会再写一遍；现在镜像逻辑检查磁盘上的原始条目，跳过 env 引用条目，字面密钥行为不变。配合 8fd144c50 fix(desktop)：模型分配/自定义端点激活现在 carry key_env 指针而非解析后的密钥，model 条目运行时继续解析、config.yaml 零明文，绕开 #88990 的明文泄漏路径（salvage #90484）。</li>
+<li>a65a517d0 fix(dashboard-auth): url-encode the PKCE cookie value so strict proxy hops stop dropping it (#99176)：PKCE cookie 值做 URL 编码，严格的代理跳点不再丢弃它，OAuth 回调登录不再随机失败。</li>
+<li>1f99a4b2f fix(relay): resolve fresh-final unfurl decision per chat, not per primary identity (#99206)：relay 的 fresh-final 决策之前按主身份的平台判定（stream consumer 没打平台 key），multiplex 下 Slack primary + Telegram/Discord 从属时，非 Slack 聊天里每个带链接的流式 final 都会被二次投递（孤儿预览）；非 Slack primary + Slack 从属时 force-on unfurl 完全失效。现在按聊天逐条判定。</li>
+<li>1152d4d3c fix(cli): recognize whitespace around &#x27;=&#x27; in .env save/remove：.env 里 `OPENAI_API_KEY = sk-...`（等号带空格）是有效赋值（load_env 按第一个 = 分割并 strip），但写入器重写/删除时只认 KEY= 前缀，这类行像复活洞一样删不掉改不了（#40041 修过 export KEY= 形式，空格形式这次补齐）。</li>
+<li>82733a3fd fix(credential-pool): materialize pool entry on Desktop PUT /api/env save (#96058)</li>
+<li>22f9caf84 fix(credentials): scrub the keyed `providers` schema on rotate/remove：凭据轮换/删除时 config.yaml 镜像清理之前只走 model、auxiliary.&lt;task&gt;、custom_providers.&lt;name&gt;，漏了 keyed `providers` schema——而桌面端/仪表盘写自定义端点的内联 key 正是写到 providers.&lt;id&gt;.api_key（运行时解析器读它且内联 key 优先级高于 env var）。现在轮换/删除会把 providers 里的镜像一并清掉。</li>
+<li>89c28ccf7 fix(desktop): fail-open attached shared-remote probe; honest ensure/open (#96493)：附着共享远程的探测超时不再复活 ghost secondary；ensureGatewayForAgent 在 primary socket 关闭时如实返回 false，openGatewayForAgent 抛错而不是无操作 no-op。3efb514b9 配套：命名 profile 复用 primary WS。</li>
+<li>2f261f99f fix(desktop): keep profile scope when reusing primary remote backend：复用 primary 远程后端时保持 profile 作用域。</li>
+<li>f9908e2ed fix(bot-mode): avoid inherited stdin on Windows：查询文件式 DM 传输不消费 stdin，初试和策略门控重试都用 DEVNULL，避免 Git Bash 把无效伪句柄传给 Windows 子进程创建。</li>
+<li>5a3edc746 fix(bot-mode): cancel re-routes on worker races instead of failing disband：worker 竞争时取消重路由而不是解散失败。</li>
+<li>e35539483 fix(browser): isolate Lightpanda and Chrome fallback flags：Lightpanda 和 Chrome 回退的环境 flag 互相隔离；a9eb06a62 配套：Chromium-only flag 被剥离时打日志。</li>
+<li>a684d154b fix(buzz): let the requirement gate see externally managed secrets：外部管理的密钥也能通过 requirement 检查。</li>
+<li>a5e735576 fix(buzz): resolve BUZZ_AUTH_TAG through the profile secret scope：BUZZ_AUTH_TAG 走 profile 密钥作用域解析。</li>
+<li>306dc874c fix(buzz): dispatch forum-channel kinds instead of chat kind 9 only：论坛频道类消息也能被分发，不只 chat kind 9。</li>
+<li>f40edee45 fix(buzz): trust explicit DM metadata fallback：显式 DM 元数据兜底被信任。</li>
+<li>722209bb5 fix(buzz): require explicit group addressing：群消息必须显式寻址，避免误投。</li>
+<li>ef2be5502 fix(buzz): treat NIP-10 replies to own messages as mentions：NIP-10 回复自己消息算提及。</li>
+<li>26f178e5f fix(terminal): gate the BUZZ_* terminal carve-out on actual Buzz agent context：BUZZ_* 终端环境变量注入只在真实 Buzz agent 上下文生效。</li>
+<li>a6192c7ad fix(terminal): let Buzz-managed agents inherit BUZZ CLI credentials in terminal env</li>
+<li>a4c682121 fix(tools): pass BUZZ_* platform credentials to terminal children</li>
+<li>09cbce43e fix(buzz): preserve stable thread roots（线程根保持稳定，不被后续回复挪动）</li>
+</ul>
+<p>封面说明</p>
+<ul>
+<li>本期封面：09·01 · 140 commits · 12 feat · 87 fix · 1 merge，数据范围 08-31 09:37 ~ 09-01 06:30。</li>
+</ul>
+    </section>
+    
     <section id="2026-08-31" class="day">
       <h2>Hermes 日报 2026-08-31：桌面端真实浏览器配置开关移位、/plan 升级全平台内建命令、cron 自然语言调度放行、压缩系统提示重建</h2>
       <p><strong>本期覆盖 8 月 30 日 ~ 8 月 31 日合入 main 的提交，共 151 个 commit（不含 merge），另有 0 个 merge。新增 20 个功能、90 个修复。</strong></p>
@@ -35,32 +196,12 @@
 <p>会话压缩重建后系统提示强制重建，长会话终于收到新指令；配套压缩行为修一串</p>
 <p>重点条目：</p>
 <p>桌面端（真实浏览器配置 + MCP OAuth 远程回调 + 长投递超时，本期最大头）</p>
-<p>真实浏览器配置开关移位：「使用我的真实浏览器配置」开关之前藏在通用的 设置→Config 编辑器 里，几乎没人找得到。现在移到 能力 → 工具 → 浏览器 面板，浏览器工具集的详情区、后端/提供商矩阵上方直接显示（6cb6aeb16，BrowserRealProfilePanel，配置读写支持乐观更新、失败回滚）。用真实 Chrome 配置让 agent 替你浏览的入口终于好找了。</p>
-<p>MCP OAuth 远程回调修复：桌面端连远程后端（SSH/Tailscale）时，MCP 的 OAuth 授权回调会死在中间——桌面端在自己的 127.0.0.1 上监听回调，远程后端也在后端机器的 127.0.0.1 上监听，浏览器解析 loopback 落回本机，重定向直接作废，ClickUp 等 catalog 服务器全部授权失败（正是社区「MCP Recurring errors」支援帖的拓扑）。现在加了客户端侧回调中继（client-side callback relay），远程后端场景 OAuth 也能完成（0f5dd5c46，配套 import 排序修复 3528a3bfc）。</p>
-<p>bot 模式长投递不再被 30 秒超时掐断：桌面端 bot 模式（机器人会话）的投递走网关插件 RPC，之前落在网关池的通用 30 秒 deadline 上；但 bot_relay.deliver 的后端契约长得多——后端先持有 120 秒回合锁再跑 600 秒回合、重试策略还允许一次有界重跑，30 秒直接被掐断。现在 relay 的投递 deadline 改为跟随后端真实预算（120s 等锁 + 600s 回合 + 策略门控重试），长任务结果能完整返回（10f1c3076、544ad1aa6）。</p>
-<p>桌面端 todo 面板补丁合并：之前后端发来 todo 快照直接整体替换 Tasks 列表，本地正在编辑的改动会被冲掉，面板看起来卡在 0/5 直到最终结果。现在 tool.start 的 merge:true 写入按 id 增量合并，只在完整结果时替换（cf692532c）。</p>
 <p>命令体系</p>
-<p>/plan 从内置技能升级为全平台内建命令：之前 /plan 是 bundled 技能，在 Telegram/Discord 等平台命令菜单只给技能层部分槽位（默认 82 个技能按字母序裁剪，&#x27;plan&#x27; 排第 57 位被裁掉），很多平台根本看不到 /plan。升级为第一公民 CommandDef 后，每个平台的命令菜单都有核心槽位；CLI 端也补齐了 /plan 命令（走 _pending_agent_seed 注入，同 /moa 模式）（0f3fcacd3、5c6e5e7ea），Discord 原生斜杠选择器也直接暴露（83f4524b4）。</p>
-<p>Telegram 内联命令选择器：Telegram 的 / 菜单默认只有 60 个槽位，大部分技能命令永远进不了菜单。现在支持内联模式：任意聊天里输入 @机器人名 + 查询词，返回实时可搜索的选择器，覆盖每个核心命令、插件命令和已安装技能——每敲一个字符实时计算结果、每页 50 条分页。是 Discord 动态 /skill 自动补全（#18741）的 Telegram 对应版（5bdaea64e）。</p>
 <p>cron 调度解析大修</p>
-<p>裸时长按循环间隔解析：之前写「30 分钟」会被错误解析成一次性任务——agent 说「每 30 分钟跑一次」实际跑一次就死。现在 30m/2h/1d 按文档正确解析为循环间隔，一次性任务要显式写成「in 30 分钟」（e8bab87ba）。顺手修了 repeat 字符串在 update 路径的 TypeError（52e5e7c03）、自定义 provider 的 request_overrides（extra_body/extra_headers）转发进定时任务（792dbea77）、cronjob 工具 schema 里被弄坏的 schedule 字段（0582ae76d）。</p>
-<p>自然语言调度全面放行：&#x27;Monday, Wednesday at 9am&#x27;、&#x27;weekdays at 9am&#x27;、&#x27;every monday 9am&#x27;、&#x27;MON-FRI&#x27; 命名星期、&#x27;JAN&#x27; 命名月份，之前全部报「Invalid schedule」被拒，现在都能正确转成 cron 表达式（57ad23c5d、77fd6db4c、ecdc03c61、ab9d85287、1d13fe70b）。</p>
 <p>压缩系统</p>
-<p>系统提示在压缩边界重建：会话被压缩重建后，系统提示词之前可能停留在旧版本——项目更新、新指令永远到不了长期会话。现在每次 commit 边界都强制用实时构建器重建系统提示，「更新终于能到达长期会话」（514707ff3，#98426）。</p>
-<p>配套压缩行为修复：native compaction 设置改动立即生效，不用等重启（77f5de627）；压缩时图片只读内容不再被丢弃（532b2d887）；lean compaction 每次尝试只发一次辅助请求（4f2254350）；压缩内部还修了 switch 兼容 fixture 保留（48a4201f4）、从 effective switch URL 解析能力（903c36b6d）、进程退出时安全清理已完成 todo 快照（989e48cc8）、从列表消息里剥离过期的内嵌 todo 快照（1762d3788）。</p>
 <p>浏览体验与账号安全</p>
-<p>真实配置浏览修复：agent 用你自己的浏览器配置干活时，之前每轮都会把真实浏览器弹到前台抢焦点，现在改成 headless 后台运行，你可以继续干自己的事（d5fd2e936）。快照里的 Cookies/Login Data/Web Data（你的登录态）之前是 0644 权限，机器上其他用户都能读，现在全部收紧为仅所有者可读 0700（0f7981b8a，#96729）。支持 Brave Origin 浏览器（独立付费版 Brave，Windows/macOS 各渠道精确识别）（b6d535dd8）。复制浏览器配置时把源 profile 身份一并写入 Local State——之前 cookies 属于 profile B 而元数据说 profile A，Chrome 每次都要你「以名字继续」重新核对账户（a50b41f84）。macOS 上修掉了 sqlite 锁协商挂死、启动的 Chrome 会被回收不再堆积孤儿进程（8e746668b、f8546c2ea）。</p>
-<p>Anthropic OAuth 登录修复一批：仪表盘 OAuth 登录后，旧的 API key 会「影子化」OAuth 凭证——resolve_anthropic_token() 一直返回过期 key，401 不断；现在登录后自动清掉 key、OAuth 生效（b4403a942）。回调补上 CSRF state 校验（之前回调从不检查 state，同类 bug 在 CLI 流程已修过）（739dc6d19）。刷新凭证提交改为事务的一部分，避免发送旧 token 却把新 token 作废（07faed33b）；claude_code 借用的凭证行不再作为 token 权威、跨进程并发刷新加锁——多个 Hermes 进程抢刷新同一份凭证会竞态丢更新，现在同步等锁而不是互相覆盖（e1a210652）。</p>
 <p>审批与安全</p>
-<p>webhook 无人值守平台：审批默认拒绝，不再卡死 60-300 秒：webhook/msgraph_webhook/api_server 这类无人值守的程序化平台，之前遇到需要审批的操作会阻塞整个会话等一个不存在的人（approval 超时 60-300 秒白等，webhook 又没有接收 /approve 回复的通道）。现在这些平台走 approvals.unattended_mode（默认拒绝，镜像 cron_mode 语义），审批决策瞬间返回，不阻塞（ef71f2cad，配套基础 73f8fb74e）。</p>
-<p>数据外泄误报修复：外泄检测的正则之前用未锚定的 \w*(KEY|TOKEN|...|API) 匹配变量名——$TRILLIUM_ETAPI_URL 这种中间含 API 的环境变量会被判「严重外泄告警」。现在要求 KEY/TOKEN/SECRET/PASSWORD 出现在变量名末尾、加 \b 锚定，SOUL.md 里正常的 API 用法文档不再误报（6b290b81d、21e52c1fd）。</p>
 <p>工具与技能</p>
-<p>TUI 状态栏升级：显示提示缓存命中率、平均延迟、每秒 token 数（同一份 per-call deque 历史），并新增 display.status_bar.fields 配置决定显示哪些字段；窄终端自动按优先级裁掉这些尾巴段（86a2fdc63、3548fc809、fb786d2f5、4bc7e624d）。</p>
-<p>/loop 首次唤醒立即触发：/loop 循环任务之前第一次迭代要等一个完整周期（比如每小时轮回首次触发最晚要等 1 小时），现在设置循环的时刻就是第一次唤醒的时刻，之后按正常节奏递归（1a47a3642）。--start-now 旗标因从未发布直接删除。</p>
-<p>阿里云中国模型进选择器：alibaba-cn / alibaba-coding-plan-cn / alibaba-token-plan-cn 三个变体全部进入模型选择器精选列表，并归入 qwen provider 组支持 drill-down 选择（93b6cf2ef、46076b2d6）。技能目录新增 impeccable 技能（内容从上游实时拉取）（45d9c33d8）。</p>
-<p>delegation.request_overrides 三路分支打通：delegation.request_overrides 之前只在部分解析分支生效，现在 direct-endpoint 等全部三个分支都 honor，显式配置覆盖运行时派生值、extra_body 深层合并（bacb90fe2、d3bfd2e9b）。</p>
-<p>后台评审工具白名单可配置：profile 可以给后台评审运行时授予窄域工具白名单，无关工具仍然拒绝（c8bbde777）。computer-use 不再启动已退役的浏览器授权运行时（b2e24b986）；新增 CDP 连接检测 Brave Origin 浏览器（bca0a865c）。</p>
-<p>技能包瘦身（index −26%）：15 个技能移到 optional（可经技能商店安装，历史保留）、github 技能六路合并、pdf 技能吸收 OCR、teams 管线按频道门控。每个会话都支付技能索引开销，桌面端每调用省约 500 token（c49fa88b8，#98539）。skill 安装修复：缺失的引用支持文件不再中断安装（7d87bab50）、显式链接的同目录兄弟文件正确拉取（86dda3cd3）、安装后 revision pinning 与大小写保护（7e95b67ad）、支持文件列表不再每行重复绝对路径（2a598aad1）。</p>
     </section>
     
     <section id="2026-08-30" class="day">
