@@ -22,9 +22,47 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 33 期 · 6946 个提交 · 每日自动更新 ·
+<p class="meta">共 34 期 · 7097 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-08-31" class="day">
+      <h2>Hermes 日报 2026-08-31：桌面端真实浏览器配置开关移位、/plan 升级全平台内建命令、cron 自然语言调度放行、压缩系统提示重建</h2>
+      <p><strong>本期覆盖 8 月 30 日 ~ 8 月 31 日合入 main 的提交，共 151 个 commit（不含 merge），另有 0 个 merge。新增 20 个功能、90 个修复。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端「使用我的真实浏览器配置」开关从设置深处移到 能力 → 工具 → 浏览器 面板</p>
+<p>/plan 从内置技能升级为全平台内建命令，不再被菜单裁剪；Telegram 新增内联命令选择器</p>
+<p>cron 调度解析大修：裸时长按循环间隔解析，自然语言调度（周一上午 9 点、工作日、命名月份）终于能用</p>
+<p>会话压缩重建后系统提示强制重建，长会话终于收到新指令；配套压缩行为修一串</p>
+<p>重点条目：</p>
+<p>桌面端（真实浏览器配置 + MCP OAuth 远程回调 + 长投递超时，本期最大头）</p>
+<p>真实浏览器配置开关移位：「使用我的真实浏览器配置」开关之前藏在通用的 设置→Config 编辑器 里，几乎没人找得到。现在移到 能力 → 工具 → 浏览器 面板，浏览器工具集的详情区、后端/提供商矩阵上方直接显示（6cb6aeb16，BrowserRealProfilePanel，配置读写支持乐观更新、失败回滚）。用真实 Chrome 配置让 agent 替你浏览的入口终于好找了。</p>
+<p>MCP OAuth 远程回调修复：桌面端连远程后端（SSH/Tailscale）时，MCP 的 OAuth 授权回调会死在中间——桌面端在自己的 127.0.0.1 上监听回调，远程后端也在后端机器的 127.0.0.1 上监听，浏览器解析 loopback 落回本机，重定向直接作废，ClickUp 等 catalog 服务器全部授权失败（正是社区「MCP Recurring errors」支援帖的拓扑）。现在加了客户端侧回调中继（client-side callback relay），远程后端场景 OAuth 也能完成（0f5dd5c46，配套 import 排序修复 3528a3bfc）。</p>
+<p>bot 模式长投递不再被 30 秒超时掐断：桌面端 bot 模式（机器人会话）的投递走网关插件 RPC，之前落在网关池的通用 30 秒 deadline 上；但 bot_relay.deliver 的后端契约长得多——后端先持有 120 秒回合锁再跑 600 秒回合、重试策略还允许一次有界重跑，30 秒直接被掐断。现在 relay 的投递 deadline 改为跟随后端真实预算（120s 等锁 + 600s 回合 + 策略门控重试），长任务结果能完整返回（10f1c3076、544ad1aa6）。</p>
+<p>桌面端 todo 面板补丁合并：之前后端发来 todo 快照直接整体替换 Tasks 列表，本地正在编辑的改动会被冲掉，面板看起来卡在 0/5 直到最终结果。现在 tool.start 的 merge:true 写入按 id 增量合并，只在完整结果时替换（cf692532c）。</p>
+<p>命令体系</p>
+<p>/plan 从内置技能升级为全平台内建命令：之前 /plan 是 bundled 技能，在 Telegram/Discord 等平台命令菜单只给技能层部分槽位（默认 82 个技能按字母序裁剪，&#x27;plan&#x27; 排第 57 位被裁掉），很多平台根本看不到 /plan。升级为第一公民 CommandDef 后，每个平台的命令菜单都有核心槽位；CLI 端也补齐了 /plan 命令（走 _pending_agent_seed 注入，同 /moa 模式）（0f3fcacd3、5c6e5e7ea），Discord 原生斜杠选择器也直接暴露（83f4524b4）。</p>
+<p>Telegram 内联命令选择器：Telegram 的 / 菜单默认只有 60 个槽位，大部分技能命令永远进不了菜单。现在支持内联模式：任意聊天里输入 @机器人名 + 查询词，返回实时可搜索的选择器，覆盖每个核心命令、插件命令和已安装技能——每敲一个字符实时计算结果、每页 50 条分页。是 Discord 动态 /skill 自动补全（#18741）的 Telegram 对应版（5bdaea64e）。</p>
+<p>cron 调度解析大修</p>
+<p>裸时长按循环间隔解析：之前写「30 分钟」会被错误解析成一次性任务——agent 说「每 30 分钟跑一次」实际跑一次就死。现在 30m/2h/1d 按文档正确解析为循环间隔，一次性任务要显式写成「in 30 分钟」（e8bab87ba）。顺手修了 repeat 字符串在 update 路径的 TypeError（52e5e7c03）、自定义 provider 的 request_overrides（extra_body/extra_headers）转发进定时任务（792dbea77）、cronjob 工具 schema 里被弄坏的 schedule 字段（0582ae76d）。</p>
+<p>自然语言调度全面放行：&#x27;Monday, Wednesday at 9am&#x27;、&#x27;weekdays at 9am&#x27;、&#x27;every monday 9am&#x27;、&#x27;MON-FRI&#x27; 命名星期、&#x27;JAN&#x27; 命名月份，之前全部报「Invalid schedule」被拒，现在都能正确转成 cron 表达式（57ad23c5d、77fd6db4c、ecdc03c61、ab9d85287、1d13fe70b）。</p>
+<p>压缩系统</p>
+<p>系统提示在压缩边界重建：会话被压缩重建后，系统提示词之前可能停留在旧版本——项目更新、新指令永远到不了长期会话。现在每次 commit 边界都强制用实时构建器重建系统提示，「更新终于能到达长期会话」（514707ff3，#98426）。</p>
+<p>配套压缩行为修复：native compaction 设置改动立即生效，不用等重启（77f5de627）；压缩时图片只读内容不再被丢弃（532b2d887）；lean compaction 每次尝试只发一次辅助请求（4f2254350）；压缩内部还修了 switch 兼容 fixture 保留（48a4201f4）、从 effective switch URL 解析能力（903c36b6d）、进程退出时安全清理已完成 todo 快照（989e48cc8）、从列表消息里剥离过期的内嵌 todo 快照（1762d3788）。</p>
+<p>浏览体验与账号安全</p>
+<p>真实配置浏览修复：agent 用你自己的浏览器配置干活时，之前每轮都会把真实浏览器弹到前台抢焦点，现在改成 headless 后台运行，你可以继续干自己的事（d5fd2e936）。快照里的 Cookies/Login Data/Web Data（你的登录态）之前是 0644 权限，机器上其他用户都能读，现在全部收紧为仅所有者可读 0700（0f7981b8a，#96729）。支持 Brave Origin 浏览器（独立付费版 Brave，Windows/macOS 各渠道精确识别）（b6d535dd8）。复制浏览器配置时把源 profile 身份一并写入 Local State——之前 cookies 属于 profile B 而元数据说 profile A，Chrome 每次都要你「以名字继续」重新核对账户（a50b41f84）。macOS 上修掉了 sqlite 锁协商挂死、启动的 Chrome 会被回收不再堆积孤儿进程（8e746668b、f8546c2ea）。</p>
+<p>Anthropic OAuth 登录修复一批：仪表盘 OAuth 登录后，旧的 API key 会「影子化」OAuth 凭证——resolve_anthropic_token() 一直返回过期 key，401 不断；现在登录后自动清掉 key、OAuth 生效（b4403a942）。回调补上 CSRF state 校验（之前回调从不检查 state，同类 bug 在 CLI 流程已修过）（739dc6d19）。刷新凭证提交改为事务的一部分，避免发送旧 token 却把新 token 作废（07faed33b）；claude_code 借用的凭证行不再作为 token 权威、跨进程并发刷新加锁——多个 Hermes 进程抢刷新同一份凭证会竞态丢更新，现在同步等锁而不是互相覆盖（e1a210652）。</p>
+<p>审批与安全</p>
+<p>webhook 无人值守平台：审批默认拒绝，不再卡死 60-300 秒：webhook/msgraph_webhook/api_server 这类无人值守的程序化平台，之前遇到需要审批的操作会阻塞整个会话等一个不存在的人（approval 超时 60-300 秒白等，webhook 又没有接收 /approve 回复的通道）。现在这些平台走 approvals.unattended_mode（默认拒绝，镜像 cron_mode 语义），审批决策瞬间返回，不阻塞（ef71f2cad，配套基础 73f8fb74e）。</p>
+<p>数据外泄误报修复：外泄检测的正则之前用未锚定的 \w*(KEY|TOKEN|...|API) 匹配变量名——$TRILLIUM_ETAPI_URL 这种中间含 API 的环境变量会被判「严重外泄告警」。现在要求 KEY/TOKEN/SECRET/PASSWORD 出现在变量名末尾、加 \b 锚定，SOUL.md 里正常的 API 用法文档不再误报（6b290b81d、21e52c1fd）。</p>
+<p>工具与技能</p>
+<p>TUI 状态栏升级：显示提示缓存命中率、平均延迟、每秒 token 数（同一份 per-call deque 历史），并新增 display.status_bar.fields 配置决定显示哪些字段；窄终端自动按优先级裁掉这些尾巴段（86a2fdc63、3548fc809、fb786d2f5、4bc7e624d）。</p>
+<p>/loop 首次唤醒立即触发：/loop 循环任务之前第一次迭代要等一个完整周期（比如每小时轮回首次触发最晚要等 1 小时），现在设置循环的时刻就是第一次唤醒的时刻，之后按正常节奏递归（1a47a3642）。--start-now 旗标因从未发布直接删除。</p>
+<p>阿里云中国模型进选择器：alibaba-cn / alibaba-coding-plan-cn / alibaba-token-plan-cn 三个变体全部进入模型选择器精选列表，并归入 qwen provider 组支持 drill-down 选择（93b6cf2ef、46076b2d6）。技能目录新增 impeccable 技能（内容从上游实时拉取）（45d9c33d8）。</p>
+<p>delegation.request_overrides 三路分支打通：delegation.request_overrides 之前只在部分解析分支生效，现在 direct-endpoint 等全部三个分支都 honor，显式配置覆盖运行时派生值、extra_body 深层合并（bacb90fe2、d3bfd2e9b）。</p>
+<p>后台评审工具白名单可配置：profile 可以给后台评审运行时授予窄域工具白名单，无关工具仍然拒绝（c8bbde777）。computer-use 不再启动已退役的浏览器授权运行时（b2e24b986）；新增 CDP 连接检测 Brave Origin 浏览器（bca0a865c）。</p>
+<p>技能包瘦身（index −26%）：15 个技能移到 optional（可经技能商店安装，历史保留）、github 技能六路合并、pdf 技能吸收 OCR、teams 管线按频道门控。每个会话都支付技能索引开销，桌面端每调用省约 500 token（c49fa88b8，#98539）。skill 安装修复：缺失的引用支持文件不再中断安装（7d87bab50）、显式链接的同目录兄弟文件正确拉取（86dda3cd3）、安装后 revision pinning 与大小写保护（7e95b67ad）、支持文件列表不再每行重复绝对路径（2a598aad1）。</p>
+    </section>
+    
     <section id="2026-08-30" class="day">
       <h2>Hermes 日报 2026-08-30：看板整体导出导入可迁移、/btw 边车问答上线、三大新模型平台接入、todo 支持嵌套子任务</h2>
       <p><strong>本期覆盖 8 月 28 日 ~ 8 月 29 日合入 main 的提交，共 125 个 commit（不含 merge），另有 2 个 merge。新增 21 个功能、57 个修复、1 个性能优化。</strong></p>
