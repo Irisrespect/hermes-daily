@@ -22,9 +22,146 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 35 期 · 7226 个提交 · 每日自动更新 ·
+<p class="meta">共 36 期 · 7706 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-02" class="day">
+      <h2>Hermes 日报 2026-09-02：本地模型一键跑、桌面端官方技能一键装、更新系统三十条修复</h2>
+      <p><strong>本期覆盖 9 月 1 日 06:30 ~ 9 月 2 日 10:30 合入 main 的提交（手动补采，网关未运行），共 480 个 commit（不含 merge），另有 3 个 merge。新增 22 个功能、335 个修复、1 个性能优化。修复占比约七成，是明显的一期「加固期」，但两个新入口（本地模型、技能目录）都落在桌面端和 CLI 上，用户可直接上手。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>本地模型成为一等配置：托管 llama.cpp 运行时，桌面端一键设置（hermes desktop --local）</li>
+<li>桌面端 Capabilities → Skills 内置官方技能目录，一键安装、装完即开关</li>
+<li>更新系统 30 条修复：不再冲掉用户模型配置、cron 更新死锁解除、Git 启动器自修复</li>
+<li>消息可靠性：会话回收后自动恢复、冷启动闸门等就绪、启动死锁看门狗</li>
+<li>Buzz 媒体与连接大修、Tavily 搜索回归、压缩 9 条修复、cron doctor 上线</li>
+</ul>
+<p>重点条目：</p>
+<p>本地模型：托管 llama.cpp 运行时，一键跑本地模型</p>
+<ul>
+<li>43e67d872 feat: local models — managed llama.cpp runtime with one-click desktop setup</li>
+<li>本地运行模型成为正式的一等 provider：CLI 侧新增托管式 llama.cpp 运行时（hermes_cli/local_runtime/），包含引擎安装、模型下载、服务器监管；桌面端在该运行时之上做了完整的设置和管理界面。GUI 界面通过 hermes desktop --local 启动参数打开（打包版桌面端同样支持该 flag），后端路由和 CLI 端功能始终可用。</li>
+<li>带精选 GGUF 模型目录，按机器配置自动选择合适变体（硬编码/机型差异自动适配）。适合数据不出本机、离线可用、无接口费用的使用场景。</li>
+</ul>
+<p>桌面端：Capabilities → Skills 内置官方技能目录</p>
+<ul>
+<li>a1c25d393 feat(desktop): built-in optional-skills catalog in Capabilities → Skills with one-click install</li>
+<li>Skills 标签页在已安装技能下方，现在列出仓库自带的全部官方可选技能目录（optional-skills/ 随仓库分发）。每个技能一行，带 Install 按钮，走标准技能安装管线（hub action pipeline）；装完自动翻转到已安装列表，带启用/禁用开关。</li>
+<li>目录来自本地扫描（OptionalSkillSource.list_local()，无网络依赖），按 profile 区分已安装状态。装技能从「翻仓库找文件」变成界面内一键完成。</li>
+</ul>
+<p>更新系统：30 条修复，几个会咬人的问题堵上了</p>
+<ul>
+<li>045865377 fix(update): restore user model settings config.yaml rewrites drop during update</li>
+<li>49a71c972 fix(update): break the cron-update three-way restart deadlock (#100179)</li>
+<li>0bab9ff9e fix(update): self-heal broken Git-for-Windows trampoline on Windows</li>
+<li>e49df4068 fix(update): refuse to mutate a venv containing foreign-owned files (#83529)</li>
+<li>fd24ac94e fix(update): resume deferred Windows desktop updates</li>
+<li>86b50fb43 fix(update): back up HEAD to a rescue ref before orphan-history reset</li>
+<li>6cccc2ef7 fix(update): locate PortableGit under the shared root, not profile home</li>
+<li>配置不再被更新冲掉：桌面端更新/修复循环此前会整段重写 config.yaml，用户设置的 model.provider/model.default/model.base_url/model.api_key 被冲掉、moa 段整个丢失，而 gateway 和无人值守的 cron 任务也读这份配置——更新一次就可能把付费推理静默改回机器全局设置。现在更新前拍快照、更新后对比恢复（沿用 restore_cron_jobs_if_emptied 防御模式 #34600）。</li>
+<li>cron 更新死锁解除：hermes-auto-update 从 cron 里跑 hermes update 时，更新进程活在被更新的 gateway 自己的进程树里——gateway 等 cron 会话结束、cron 会话等 update 进程退出、update 又等 gateway 退出，三方循环等待。现在这个死锁被打破（#100179）。</li>
+<li>Git-for-Windows 自修复：trampoline 启动器（bin\git.exe / cmd\git.exe 的 ~46KB shim）失效后所有 git 调用被 &quot;BUG (fork bomb)&quot; 保护拒绝（#87876）；现在更新时先 git --version 探测、定位真实 git 二进制（Git for Windows 或 Hermes 管理的 PortableGit，从共享根目录找而非 profile home）并替换失效 shim。</li>
+<li>venv 外属文件保护：被 sudo pip/sudo hermes 碰过的 venv 里有 root 属主文件，普通用户更新时 uv pip install -e . 中途 Permission denied、venv/bin/hermes 已删、CLI 报废（#83529）。更新前检测并拒绝变更外属文件。</li>
+<li>另外：更新前把 HEAD 备份到 rescue ref（孤儿历史重置前）、Windows 桌面更新恢复执行、serve/dashboard 单元恢复、restore 检查 fail-closed 等一批加固。</li>
+</ul>
+<p>消息可靠性：不再静默丢消息、启动死锁能被发现</p>
+<ul>
+<li>99ec7fdfe fix(gateway): recover agent after session reaped so messages are not silently dropped</li>
+<li>fc2421cfa fix(gateway): hold inbound gate until turn machinery is warm on fresh boot (#99373)</li>
+<li>8a3b6f374 fix(gateway): startup-liveness watchdog for pre-event-loop deadlocks (OOF-298)</li>
+<li>d2c3c38e9 fix(gateway): config.yaml surface for the startup watchdog + precise argv arming</li>
+<li>f5bb1e144 fix(gateway): address startup-watchdog review findings (OOF-298, PR #89750)</li>
+<li>44eeef9a8 fix(gateway): apply startup-watchdog config to the already-armed handle</li>
+<li>c1bd0511c fix(gateway): persist the platform message id on every user turn</li>
+<li>会话被系统回收（session reaped）后 agent 实例已死，但后续消息仍被路由进来，实际静默丢弃（#99106）。现在回收发生后先恢复 agent 再继续收消息。</li>
+<li>冷启动时入站闸门开得太早：没有 resume_pending 会话时，_finish_startup_restore 几乎立即打开入站口，而 agent 侧 turn 机制（run_agent 导入图、工具 schema + check_fn 探测、上下文文件层）还没暖机，这个窗口进来的消息会被残缺系统提示服务（#99373）。现在闸门等到机制就绪才打开。</li>
+<li>托管 gateway 死锁检测：一个托管实例启动时所有线程卡在 futex 等待、asyncio 事件循环没起来——零日志、/health 不通，但进程活着，外部监控看 PID 在就不重启，gateway_state.json 还告诉所有状态面板&quot;网关正常&quot;。新增启动存活看门狗（支持 config.yaml 配置 + 精确 argv 武装），事件循环未起即可被判死处理。</li>
+<li>每条用户轮次持久化平台消息 ID，路由身份可靠落库。</li>
+</ul>
+<p>Buzz：媒体投递与断线重连整批加固</p>
+<ul>
+<li>d36827b08 fix(buzz): resume watched channels from a durable cursor across restarts (#90464)</li>
+<li>c84c6e238 fix(buzz): open fresh WS subscriptions from the beginning and discover conversations on a timer (#78429, #93557, #7)</li>
+<li>d3730a3fa fix(buzz): handle restricted CLOSED per-subscription, stop reconnect flood</li>
+<li>94d86fa4d fix(buzz): bound WebSocket read idle time to force reconnect on silent relays</li>
+<li>37c943997 fix(buzz): support media in standalone sends</li>
+<li>ebda1fbf8 fix(buzz): deliver local images through native upload</li>
+<li>55136adcc fix(buzz): preserve inbound media captions</li>
+<li>aaad05433 fix(buzz): gate authenticated inbound media on explicit authorization</li>
+<li>9c2570425 fix(buzz): verify live media delivery receipts</li>
+<li>连接侧：重启后从持久游标恢复关注的频道（不再丢状态，#90464）；WebSocket 订阅从开头重建并在定时器上发现会话（修了 #78429/#93557 等三个 issue）；受限频道 CLOSED 按订阅单独处理、停止重连风暴；读空闲时间被限制，静默中继会强制重连。</li>
+<li>媒体侧：独立发送支持媒体、本地图片走原生上传、入站媒体保留 caption 且按显式授权门控、媒体投递有回执验证、URL 本地化与附件路径合并等。</li>
+</ul>
+<p>Tavily 搜索提供商回归</p>
+<ul>
+<li>428e084dc feat(web): add Tavily web search and extract provider</li>
+<li>7cd91114b fix(web): drop tavily from the removed-backend registry after the restore</li>
+<li>89ca5e614 fix(tavily): update Tavily provider documentation</li>
+<li>Tavily 之前在 #99199 被移除出 web 后端，本轮重新引入，同时支持搜索和内容抽取两个能力，并从&quot;已移除后端&quot;注册表里去掉，文档同步更新。</li>
+</ul>
+<p>压缩系统：9 条稳定性修复</p>
+<ul>
+<li>d8f8a07ee fix(compression): truncated summaries no longer become compaction checkpoints (port of earendil-works/pi#7048)</li>
+<li>ecdbcef7a fix(compression): roll the live transcript back when an in-place compaction commit fails (#99477)</li>
+<li>f50b5bb0f fix(compression): dead Codex summary streams fail over in 60s instead of stacking 5-minute waits</li>
+<li>820786221 fix(compression): stop timeout paths from blocking retries</li>
+<li>99d037eeb fix(compression): count streamed reasoning details as progress</li>
+<li>0c24b3a12 fix(compression): pop the tail tags before the anti-growth estimate; count against the final list</li>
+<li>c0667439e fix(compression): rotation heals stale automatic ended_at stamps instead of wedging (#88197)</li>
+<li>截断的摘要不再成为压缩检查点（坏摘要不固化，移植自 earendil-works/pi#7048）；原地压缩提交失败时把 live transcript 回滚，不留半成品（#99477）；卡死的 Codex 摘要流 60 秒内切换（原来是叠 5 分钟等待）；超时路径不再阻塞重试；流式 reasoning 内容计入进度，长思考不再被误判为卡死；轮转时自动修复过期的 ended_at 时间戳。</li>
+</ul>
+<p>cron doctor 健康检查上线</p>
+<ul>
+<li>b028fe632 feat: add cron doctor health check</li>
+<li>f2f7a3bf1 feat(cron): doctor flags overdue next_run_at as silent non-firing</li>
+<li>新增 cron doctor 命令，最有价值的一条检查：任务的 next_run_at 停在过去 15 分钟以上 = 静默不触发（死 ticker / 网关挂了 / 触发申领卡住），把这类&quot;任务看起来在、实际已经断更&quot;的情况标记出来。doctor 同时注册进文档（cron 指南 + CLI 参考）。本期数据正是因此手动补采——网关未运行、06:30 定时任务未触发。</li>
+</ul>
+<p>桌面端细节：/stop 打断、删除确认、设置不互踩、浏览器评论模式</p>
+<ul>
+<li>e07172319 fix(desktop): make /stop interrupt active turns</li>
+<li>b811350c5 fix(desktop): confirm before deleting a session in the Command Center</li>
+<li>f615f3796 fix(desktop): restore the transcript when regenerate is rejected</li>
+<li>10f2a2096 feat(desktop): add comment mode to the in-app browser</li>
+<li>5361867c6 fix(desktop): stop Settings autosave from clobbering out-of-band config edits</li>
+<li>6d407ca1a fix(desktop): stop model_context_length edits from being dropped or wiped</li>
+<li>a922dad9d feat(desktop): add Russian (ru) locale</li>
+<li>ada7213cc feat(desktop): first-open consent prompt for real-profile browsing</li>
+<li>9052ce76c feat(desktop): collapse Yesterday / Last week groups in the sessions sidebar</li>
+<li>0b247df94 fix(desktop): dock the sidebar rails down to 640px</li>
+<li>f98f5e74e fix(desktop): preserve terminal startup output</li>
+<li>5994b833b fix(desktop): route /btw through prompt.btw so the answer reaches the chat</li>
+<li>/stop 能打断进行中的回合；Command Center 删除会话前有确认；generate 被拒绝时恢复原 transcript。设置自动保存不再覆盖外部配置编辑（改一个字段不再冲掉另一个），model_context_length 编辑不被丢。应用内浏览器支持评论模式：点击/拖拽预览页钉编号评论，Add comments 把截取区域 + 一句提示放进输入框（不直接发送）。侧边栏会话列表可折叠&quot;昨天/上周&quot;分组；新增俄语界面；首次打开真实 profile 浏览前有同意提示；/btw 改走 prompt.btw 让回答真正到达聊天；终端启动输出保留。</li>
+</ul>
+<p>浏览器/模型/技能/遥测</p>
+<ul>
+<li>e3a85ae5a feat(browser): honor browser.engine=lightpanda in Browser Use mode</li>
+<li>9f069a117 feat(models): add anthropic/claude-fable-5.1 to OpenRouter and Nous catalogs</li>
+<li>42c283867 feat(skills): skills.create_dir routes agent-created skills to a configured directory</li>
+<li>f709bd88b feat(skills): render the configured create dir in every instruction that names the path</li>
+<li>e5180ab3d feat(telemetry): add opt-in send config and send-state columns</li>
+<li>00c75cea3 feat(telemetry): send exported packages to the ingest service</li>
+<li>6fdf6f4d4 feat(telemetry): run the send pass off the export hook</li>
+<li>a69a9c351 feat(telemetry): transmit the stable install_id as-is</li>
+<li>7ffd454df feat(telemetry): derive the transmitted install identity via keyed HMAC</li>
+<li>Browser Use 模式此前从不读取 browser.engine：_resolve_backend_cdp() 按 BU_CDP_* env → CDP 覆盖 → 云 provider → 本地 Chrome 的顺序走，engine: lightpanda 在默认后端是静默 no-op，在内置路径上被云 provider/Camofox/CDP 覆盖时也被跳过。现在 engine=lightpanda 且无更高优先级占用时，会真正拿到 Lightpanda 会话。</li>
+<li>模型目录新增 anthropic/claude-fable-5.1。</li>
+<li>skills.create_dir 配置项上线：agent 创建的技能落到指定目录，所有命名该路径的指引同步渲染配置值。</li>
+<li>遥测系统上线：共享指标导出器采用 opt-in 设计（发送开关 + 发送状态列），安装标识通过 keyed HMAC 派生后传输，走导出钩子异步发送到 ingest 服务，不发送未经同意的数据。</li>
+</ul>
+<p>nous：org 级模型策略</p>
+<ul>
+<li>c248d5356 feat(nous): read the org model policy and expose it as a list filter</li>
+<li>c38d62aef feat(nous): tell a governed org its model choice is restricted</li>
+<li>受组织的 Nous 部署读取组织模型策略，把受限模型从列表过滤掉；用户选了受限模型时明确提示（面向企业 org 管理场景）。</li>
+</ul>
+<p>小功能：工具提示撤回、agent 消毒器通知</p>
+<ul>
+<li>b293157f7 feat(tools): withdraw tip and tour when the user switches them off</li>
+<li>fb9b2c893 feat(agent): escalate repeated transcript-sanitiser heals with a one-time user notice (#96870)</li>
+<li>用户关掉工具提示后，对应提示位和引导不再出现；agent 反复修复消毒对话记录时一次性通知用户（#96870），不再静默处理。</li>
+</ul>
+    </section>
+    
     <section id="2026-09-01" class="day">
       <h2>Hermes 日报 2026-09-01：桌面端不再误杀健康网关、Group Chat 群聊高可用、子代理失败状态修正、Buzz 线程化</h2>
       <p><strong>本期覆盖 8 月 31 日 ~ 9 月 1 日合入 main 的提交，共 140 个 commit（不含 merge），另有 1 个 merge。新增 12 个功能、87 个修复、0 个性能优化。</strong></p>
