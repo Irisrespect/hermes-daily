@@ -5,13 +5,249 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 02 Sep 2026 11:09:44 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 03 Sep 2026 06:49:51 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-03：GitSpawn RCE 漏洞修复、桌面端 bot 列表自定义分组、核心工具延迟加载省一半 schema</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-03</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-03</guid>
+      <pubDate>Thu, 03 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 2 日 11:52 ~ 9 月 3 日 06:30 合入 main 的提交，共 477 个 commit（不含 merge），另有 9 个 merge。新增 29 个功能、301 个修复、19 个性能优化。修复占比依旧很高，但本期有整类安全漏洞修复（GitSpawn RCE）和两个重量级桌面端功能（bot 列表自定义分组、浏览器评论增强），性能侧核心工具延迟加载把桌面端 schema 砍掉约一半。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>安全高危修复：恶意仓库的 .git/config 不再在上下文收集时执行任意代码（GHSA-7x36-8jrh-v4pw）</li>
+<li>桌面端 bot 列表支持用户自定义分组，拖拽归档、删除可撤销，gateway 分组保持顶层</li>
+<li>桌面端更新改为 stage-and-swap 打包，失败不再弄丢可用 app；update 不再卡 GitHub 用户名提示</li>
+<li>核心工具默认延迟加载，桌面端 schema 从 13.4K 降到 6.9K（-49%）</li>
+<li>图像生成新增 Meta Model API（muse-image）后端，模型目录新增 gemini-3.8-flash</li>
+</ul>
+<p>重点条目：</p>
+<p>安全：GitSpawn RCE 漏洞修复（GHSA-7x36-8jrh-v4pw）</p>
+<p>f6234d00c|2026-09-02|Teknium|fix(security): close GitSpawn RCE class — malicious repo .git/config no longer executes on context gathering (GHSA-7x36-8jrh-v4pw)</p>
+<ul>
+<li>问题：Hermes 会在任何 prompt、工具调用、审批、信任门之前自动对会话目录跑 git 收集上下文——工作区快照、gateway 项目树、/diff、@diff|@staged 引用、goal-gate 指纹、-w 启动 worktree。这些探测用的是系统 git 且没有剥离仓库自己的 config。一个以完整 .git 目录交付的恶意仓库（zip、同步文件夹、U 盘；git clone 本身不会传输 .git/config）可以在 .git/config 里设置执行型 git 设置，从而在屏幕上没有任何提示的情况下以用户身份执行任意主机代码。</li>
+<li>修复：git 探测改为剥离仓库自身 config，恶意配置不再参与执行。</li>
+<li>效果：关闭了一整类「仓库即攻击面」的 RCE，属高危安全修复，建议尽快更新。</li>
+</ul>
+<p>桌面端：bot 列表用户自定义分组 + 拖拽归档</p>
+<p>3d0ac691a|2026-09-02|Michael Knaap|feat(desktop): user-made sections in the bot roster, with drag-and-drop filing</p>
+<p>e9dd0bf5d|2026-09-02|Teknium|feat(desktop): polish bot roster sections — dialog rename, Undo delete, Esc-cancel drag, nested under gateways (salvage #100745)</p>
+<ul>
+<li>问题：bot 列表之前只有自动分组——每个 gateway 连接一个组加群聊桶，回答的是「这个 bot 跑在哪」，回答不了「我想把两个客户端 bot 放一起叫 Clients、内部 bot 放 Team」。</li>
+<li>修复：新增第二根轴与自动分组叠加——多连接时 gateway 分组保持顶层，用户分组在下面聚合扁平列表。分组可为空、新建和重命名走统一对话框、删除无需确认（bot 回 Unassigned 且 toast 提供 Undo 恢复）、拖拽用私有 MIME 类型单行拖、Esc 取消拖拽。</li>
+<li>效果：bot 多了以后可以按自己的组织方式归档，桌面端 bots 页面可管理性明显提升。</li>
+</ul>
+<p>桌面端：浏览器评论携带元素选择器/标记/样式，按页面区域分组</p>
+<p>e4bda3ff7|2026-09-02|Brooklyn Nicholson|feat(desktop): browser comments carry the element&#x27;s selector, markup, and styles</p>
+<p>06a4f4ab3|2026-09-02|Brooklyn Nicholson|feat(desktop): group a comment batch by page region so it lands as a few tasks</p>
+<ul>
+<li>问题：评论模式之前只有截图 + 备注，agent 拿到的是问题画面，还得自己 grep 去找对应元素；一次批 23 条评论会变成 23 个 todo 逐个磨。</li>
+<li>修复：每个元素评论现在附带 CSS selector、markup 和决定布局的计算样式，agent 能直接定位到正确文件；目标行仍是用户指的那句 prose，DOM 细节在下方标注行。标记在 guest 里先 redact（密码等）再跨进程。评论批按页面区域分组落地，附带提示让 agent 按组处理而非逐条。</li>
+<li>效果：agent 修浏览器页面问题时定位成本大幅下降，批量评论可并行处理。</li>
+</ul>
+<p>桌面端：状态栏实时缓存命中率 + tokens/秒（默认关闭）</p>
+<p>3e6336717|2026-09-02|Teknium|feat(desktop): status bar can show live cache-hit rate and tokens/sec (off by default)</p>
+<ul>
+<li>新增两个可右键开关的状态栏项：prompt 缓存命中率（如「87%」）和输出吞吐（如「42 t/s」），默认隐藏。纯 renderer 实现，复用 tui_gateway 已在每个 session.usage tick 和 message.complete 里发出的 cache_hit_pct / avg_tps，无新 RPC 无轮询。</li>
+<li>效果：桌面端也能一眼看到是否吃到 prompt 缓存、输出速率多少，排查响应快慢更方便。</li>
+</ul>
+<p>桌面端：display.resume_last_session 开关（冷启动是否恢复上次会话）</p>
+<p>7aff724e5|2026-09-02|jinglun010|feat(desktop): add display.resume_last_session config toggle (#60812)</p>
+<p>648c664eb|2026-09-02|Teknium|feat(desktop): gate cold-start restore on display.resume_last_session</p>
+<ul>
+<li>新增 display.resume_last_session（默认 true）+ 外观设置里「Reopen Last Chat on Launch」开关。关闭时冷启动停在全新聊天（路由和会话恢复都停），但仍记住打开的会话供下次启动用；配置记录未就绪时保持旧行为（resume）。</li>
+<li>效果：不想要「每次打开都回到上次聊天」的用户可以关掉。</li>
+</ul>
+<p>更新保护：桌面端重建改 stage-and-swap，失败不再弄丢可用 app</p>
+<p>1398c0f5c|2026-09-02|Teknium|fix(update): stage-and-swap the Desktop rebuild so a failed pack never removes the working app</p>
+<ul>
+<li>问题：hermes update → desktop --build-only → npm run pack 是原地打包：before-pack.mjs 会先清空 release/win-unpacked（或 mac 的 Hermes.app），之后任何失败（损坏缓存 zip、下载被拦、缺依赖、磁盘满）都会留下「没有 app + 更新报告 partially complete」空 release/ 的场面（#86443）。</li>
+<li>修复：cmd_gui 打包时传 -c.directories.output=apps/desktop/.staging-&lt;pid&gt;-&lt;ts&gt; 到 staging 目录，跑完既有验证（packaged-exe 探测、macOS 重签名、Windows PE 检查）成功后才换到正式位置。</li>
+<li>效果：打包失败只影响 staging，正在用的 app 原样保留，更新可靠性提升。</li>
+</ul>
+<p>更新体验：hermes update 不再卡 GitHub 用户名提示</p>
+<p>10088c569|2026-09-02|Teknium|fix(update): hermes update no longer hangs on a GitHub username prompt</p>
+<p>6e775907d|2026-09-02|RobbertC5|fix(cli): keep passive update checks noninteractive</p>
+<ul>
+<li>问题：GitHub 故障或仓库改名/转私有时匿名 fetch 会 401，git 在继承的终端上弹 Username for &#x27;https://github.com&#x27;: 提示，hermes update 就卡在那——用户以为是 Hermes 在要 GitHub 登录。</li>
+<li>修复：更新器里所有网络 git 调用（fetch/pull/push、apply + --check + fork sync）都设 GIT_TERMINAL_PROMPT=0 + stdin=DEVNULL，401 快速失败进入 fetch 失败分类器，报告为「GitHub 侧拒绝（疑似故障）」而不是归咎用户凭据；凭据助手/askpass 保留，私有 fork 更新不受影响。</li>
+<li>效果：更新不再假死，故障归因也更准确。</li>
+</ul>
+<p>性能：核心工具默认延迟加载，桌面端 schema 减 49%</p>
+<p>e16ad33a9|2026-08-29|Teknium|feat(tool-search): core-tool deferral — curated 19-tool set behind the bridge by default; renames todo_list/cronjob_manage/process_manage/gui_tour/show_tip with legacy aliases (13.4K -&gt; 6.9K desktop schemas, -49%)</p>
+<p>b1a46e192|2026-08-29|Teknium|fix(tool-search): pull clarify back out of the default defer set — A/B showed structured ask collapses when deferred</p>
+<p>9514d354c|2026-09-01|DragonnZhang|fix(tool-search): validate deferred tool_call arguments against the concrete schema before dispatch</p>
+<ul>
+<li>精选 19 个核心工具默认放在 bridge 后面按需加载（defer），其中 todo_list/cronjob_manage/process_manage/gui_tour/show_tip 改名并提供 legacy 别名。桌面端 schema 从 13.4K 降到 6.9K，-49%。</li>
+<li>A/B 实测 clarify 被延迟会让结构化询问失效，已从默认延迟集拉回；延迟工具的参数派发前按具体 schema 先校验。</li>
+<li>效果：模型每次请求的 schema 体积减半，提示词更瘦，对延迟和成本都有帮助。</li>
+</ul>
+<p>新能力：Meta Model API（muse-image）图像生成后端</p>
+<p>d7e92ab7e|2026-09-01|Matthias Reso|feat(image_gen): add Meta Model API (muse-image) provider plugin</p>
+<ul>
+<li>新增 bundled 图像生成后端：Meta Model API（api.meta.ai/v1，OpenAI 兼容），通过标准 image_generate 工具暴露 muse-image-1.0 模型；provider 注册为 meta-ai，与已有 meta-ai 聊天 provider 配套。认证复用 MODEL_API_KEY（另支持 META_API_KEY / META_MODEL_API_KEY 别名）与 META_BASE_URL。</li>
+<li>效果：图像生成又多一个可用后端，Meta 系用户可无缝接入。</li>
+</ul>
+<p>新模型：google/gemini-3.8-flash 加入目录</p>
+<p>0ee98eda5|2026-09-02|Teknium|feat(models): add google/gemini-3.8-flash to nous + openrouter catalogs</p>
+<ul>
+<li>gemini-3.8-flash 加入 Nous Portal + OpenRouter 目录（3.7-flash 保留），同时更新 openrouter 插件 fallback。1,048,576 窗口 / 65,536 输出 / 定价与 3.7-flash 一致，两条路由均已实测计费。</li>
+</ul>
+<p>MCP：-t/--toolsets 过滤服务器启动 + 修孤儿进程泄漏</p>
+<p>e73257ccc|2026-09-03|Michel Alexander|feat(cli): filter MCP server spawning by -t/--toolsets flag + fix orphan subprocess leak</p>
+<p>af019a371|2026-09-03|kshitijk4poor|fix(cli): apply the -t/--toolsets MCP spawn filter on every discovery path</p>
+<ul>
+<li>CLI 现在按 -t/--toolsets 过滤 MCP 服务器启动：只 spawn 当前 toolset 启用的服务器；之前所有发现的服务器都会启动，且退出时可能留下孤儿进程。SIGTERM 处理改用 cleanup-scope 本地别名，自含性完整。</li>
+<li>效果：toolsets 之外不相关的 MCP 服务器不再被拉起，进程生命周期更干净。</li>
+</ul>
+<p>浏览器：Lightpanda 磁盘 HTTP 缓存</p>
+<p>6973ce3ac|2026-09-03|Adrià Arrufat|feat(browser): give Lightpanda an on-disk HTTP cache</p>
+<p>eac466d7b|2026-09-03|kshitijk4poor|fix(browser): gate lightpanda --http-cache-dir on binary support</p>
+<ul>
+<li>问题：Lightpanda 的 HTTP 缓存是 opt-in（--http-cache-dir，默认关），launcher 没传，所以每次 Browser Use 导航都重新抓取所有资源。</li>
+<li>修复：所有 Hermes 启动的实例共用 $HERMES_HOME/cache/browser-use/lightpanda/http-cache，跨会话保持资源温热；sqlite(WAL) 存储，竞争写退化为缓存 miss 而非加载失败；--http-cache-entry-limit（默认 1000）约束目录大小。25 次导航 5 个站点实测暖导航中位数显著下降。</li>
+<li>效果：浏览器导航不再重复下载静态资源，多步任务提速。</li>
+</ul>
+<p>性能：OSV 恶意检查 verdict 缓存持久化到磁盘</p>
+<p>8196d409a|2026-09-03|Christopher|perf(tools): persist OSV malware-check verdict cache to disk</p>
+<ul>
+<li>问题：OSV preflight 是每次 MCP stdio 启动的同步网络 POST（最长 10s 超时），进程重启后内存缓存丢失，hermes mcp test 和 MCP 重连会重复查询，连接耗时方差高达 5.91x。</li>
+<li>修复：verdict 缓存持久化到 &lt;hermes_home&gt;/cache/osv_check.json，过期用绝对墙钟时间戳（重启和单调钟偏移都安全），加载只补缺失键、原子写入、沿用既有缓存锁。</li>
+<li>效果：MCP 连接建立的本地开销大幅收敛。</li>
+</ul>
+<p>安全：非交互平台工具循环硬停</p>
+<p>ee2147f9e|2026-09-02|João Vitor Cunha|fix: hard stop tool loops on non-interactive platforms</p>
+<p>25d954c2c|2026-09-02|Teknium|fix(guardrails): hard stops catch replays, never legitimate iteration</p>
+<p>76648a7fa|2026-09-02|Teknium|fix(guardrails): identical-call streaks hard-stop any tool on unattended platforms</p>
+<p>384fc4bf8|2026-09-02|João Vitor Cunha|fix(guardrails): preserve interactive platform defaults</p>
+<ul>
+<li>非交互/无人值守平台上，相同工具调用连击达到阈值会被硬停（guardrails 只抓重放、不误杀合法迭代），交互平台默认值保持不变。</li>
+<li>效果：无人值守跑批时工具卡死循环不再无限烧 token。</li>
+</ul>
+<p>数据维护：state.db 默认 90 天自动清理</p>
+<p>73f68362b|2026-09-02|Teknium|fix(sessions): auto-prune state.db by default (90d) and gate VACUUM on freelist ratio (#54189)</p>
+<ul>
+<li>sessions.auto_prune 默认从 false 翻转为 true：常规安装会在 CLI/gateway/cron 启动时清理 ENDED 且 inactive 超过 retention_days（90 天）的会话，至少间隔 min_interval_hours 一次。打开、固定、进行中的会话永不删除；唯一被动的 open 行是 stale 自动化会话（关闭而非删除）；VACUUM 按 freelist 比例门控。</li>
+<li>效果：state.db 不再无限膨胀，长期使用保持瘦身。</li>
+</ul>
+<p>终端提醒：bell 统一 + OSC 9 / Warp OSC 777 通知</p>
+<p>ef6d3367a|2026-09-02|Turgut Kural|feat(cli,tui): add display.bell_on_clarify — terminal bell on clarify prompts</p>
+<p>3082a3466|2026-09-02|Turgut Kural|feat(cli,tui): add display.bell_on_approval + fix eslint error</p>
+<p>552159d22|2026-09-02|Teknium|feat(cli,tui): collapse bell_on_clarify/approval into display.bell_on_prompt</p>
+<p>632078bca|2026-09-02|Teknium|feat(cli): OSC 9 + Warp OSC 777 notifications ride on the bell flags</p>
+<ul>
+<li>终端响铃从 clarify/approval 两个开关合并为一个 display.bell_on_prompt，覆盖所有阻塞提示（clarify 单/批量、危险命令审批含 computer_use、sudo 密码、密钥采集）；同一组调用点还发出终端原生通知：OSC 9（Ghostty/iTerm2/Kitty/WezTerm 弹 OS 通知）和 Warp OSC 777 warp://cli-agent 协议（TERM_PROGRAM=WarpTerminal 时）。</li>
+<li>效果：挂着终端等审批时响铃+通知双通道提醒，不易错过。</li>
+</ul>
+<p>/fast 有界窗口：auto|cold 快速模式</p>
+<p>c7e2e0b77|2026-09-02|Teknium|feat(fast): bounded /fast auto|cold windows behind one route-aware gate</p>
+<ul>
+<li>静态 /fast 开关之上新增两种有界快速模式（默认关）：auto 模式每轮用户回合开启 agent.fast_auto_seconds（默认 60s）窗口，窗口内请求带 provider fast 参数、之后的工具循环回落到标准价；cold 模式同样窗口但只在会话第一回合开启。策略集中在 agent/fast_mode.py，fast 参数只作为 per-request kwarg 下发。</li>
+<li>效果：想「开场快、后面标准价」不用全程开着 /fast。</li>
+</ul>
+<p>邮件：IMAP/SMTP 传输安全可配置</p>
+<p>92a986451|2026-09-02|Alessandro Lamberti|feat(email): configurable IMAP/SMTP transport security (tls/starttls/plain) and TLS verify toggle</p>
+<ul>
+<li>新增 EMAIL_IMAP_SECURITY / EMAIL_SMTP_SECURITY（tls/starttls/plain）和 EMAIL_IMAP_TLS_VERIFY / EMAIL_SMTP_TLS_VERIFY（env 或 platforms.email.extra.*），替代硬编码的 IMAP4_SSL + SMTP+STARTTLS 验证上下文。</li>
+<li>效果：能连 Proton Mail Bridge 这类本地中继（IMAP 1143 / SMTP 1025、STARTTLS + 自签名证书）以及内部邮件服务器，自建邮件收发场景打通。</li>
+</ul>
+<p>模型目录：picker 目录 20 分钟刷新 + 网关保温</p>
+<p>c2954c893|2026-09-02|Teknium|feat(model-catalog): picker catalogs refresh every 20 minutes, gateway keeps them warm</p>
+<ul>
+<li>/model picker 的远程目录（curated manifest、OpenRouter 实时过滤、Nous Portal 推荐）之前是 1 小时 TTL、且没人开 picker 就不刷新。现在默认 20 分钟刷新，网关自动起监督 watcher 把三个源强制刷到磁盘。</li>
+<li>效果：新上架/下架模型最多 20 分钟可见，网关里长时间不开 picker 也不会拿到过期目录。</li>
+</ul>
+<p>子代理：批量标签改「set N」可读化</p>
+<p>7840a0e2d|2026-09-02|Teknium|feat: delegation batch tags read &quot;set N&quot; instead of a hex id slice</p>
+<p>a2600740e|2026-09-02|Teknium|feat(delegate): tag every subagent progress line with its batch id</p>
+<ul>
+<li>交错子代理 fan-out 的进度标签从 delegation id 前 4 位 hex（[b2ac 3/9]）改成按进程内出现顺序编号（[set 1 · 3/9]、[set 2 · 1/7]），桌面端 /agents 的重复 hex badge 一并去掉；每条子代理进度行都带批次 id。</li>
+<li>效果：多个子代理批量并行时，日志里一眼能分清是哪一批的进度。</li>
+</ul>
+<p>上下文：慢文件读取超时配置</p>
+<p>cfe88a1f7|2026-09-03|kshitijk4poor|feat(config): context_file_read_timeout key + narrow reader catch</p>
+<p>972b94bd2|2026-09-03|Edder Talmor|fix(agent): time out slow context file reads</p>
+<ul>
+<li>新增 context_file_read_timeout 配置（附文档），慢上下文文件读取不再无限阻塞会话，配合窄化后的 reader catch 处理超时。</li>
+<li>效果：挂载盘/网络盘上读取缓慢不再卡死整个会话。</li>
+</ul>
+<p>TTS：语音开关预热/释放本地引擎</p>
+<p>4e3feb8bb|2026-09-01|Teknium|feat(tts): speech toggles warm up and unload local TTS engines (#100881)</p>
+<p>782dd635f|2026-09-02|Teknium|feat(tts): speech toggles warm/release plugin and command TTS providers</p>
+<ul>
+<li>问题：桌面端「朗读回复」/语音会话、TUI 和 CLI 的 /voice tts 之前是每次首条回复现场加载模型，语音第一句前有一段明显的死等。</li>
+<li>修复：语音开关现在持有 TTS 引擎租约——开启时预加载（piper/kittentts 模型进同一个 LRU 槽、懒安装的云 SDK 一并就绪），关闭时卸载常驻模型；并扩展到用户自定义 provider（自托管 TTS 服务器可在朗读/语音打开时预载、关闭时卸载，Discord 需求）。</li>
+<li>效果：第一条语音回复不用再干等模型加载，语音功能开关机也更干净。</li>
+</ul>
+<p>桌面端：更新时缺依赖拒绝构建</p>
+<p>fdb2e10a8|2026-09-02|Teknium|fix(desktop): refuse the build when ANY declared non-optional dep is missing</p>
+<p>15e74fa62|2026-09-02|Jack Lau|fix(desktop): guard the whole build-critical dep set, before clean</p>
+<ul>
+<li>声明为非可选的构建关键依赖只要有缺失，桌面端构建直接在 clean 之前拒绝，避免「清掉旧构建又缺依赖装不出新的」。</li>
+<li>效果：更新/重建时缺依赖不再把可用状态搞坏，配合 stage-and-swap 打包，桌面端更新链路整体更稳。</li>
+</ul>
+<p>文件操作：本地路径原生快路径</p>
+<p>d3275acf8|2026-09-03|Alex Jia|perf(file-ops): native read_file fast path on local POSIX environments</p>
+<p>6a2b3f1eb|2026-09-03|Alex Jia|perf(file-ops): collapse read_file&#x27;s shell probes into one compound command</p>
+<p>9fbb3b716|2026-09-03|Alex Jia|perf(file-ops): merge write_file&#x27;s pre-write probes into one shell call</p>
+<ul>
+<li>本地 POSIX 环境 read_file 走原生快路径 + memchr 数尾部，read/write 的前置 shell 探测合并成一次复合命令。</li>
+<li>效果：高频文件读写少起多次 shell，工具调用开销下降。</li>
+</ul>
+<p>多 profile（multiplex）隔离大修（视频未覆盖，RSS 详列）</p>
+<ul>
+<li>本期 multiplex 相关 commit 37 条，核心是把多 profile 网关下所有平台的配置读取、凭据、状态、路由收进各自 profile 作用域，避免「一个 profile 拿错另一个 profile 的凭据/配置」：</li>
+<li>b53c50cf8|2026-09-02|Teknium|fix(config): resolve ${VAR} config refs through the profile secret scope (#84079) — ${MATRIX_ACCESS_TOKEN} 等 ${VAR} 引用之前直接读 os.environ，多 profile 下全部展开成默认 profile 启动时加载的 token，一条入站消息在所有 profile 间 fan-out。现在在 secret scope 内走 get_secret，各 profile 用自己的凭据。</li>
+<li>1aa62ceb4|2026-09-02|Lester Liang|fix(security): isolate multiplex dotenv reloads — dotenv 重载隔离到各自 profile。</li>
+<li>247533544|2026-09-02|Teknium|fix(config): keep .env publishes inside the routed profile scope under multiplex (#88441)</li>
+<li>平台配置按 profile 隔离：feishu（14f20d142、9f40d3bdd、97b8a9786）、wecom（171/173）、simplex（172）、mattermost（174）、photon（175）、ntfy（176）、irc（177）、google-chat（b1bc9bb65、3fcfa647e）、teams（168/169）、matrix（001b8abbd）。</li>
+<li>模块级状态按 profile 隔离：a2a（8167cfa4b、79732c645、205）、raft（504dd1f24）、memory/hindsight（cd7811a7a）、browser 会话（4e7aa4871）、terminal 配置（1cd736ff6）、tts 输出目录（7d509657a）、telegram topic 表（351e4c006）。</li>
+<li>网关行为按 profile：webhook 出站带 profile 戳（98c27aa25）、/voice 状态隔离（ca42d7a03）、cron 按 profile 隔离（a2fea79de）、日志按 profile 目录（198）、profile 路由 ids（bedebf5f7、df50b5287）。</li>
+<li>效果：多 profile（默认 + 生产/测试并存）用户的配置串扰、凭据误用风险系统性收敛。</li>
+</ul>
+<p>状态库 / 数据安全修复群（视频未覆盖，RSS 详列）</p>
+<ul>
+<li>7f7df1ce4|2026-09-02|Cursor Agent|fix(state): refuse SessionDB open and writes on a deleted WAL generation — 会话数据库在 WAL 文件被删的世代上拒绝打开和写入，防止打开即损坏。</li>
+<li>e9fa7bc05|2026-09-02|kshitijk4poor|fix(state): keep the #94736 teardown self-heal alive under the deleted-WAL guard — deleted-WAL 守卫下保留 teardown 自愈。</li>
+<li>06d7b77b1|2026-09-03|Benjamin PERRY|fix(state): block repair on deleted SQLite holders — 已删除的 SQLite 持有者不再触发修复。</li>
+<li>bcc2e6581|2026-09-02|leomcamilo|fix(state): quarantine SessionDB handle after structural corruption — 结构性损坏后隔离句柄并封存；e9160625d 顺带禁用 py3.12+ 的 close-time checkpoint。</li>
+<li>fd0502943|2026-09-02|teknium1|fix(state): fail fast on non-contention flock errors and retry deferred FTS rebuilds in-process (salvage #100130) — 非竞争 flock 错误快速失败，延迟 FTS 重建进程内重试。</li>
+<li>61635e1b5|2026-09-02|fangliquanflq|fix(state): single-flight shared database opens — 共享库打开单飞，避免并发打开互相踩。</li>
+<li>f5f4cefc3|2026-09-01|HexLab98|fix(state): fail closed when a state.db admission lock file cannot be opened — 准入锁文件打不开就 fail closed。</li>
+<li>0aa84bb3f|2026-09-02|Alex|fix(state): reap stale state-owned sessions safely；9bc249c7e 汇报自动维护清理的 stale-open 数。</li>
+<li>0192ca283|2026-09-02|HexLab98|fix(recovery): copy delivery_obligations during session salvage — 会话抢救时复制投递义务，不丢消息；5dfd1e77a 统一懒注册表 schema map。</li>
+<li>效果：SQLite 状态库在损坏/删除/锁冲突场景下从「打开即坏、修复误伤」走向「fail closed + 隔离 + 自愈」，数据安全底线加固。</li>
+</ul>
+<p>cron 可靠性（视频未覆盖，RSS 详列）</p>
+<ul>
+<li>c9491e6a7|2026-09-02|Victor Kyriazakos|feat(cron): per-job failure_deliver — route or suppress failure notices (NS-788) — 每个 job 可配 failure_deliver，失败通知可路由或静默（local = 结构静默，状态仍记录在 last_status/last_error/历史）。</li>
+<li>8fd76fd1d|2026-09-02|Justin Wilson|fix(cron): surface delivery_failed instead of last_status ok — 运行成功但投递失败的 job 之前记录 last_status=ok 把失败埋在 last_delivery_error，CLI 列表一片绿；现在记录 delivery_failed 且不递增 failure_streak。</li>
+<li>dd72b42ba|2026-09-02|kaiomp|fix(cron): require positive evidence for live-adapter delivery confirmation — 「delivered via live adapter」日志不再是成功证据：静默过滤、空 payload、错误线程都可能假阳性；现在要求正向证据才确认送达（修 #77763）。</li>
+<li>效果：cron 失败/投递状态不再「假成功」，共享频道里失败通知可配，运维可观测性明显提升。</li>
+</ul>
+<p>桌面端 20+ 条修复节选（Bot Chat 稳定性）</p>
+<ul>
+<li>202997b51|2026-09-02|Alonso|fix(desktop): one conversation never opens as two tabs after compaction — 压缩后一个会话不会开成两个标签页。</li>
+<li>195c3e5a3|2026-09-02|Brooklyn Nicholson|fix(desktop): refuse every resume for a chat the user is deleting — 正在删除的聊天拒绝一切恢复；990879d68 不许残留 4001 resume 复活已删除会话。</li>
+<li>86b204081|2026-09-02|Brooklyn Nicholson|fix(gateway): read the compacted transcript for a warm session switch — 切换会话时读取压缩后的 transcript。</li>
+<li>d29a7936e|2026-09-02|Teknium|fix(bot-mode): DMs to a Desktop-owned Bot Chat land in the live session instead of being dropped (#100523)；0058bde25 保证 DM 排队为下一轮、不打断在飞轮次。</li>
+<li>维护性 fix 群：机器人群组聊串行化 + 单 bot 时间（3e6336717 配套 5d4aa4fcb、fb5023950）、分支会话归属（471/472/473 等）、审批 RPC 防重放（d68739c2f、0a80adc12、16021395f）、更新重装保护（1398c0f5c 已列、bfbb34bbe、f9bca5a0d）。</li>
+</ul>
+<p>其他值得注意</p>
+<ul>
+<li>73f68362b 之外的状态维护：351e4c006 的 telegram topic 表按 profile 命名空间化（与 multiplex 相关）。</li>
+<li>1bd0b8ed4|2026-09-02|Alexander Prendota|feat(providers): let an external-process provider ship out of tree — 外部进程 provider（agent CLI 通过 stdio 驱动而非 HTTP 端点）之前三处硬编码只为一款 vendor 写死：注册表自动扩展只覆盖 api-key provider、运行时分支只认字面量 copilot-acp、凭据解析硬编码二进制。现在外置 provider profile 也能进注册表并用自己的运行时。</li>
+<li>1131b2285|2026-09-02|Alexander Prendota|feat(providers): let a provider profile supply its own client — create_openai_client 之前是硬编码 if-ladder（copilot-acp 走 ACP stdio shim、gemini 走原生 client、其余 openai.OpenAI），没有扩展点；现在 ProviderProfile.create_client() 让 provider profile 自己提供 client（默认 None 走回退 ladder），ACP provider 终于可以不在本仓库内也能发布（~/.hermes/plugins/model-providers/ 与 pip entry point 早已支持发现）。</li>
+<li>52f359a01|2026-09-01|Teknium|fix(sessions): Desktop resume of a heavily-compacted chat no longer fails with 4130 — 冷启动恢复重度压缩会话（85 个压缩段、约 2.9 万 lineage 行、tip 段仅约 700 行）之前被 max_resume_messages=20000 拒掉，永远停在「Waking up default…」；现在守护按 tip 段计数，健康会话不再被误拒。</li>
+<li>45b0d8cab|2026-09-02|Teknium|feat(gateway): one gateway.trust_env key controls aiohttp proxy-env honoring at every adapter site（#48820 bug 3）— 集中用一个 gateway.trust_env 控制所有适配器是否读代理环境变量，之前各平台行为不一致。</li>
+<li>b36489be3|2026-09-02|globalvet2025|fix: gate Nous auth-refresh message behind verbose mode — 认证刷新提示归入 verbose，不再刷屏。</li>
+</ul>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-02：本地模型一键跑、桌面端官方技能一键装、更新系统三十条修复</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-02</link>
       <guid isPermaLink="false">hermes-daily-2026-09-02</guid>
-      <pubDate>Wed, 02 Sep 2026 10:30:00 +0800</pubDate>
+      <pubDate>Thu, 03 Sep 2026 06:30:00 +0800</pubDate>
       <description><![CDATA[<p><strong>本期覆盖 9 月 1 日 06:30 ~ 9 月 2 日 10:30 合入 main 的提交（手动补采，网关未运行），共 480 个 commit（不含 merge），另有 3 个 merge。新增 22 个功能、335 个修复、1 个性能优化。修复占比约七成，是明显的一期「加固期」，但两个新入口（本地模型、技能目录）都落在桌面端和 CLI 上，用户可直接上手。</strong></p>
 <p>📌 今日要点：</p>
 <ul>
@@ -24,25 +260,16 @@
 <p>重点条目：</p>
 <p>本地模型：托管 llama.cpp 运行时，一键跑本地模型</p>
 <ul>
-<li>43e67d872 feat: local models — managed llama.cpp runtime with one-click desktop setup</li>
 <li>本地运行模型成为正式的一等 provider：CLI 侧新增托管式 llama.cpp 运行时（hermes_cli/local_runtime/），包含引擎安装、模型下载、服务器监管；桌面端在该运行时之上做了完整的设置和管理界面。GUI 界面通过 hermes desktop --local 启动参数打开（打包版桌面端同样支持该 flag），后端路由和 CLI 端功能始终可用。</li>
 <li>带精选 GGUF 模型目录，按机器配置自动选择合适变体（硬编码/机型差异自动适配）。适合数据不出本机、离线可用、无接口费用的使用场景。</li>
 </ul>
 <p>桌面端：Capabilities → Skills 内置官方技能目录</p>
 <ul>
-<li>a1c25d393 feat(desktop): built-in optional-skills catalog in Capabilities → Skills with one-click install</li>
 <li>Skills 标签页在已安装技能下方，现在列出仓库自带的全部官方可选技能目录（optional-skills/ 随仓库分发）。每个技能一行，带 Install 按钮，走标准技能安装管线（hub action pipeline）；装完自动翻转到已安装列表，带启用/禁用开关。</li>
 <li>目录来自本地扫描（OptionalSkillSource.list_local()，无网络依赖），按 profile 区分已安装状态。装技能从「翻仓库找文件」变成界面内一键完成。</li>
 </ul>
 <p>更新系统：30 条修复，几个会咬人的问题堵上了</p>
 <ul>
-<li>045865377 fix(update): restore user model settings config.yaml rewrites drop during update</li>
-<li>49a71c972 fix(update): break the cron-update three-way restart deadlock (#100179)</li>
-<li>0bab9ff9e fix(update): self-heal broken Git-for-Windows trampoline on Windows</li>
-<li>e49df4068 fix(update): refuse to mutate a venv containing foreign-owned files (#83529)</li>
-<li>fd24ac94e fix(update): resume deferred Windows desktop updates</li>
-<li>86b50fb43 fix(update): back up HEAD to a rescue ref before orphan-history reset</li>
-<li>6cccc2ef7 fix(update): locate PortableGit under the shared root, not profile home</li>
 <li>配置不再被更新冲掉：桌面端更新/修复循环此前会整段重写 config.yaml，用户设置的 model.provider/model.default/model.base_url/model.api_key 被冲掉、moa 段整个丢失，而 gateway 和无人值守的 cron 任务也读这份配置——更新一次就可能把付费推理静默改回机器全局设置。现在更新前拍快照、更新后对比恢复（沿用 restore_cron_jobs_if_emptied 防御模式 #34600）。</li>
 <li>cron 更新死锁解除：hermes-auto-update 从 cron 里跑 hermes update 时，更新进程活在被更新的 gateway 自己的进程树里——gateway 等 cron 会话结束、cron 会话等 update 进程退出、update 又等 gateway 退出，三方循环等待。现在这个死锁被打破（#100179）。</li>
 <li>Git-for-Windows 自修复：trampoline 启动器（bin\git.exe / cmd\git.exe 的 ~46KB shim）失效后所有 git 调用被 &quot;BUG (fork bomb)&quot; 保护拒绝（#87876）；现在更新时先 git --version 探测、定位真实 git 二进制（Git for Windows 或 Hermes 管理的 PortableGit，从共享根目录找而非 profile home）并替换失效 shim。</li>
@@ -51,13 +278,6 @@
 </ul>
 <p>消息可靠性：不再静默丢消息、启动死锁能被发现</p>
 <ul>
-<li>99ec7fdfe fix(gateway): recover agent after session reaped so messages are not silently dropped</li>
-<li>fc2421cfa fix(gateway): hold inbound gate until turn machinery is warm on fresh boot (#99373)</li>
-<li>8a3b6f374 fix(gateway): startup-liveness watchdog for pre-event-loop deadlocks (OOF-298)</li>
-<li>d2c3c38e9 fix(gateway): config.yaml surface for the startup watchdog + precise argv arming</li>
-<li>f5bb1e144 fix(gateway): address startup-watchdog review findings (OOF-298, PR #89750)</li>
-<li>44eeef9a8 fix(gateway): apply startup-watchdog config to the already-armed handle</li>
-<li>c1bd0511c fix(gateway): persist the platform message id on every user turn</li>
 <li>会话被系统回收（session reaped）后 agent 实例已死，但后续消息仍被路由进来，实际静默丢弃（#99106）。现在回收发生后先恢复 agent 再继续收消息。</li>
 <li>冷启动时入站闸门开得太早：没有 resume_pending 会话时，_finish_startup_restore 几乎立即打开入站口，而 agent 侧 turn 机制（run_agent 导入图、工具 schema + check_fn 探测、上下文文件层）还没暖机，这个窗口进来的消息会被残缺系统提示服务（#99373）。现在闸门等到机制就绪才打开。</li>
 <li>托管 gateway 死锁检测：一个托管实例启动时所有线程卡在 futex 等待、asyncio 事件循环没起来——零日志、/health 不通，但进程活着，外部监控看 PID 在就不重启，gateway_state.json 还告诉所有状态面板&quot;网关正常&quot;。新增启动存活看门狗（支持 config.yaml 配置 + 精确 argv 武装），事件循环未起即可被判死处理。</li>
@@ -65,69 +285,27 @@
 </ul>
 <p>Buzz：媒体投递与断线重连整批加固</p>
 <ul>
-<li>d36827b08 fix(buzz): resume watched channels from a durable cursor across restarts (#90464)</li>
-<li>c84c6e238 fix(buzz): open fresh WS subscriptions from the beginning and discover conversations on a timer (#78429, #93557, #7)</li>
-<li>d3730a3fa fix(buzz): handle restricted CLOSED per-subscription, stop reconnect flood</li>
-<li>94d86fa4d fix(buzz): bound WebSocket read idle time to force reconnect on silent relays</li>
-<li>37c943997 fix(buzz): support media in standalone sends</li>
-<li>ebda1fbf8 fix(buzz): deliver local images through native upload</li>
-<li>55136adcc fix(buzz): preserve inbound media captions</li>
-<li>aaad05433 fix(buzz): gate authenticated inbound media on explicit authorization</li>
-<li>9c2570425 fix(buzz): verify live media delivery receipts</li>
 <li>连接侧：重启后从持久游标恢复关注的频道（不再丢状态，#90464）；WebSocket 订阅从开头重建并在定时器上发现会话（修了 #78429/#93557 等三个 issue）；受限频道 CLOSED 按订阅单独处理、停止重连风暴；读空闲时间被限制，静默中继会强制重连。</li>
 <li>媒体侧：独立发送支持媒体、本地图片走原生上传、入站媒体保留 caption 且按显式授权门控、媒体投递有回执验证、URL 本地化与附件路径合并等。</li>
 </ul>
 <p>Tavily 搜索提供商回归</p>
 <ul>
-<li>428e084dc feat(web): add Tavily web search and extract provider</li>
-<li>7cd91114b fix(web): drop tavily from the removed-backend registry after the restore</li>
-<li>89ca5e614 fix(tavily): update Tavily provider documentation</li>
 <li>Tavily 之前在 #99199 被移除出 web 后端，本轮重新引入，同时支持搜索和内容抽取两个能力，并从&quot;已移除后端&quot;注册表里去掉，文档同步更新。</li>
 </ul>
 <p>压缩系统：9 条稳定性修复</p>
 <ul>
-<li>d8f8a07ee fix(compression): truncated summaries no longer become compaction checkpoints (port of earendil-works/pi#7048)</li>
-<li>ecdbcef7a fix(compression): roll the live transcript back when an in-place compaction commit fails (#99477)</li>
-<li>f50b5bb0f fix(compression): dead Codex summary streams fail over in 60s instead of stacking 5-minute waits</li>
-<li>820786221 fix(compression): stop timeout paths from blocking retries</li>
-<li>99d037eeb fix(compression): count streamed reasoning details as progress</li>
-<li>0c24b3a12 fix(compression): pop the tail tags before the anti-growth estimate; count against the final list</li>
-<li>c0667439e fix(compression): rotation heals stale automatic ended_at stamps instead of wedging (#88197)</li>
 <li>截断的摘要不再成为压缩检查点（坏摘要不固化，移植自 earendil-works/pi#7048）；原地压缩提交失败时把 live transcript 回滚，不留半成品（#99477）；卡死的 Codex 摘要流 60 秒内切换（原来是叠 5 分钟等待）；超时路径不再阻塞重试；流式 reasoning 内容计入进度，长思考不再被误判为卡死；轮转时自动修复过期的 ended_at 时间戳。</li>
 </ul>
 <p>cron doctor 健康检查上线</p>
 <ul>
-<li>b028fe632 feat: add cron doctor health check</li>
-<li>f2f7a3bf1 feat(cron): doctor flags overdue next_run_at as silent non-firing</li>
 <li>新增 cron doctor 命令，最有价值的一条检查：任务的 next_run_at 停在过去 15 分钟以上 = 静默不触发（死 ticker / 网关挂了 / 触发申领卡住），把这类&quot;任务看起来在、实际已经断更&quot;的情况标记出来。doctor 同时注册进文档（cron 指南 + CLI 参考）。本期数据正是因此手动补采——网关未运行、06:30 定时任务未触发。</li>
 </ul>
 <p>桌面端细节：/stop 打断、删除确认、设置不互踩、浏览器评论模式</p>
 <ul>
-<li>e07172319 fix(desktop): make /stop interrupt active turns</li>
-<li>b811350c5 fix(desktop): confirm before deleting a session in the Command Center</li>
-<li>f615f3796 fix(desktop): restore the transcript when regenerate is rejected</li>
-<li>10f2a2096 feat(desktop): add comment mode to the in-app browser</li>
-<li>5361867c6 fix(desktop): stop Settings autosave from clobbering out-of-band config edits</li>
-<li>6d407ca1a fix(desktop): stop model_context_length edits from being dropped or wiped</li>
-<li>a922dad9d feat(desktop): add Russian (ru) locale</li>
-<li>ada7213cc feat(desktop): first-open consent prompt for real-profile browsing</li>
-<li>9052ce76c feat(desktop): collapse Yesterday / Last week groups in the sessions sidebar</li>
-<li>0b247df94 fix(desktop): dock the sidebar rails down to 640px</li>
-<li>f98f5e74e fix(desktop): preserve terminal startup output</li>
-<li>5994b833b fix(desktop): route /btw through prompt.btw so the answer reaches the chat</li>
 <li>/stop 能打断进行中的回合；Command Center 删除会话前有确认；generate 被拒绝时恢复原 transcript。设置自动保存不再覆盖外部配置编辑（改一个字段不再冲掉另一个），model_context_length 编辑不被丢。应用内浏览器支持评论模式：点击/拖拽预览页钉编号评论，Add comments 把截取区域 + 一句提示放进输入框（不直接发送）。侧边栏会话列表可折叠&quot;昨天/上周&quot;分组；新增俄语界面；首次打开真实 profile 浏览前有同意提示；/btw 改走 prompt.btw 让回答真正到达聊天；终端启动输出保留。</li>
 </ul>
 <p>浏览器/模型/技能/遥测</p>
 <ul>
-<li>e3a85ae5a feat(browser): honor browser.engine=lightpanda in Browser Use mode</li>
-<li>9f069a117 feat(models): add anthropic/claude-fable-5.1 to OpenRouter and Nous catalogs</li>
-<li>42c283867 feat(skills): skills.create_dir routes agent-created skills to a configured directory</li>
-<li>f709bd88b feat(skills): render the configured create dir in every instruction that names the path</li>
-<li>e5180ab3d feat(telemetry): add opt-in send config and send-state columns</li>
-<li>00c75cea3 feat(telemetry): send exported packages to the ingest service</li>
-<li>6fdf6f4d4 feat(telemetry): run the send pass off the export hook</li>
-<li>a69a9c351 feat(telemetry): transmit the stable install_id as-is</li>
-<li>7ffd454df feat(telemetry): derive the transmitted install identity via keyed HMAC</li>
 <li>Browser Use 模式此前从不读取 browser.engine：_resolve_backend_cdp() 按 BU_CDP_* env → CDP 覆盖 → 云 provider → 本地 Chrome 的顺序走，engine: lightpanda 在默认后端是静默 no-op，在内置路径上被云 provider/Camofox/CDP 覆盖时也被跳过。现在 engine=lightpanda 且无更高优先级占用时，会真正拿到 Lightpanda 会话。</li>
 <li>模型目录新增 anthropic/claude-fable-5.1。</li>
 <li>skills.create_dir 配置项上线：agent 创建的技能落到指定目录，所有命名该路径的指引同步渲染配置值。</li>
@@ -135,14 +313,10 @@
 </ul>
 <p>nous：org 级模型策略</p>
 <ul>
-<li>c248d5356 feat(nous): read the org model policy and expose it as a list filter</li>
-<li>c38d62aef feat(nous): tell a governed org its model choice is restricted</li>
 <li>受组织的 Nous 部署读取组织模型策略，把受限模型从列表过滤掉；用户选了受限模型时明确提示（面向企业 org 管理场景）。</li>
 </ul>
 <p>小功能：工具提示撤回、agent 消毒器通知</p>
 <ul>
-<li>b293157f7 feat(tools): withdraw tip and tour when the user switches them off</li>
-<li>fb9b2c893 feat(agent): escalate repeated transcript-sanitiser heals with a one-time user notice (#96870)</li>
 <li>用户关掉工具提示后，对应提示位和引导不再出现；agent 反复修复消毒对话记录时一次性通知用户（#96870），不再静默处理。</li>
 </ul>]]></description>
     </item>
