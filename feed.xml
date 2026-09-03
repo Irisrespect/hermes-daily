@@ -5,14 +5,14 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 03 Sep 2026 06:49:51 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 03 Sep 2026 10:56:08 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>Hermes 日报 2026-09-03：GitSpawn RCE 漏洞修复、桌面端 bot 列表自定义分组、核心工具延迟加载省一半 schema</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-03</link>
       <guid isPermaLink="false">hermes-daily-2026-09-03</guid>
       <pubDate>Thu, 03 Sep 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p><strong>本期覆盖 9 月 2 日 11:52 ~ 9 月 3 日 06:30 合入 main 的提交，共 477 个 commit（不含 merge），另有 9 个 merge。新增 29 个功能、301 个修复、19 个性能优化。修复占比依旧很高，但本期有整类安全漏洞修复（GitSpawn RCE）和两个重量级桌面端功能（bot 列表自定义分组、浏览器评论增强），性能侧核心工具延迟加载把桌面端 schema 砍掉约一半。</strong></p>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 2 日 10:30 ~ 9 月 3 日 06:30 合入 main 的提交，共 488 个 commit（不含 merge），另有 9 个 merge。新增 29 个功能、312 个修复、19 个性能优化。修复占比依旧很高，但本期有整类安全漏洞修复（GitSpawn RCE）和两个重量级桌面端功能（bot 列表自定义分组、浏览器评论增强），性能侧核心工具延迟加载把桌面端 schema 砍掉约一半。</strong></p>
 <p>📌 今日要点：</p>
 <ul>
 <li>安全高危修复：恶意仓库的 .git/config 不再在上下文收集时执行任意代码（GHSA-7x36-8jrh-v4pw）</li>
