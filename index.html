@@ -22,9 +22,376 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 37 期 · 8191 个提交 · 每日自动更新 ·
+<p class="meta">共 38 期 · 8326 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-04" class="day">
+      <h2>Hermes 日报 2026-09-04：桌面端池设置可调、Muse Spark 1.3 入库、搜索整批加固、压缩与定时投递可靠性修复</h2>
+      <p><strong>本期覆盖 9 月 3 日 06:30 ~ 9 月 4 日 06:30 合入 main 的提交，共 135 个 commit（不含 merge），另有 5 个 merge。新增 5 个功能、85 个修复、8 个性能优化。修复仍是绝对主力（占六成以上），本期没有重量级新平台，亮点集中在四块：桌面端的池设置与热切换卡顿修复、Meta Muse Spark 1.3 模型家族入库（配套工具调用与图片输入修复）、文件搜索系统的一整批边界加固、以及上下文压缩与定时投递的可靠性修复。性能侧有实打实的数字：子代理共享传输池、流式回复线性化、线程收编、state.db 瘦身。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端后端池上限/空闲时间变成实时设备偏好，悬停预加载不再挤掉正要点的后端；会话热切换不再全量重新高亮</li>
+<li>Meta Muse Spark 1.3 家族入库模型选择器，补上工具调用强制与执行引导，图片工具结果正确拦截</li>
+<li>文件搜索系统 13+ 条边界修复，新增发现文件排序</li>
+<li>上下文压缩过程心跳可见，远程看门狗不再误杀；定时投递重启后保留不丢</li>
+<li>性能侧：共享 HTTP 传输池（连接池 183→7）、流式回复线性化、子代理计时器收编单线程、state.db 瘦身</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端：池上限变为设备偏好，热切换不再卡主线程</p>
+<p>c401756a6|2026-09-03|ClintonEmok|fix(desktop): pool sizing as a live device preference in Settings (#91545)</p>
+<ul>
+<li>问题：鼠标悬停的预加载扫荡会扫过 Bots 栏、越过池上限，用 LRU 把用户正要点击的后端挤掉，触发「挤出→重拉」级联，profile 切换越来越慢（#91545）。</li>
+<li>修复：预加载在后端池每个槽位都持有打开的 socket 后跳过投机启动，真实点击仍按需拉起；池上限和空闲时间变成 Settings → Advanced 里的设备偏好，原子持久化到 pool-limits.json，通过 IPC 实时生效；HERMES_DESKTOP_POOL_* 环境变量退为初始兜底，默认值不变（3 后端 / 10 分钟空闲）。</li>
+<li>效果：切 profile 不再越用越慢，池参数不重启也能调。</li>
+</ul>
+<p>e245e40f7|2026-09-03|Finn763|fix(desktop): warm session switch pegs renderer main thread (#95595)</p>
+<ul>
+<li>问题：切回已打开的会话会重新挂载记录，并对每个 fenced 代码块从头做 shiki 高亮（N 块 × 全量 tokenize），主线程 96-100% CPU 卡数秒。</li>
+<li>修复：代码块高亮加内容键 LRU 缓存，未变区块直接画缓存、高亮器零调用；会话窗口按会话记忆粘性复用，切换不重建仓库。</li>
+<li>效果：会话热切换从秒级卡顿降到基本无感，还加了回归测试防重新 tokenize。</li>
+</ul>
+<p>37fd6eea9|2026-09-03|Edder Talmor|fix(desktop): toast action is a real button, not a hairline text link</p>
+<ul>
+<li>问题：通知操作渲染成 11px 下划线灰字链接，点击区只有约 44×20，用户以为是脚注；数据训练确认 toast（如切 muse-spark-1.2-contributor 时）「按不动」。</li>
+<li>修复：提升为 SDK 默认变体的实心主按钮（size=sm），大点击区、明确的可点击外观，无新样式。</li>
+<li>效果：toast 上的确认操作一眼可点。</li>
+</ul>
+<p>3ea71a47b|2026-09-03|cmyyy|fix(desktop): refresh Bot Chat transcript when a roster click fronts an already-open tab</p>
+<ul>
+<li>问题：点 roster 中 canonical Bot Chat 已打开的 bot，只前置了面板，内容保留上次绘制的快照——cron 投递、队友 message_agent、别的 bot 回合写的新消息看不到，直到下一次用户回合。</li>
+<li>修复：前置分支复用 refreshOpenBotChat 机制，forceResume 重新拉取最新记录；回归测试钉住行为。</li>
+<li>效果：点开已开面板即看到最新会话内容。</li>
+</ul>
+<p>b6d549d00|2026-09-03|Gille|fix(desktop): restore missing Bot Chat panes before claiming focus</p>
+<ul>
+<li>问题：面板缺失时直接抢焦点，Bot Chat 窗格不完整。</li>
+<li>修复：先在焦点主张前恢复缺失的 Bot Chat 面板。</li>
+<li>效果：面板完整后再聚焦，不再出现空白窗格。</li>
+</ul>
+<p>05f548f35|2026-09-03|liuhao1024|fix(desktop): declare rememberLog state before the top-level pool-limits read</p>
+<ul>
+<li>问题：readPersistedPoolLimits() 在模块求值期就跑，且各分支都通过 rememberLog() 记日志，但 hermesLog / desktopLogBuffer 等四个声明在 ~110 行之后。esbuild 把 const/let 降级为 var，打包后的桌面端每次启动都报 &quot;Cannot read properties of undefined (reading &#x27;push&#x27;)&quot; 崩溃（#101941、#101960）。</li>
+<li>修复：四个日志声明移到读取之上，崩溃消失，[pool-limits] 早行日志保留。</li>
+<li>效果：桌面端不再启动即崩（这期最关键的一条启动级修复）。</li>
+</ul>
+<p>iMessage 式机器人提及修复：</p>
+<p>2e542c92e|2026-09-03|liuhao1024|fix(desktop): annotate canonical relay targets for remote @mentions</p>
+<p>bd6cc48b9|2026-09-03|Teknium|fix(desktop): annotate the resolvable target for aliased LOCAL rows too</p>
+<ul>
+<li>问题：Bot Mode 提及中间件用 botHandle() 建 message_agent 目标，偏好 roster 行的 source 限定 UI 别名（如 &quot;default-vera&quot;），但两个解析器都不认这种形式——relay 匹配 canonical handle/profile（±@connection-id），本地路径只认裸 profile 名或 &quot;hermes&quot;，远程交接在入队前就死于 &quot;No teammate named&quot;。</li>
+<li>修复：远程行标注 profile@connection-id，本地行在别名与可解析 handle 不一致时也标注 canonical 裸 handle（default→hermes）。</li>
+<li>效果：远程/别名机器人的 @提及交接能正确送达。</li>
+</ul>
+<p>e924615bb|2026-09-03|Kryptonator|fix(desktop): cap concurrent local profile backend spawns</p>
+<p>5810172f5|2026-09-03|kshitijk4poor|fix(desktop): bound the pool-slot wait below the renderer boot budget</p>
+<p>bb319d0d7|2026-09-03|cez0060405|fix(desktop): bound orphan-reap sweep so slow probes cannot stall boot</p>
+<p>f260ea534|2026-09-03|kshitijk4poor|fix(desktop): let the spawn coordinator follow the live pool max</p>
+<ul>
+<li>并发后端拉起的上限、池槽等待时间、孤儿清理扫描都被加了边界，启动阶段不再被慢探测拖住；spawn 协调器跟随实时池上限而不是旧默认值。</li>
+</ul>
+<p>新模型：Meta Muse Spark 1.3 家族入库</p>
+<p>7e60d0c04|2026-09-03|mr-r0b0t|feat(models): add Meta Muse Spark 1.3 family to picker</p>
+<ul>
+<li>meta/muse-spark-1.3 与 -1.3-contributor 进入 OpenRouter 精选列表、meta-ai provider 兜底、opencode-zen / opencode-free / opencode-go 最低档、安装向导短名单，托管模型目录同步更新。</li>
+<li>效果：更新后模型选择器直接选到 Muse Spark 1.3。</li>
+</ul>
+<p>7f2aa70ad|2026-09-03|Christian Reyes|feat(models): add Muse Spark contributor to OpenRouter</p>
+<ul>
+<li>OpenRouter 侧补上 Muse Spark contributor 档位（7e60d0c04 的配套）。</li>
+</ul>
+<p>cfa7e72c9|2026-09-03|mr-r0b0t|fix(models): correct contributor guard, 1M context, docs for muse-spark-1.3</p>
+<ul>
+<li>修正 contributor 守卫、1M 上下文标注和文档。</li>
+</ul>
+<p>bb8f4afa4|2026-09-03|GTHell|fix(context): add muse-spark 1M fallback (zen/GO SG showed 256k)</p>
+<p>4359af770|2026-09-03|Teknium|fix(models_dev): alias opencode-free to the Zen &quot;opencode&quot; catalog; pin Muse Spark 1M invariant</p>
+<p>779aecb62|2026-09-03|Steve-prog001|fix(context): resolve commandcode models via live /models</p>
+<ul>
+<li>问题：多条路径把 Muse Spark 的上下文窗口错误落到 256K：opencode-free 没有 models.dev 条目、commandcode 作为已知 provider 跳过了自定义端点探测、新加坡镜像只显示 256k。</li>
+<li>修复：opencode-free 别名指向 Zen 的 &quot;opencode&quot; 目录（该目录在 1,048,576 处列出 muse-spark-1.2/-1.2-contributor-free/-1.3-contributor-free，Go 目录只有付费 SKU）；commandcode 走 live /models 解析真实 context_length 并钉住 1M 不变量。</li>
+<li>效果：Muse Spark 1M 上下文在 free 档和 commandcode 下都正确显示，状态栏与文档不再打架。</li>
+</ul>
+<p>d0b7cec0b|2026-09-03|Teknium|fix(prompt): Muse Spark gets tool-use enforcement + execution guidance on defaults (#96550)</p>
+<ul>
+<li>问题：tool_use_enforcement/execution_guidance 为 auto 时，muse-spark-* 不在任何一个模型元组里，只收到通用 finish-the-job 块，0 次工具调用、纯文字回答，回合以 finish_reason=stop 关闭。</li>
+<li>修复：&quot;muse&quot; 加入两个元组，Claude 及其他家族不变。</li>
+<li>效果：Muse Spark 按默认配置真正调用工具执行任务。</li>
+</ul>
+<p>d6bb94a1f|2026-09-03|Teknium|fix(meta-ai): declare supports_vision_tool_messages=False — Muse Spark 400s on image tool results</p>
+<p>b462989a6|2026-09-03|liuhao1024|fix(vision): honor supports_vision_tool_messages=False in tool-result media gates</p>
+<ul>
+<li>问题：Muse Spark 对图片工具结果返回 400。</li>
+<li>修复：声明 supports_vision_tool_messages=False，工具结果媒体门控在声明后正确拦截图片发送。</li>
+<li>效果：Muse Spark 处理带图片工具结果的回合不再 400 中断。</li>
+</ul>
+<p>75aaf5690|2026-09-02|ethernet|enable local models by default on win32 and darwin</p>
+<ul>
+<li>Windows 与 macOS 上本地模型改默认启用（之前默认关闭需手动开）。</li>
+</ul>
+<p>搜索系统：一整批边界加固 + 发现文件排序</p>
+<p>413fd2a1f|2026-09-03|Royalaid|feat(search): add fast discovery file ordering</p>
+<ul>
+<li>新增 fast discovery 文件排序，检索结果顺序更稳定可预期。</li>
+<li>效果：搜索返回顺序不再飘，与发现顺序一致。</li>
+</ul>
+<p>906cd5f44|2026-09-03|Royalaid|fix(search): prune heavy trees from zero-match probe</p>
+<ul>
+<li>零匹配探测前剪掉重型目录（node_modules 等），探测更快更省。</li>
+<li>效果：在大仓库里搜不存在的词不再把整棵树都走一遍。</li>
+</ul>
+<p>efd7277f0|2026-09-03|Royalaid|fix(search): propagate order through code sandbox</p>
+<ul>
+<li>排序信息正确传入代码沙箱，沙箱内结果顺序与外部一致。</li>
+</ul>
+<p>其余边界修复一批（同属 Royalaid 的 search/file-ops 加固链）：</p>
+<p>4e5499c62|2026-09-03|Royalaid|fix(search): close admission cancellation race</p>
+<p>9e47ac17b|2026-09-03|Royalaid|fix(search): serialize filename walks by root</p>
+<p>af98771b4|2026-09-03|Royalaid|fix(search): normalize dash-prefixed find roots</p>
+<p>3c864fe33|2026-09-03|Royalaid|fix(search): terminate rg root options</p>
+<p>092b355f9|2026-09-03|Royalaid|fix(search): scope macOS globs and mark bounded totals</p>
+<p>4c189cfd4|2026-09-03|Royalaid|fix(search): accept bounded rg SIGPIPE and full SemVer</p>
+<p>6d9022a55|2026-09-03|Royalaid|fix(search): harden bounded fallback handling</p>
+<p>e11d91339|2026-09-03|Royalaid|fix(search): fail closed and preserve explicit roots</p>
+<p>06086b95e|2026-09-03|Royalaid|fix(search): unify fallback scans and reject partial errors</p>
+<p>3880e4af6|2026-09-03|Royalaid|fix(search): close ordering and resolver gaps</p>
+<p>aa446092d|2026-09-03|Royalaid|fix(file-ops): normalize Windows find fallback paths</p>
+<ul>
+<li>问题：搜索 fallback 链路在多处边界会翻车——rg 根选项没终止、macOS 通配符范围没限定、失败时显式根目录被吞、Windows 的 find 兜底路径未归一、部分错误未拒绝等。</li>
+<li>修复：按根串行化文件名遍历、统一 fallback 扫描并拒绝部分错误、失败时保留显式根、SIGPIPE/版本号按有界处理。</li>
+<li>效果：跨平台搜索边界情况大幅收敛，Windows/macOS/Linux 行为一致。</li>
+</ul>
+<p>上下文压缩：心跳可见、不丢进行中调用</p>
+<p>8381d4fad|2026-09-03|Jack|compression: emit periodic client-visible status during compaction</p>
+<ul>
+<li>问题：上下文压缩可能流式跑几分钟没有任何增量、工具事件或状态行到达远程传输层，客户端空闲进度看门狗当成死回合打断——Android relay 应用的 180 秒看门狗触发 session.interrupt，把健康的压缩掐死在半路并回滚；在接近上下文上限的会话上每轮都触发（观测到 180469ms/180233ms/180219ms 连续中断）。</li>
+<li>修复：现有的 _CompressionActivityHeartbeat 除了刷新 SessionDB 活动 tracker，现在同时在压缩开始和每个心跳 tick 通过 agent.status_callback 发 &#x27;compacting&#x27; 状态；gateway 已把 status_callback 路由到 status.update 事件，客户端收到任意事件即重置看门狗。</li>
+<li>效果：长压缩不再被远程看门狗误杀，近满会话不再无限循环失败。</li>
+</ul>
+<p>ab73aeff0|2026-09-03|kshitijk4poor|fix(compressor): keep pending tool_calls, avoid double anchors, no header stacking</p>
+<ul>
+<li>问题：压缩重放时，尾部正在进行的 assistant(tool_calls) 会被 sanitize 当成孤儿剥掉工具调用，执行器迟到的工具结果被丢弃；合并到用户钉住的摘要载体时，会再插一份相同请求（双锚点）；跨多次压缩的任务会堆叠多个头。</li>
+<li>修复：重放前先跑 _sanitize_tool_pairs 的尾部在飞豁免；载体标记 _inflight_replay_merged，识别为已含意图并让下一轮把载体当任务；文本在最后一个头之后复述，多次压缩只留一个头一份副本。</li>
+<li>效果：压缩后迟到的工具结果不再丢，任务在多次压缩后保持完整。</li>
+</ul>
+<p>0ed3f9b45|2026-09-03|Justin Wilson|fix(cron): re-append in-flight job prompt after compaction</p>
+<ul>
+<li>问题：单提示词（cron）会话压缩后没有用户消息，SUMMARY_PREFIX 让模型无事可做，调度器却记录成功（#100818）。</li>
+<li>修复：压缩后把进行中的任务重新附加到摘要之后。</li>
+<li>效果：cron 会话压缩后继续干活，不再空转报成功。</li>
+</ul>
+<p>c41525b29|2026-09-03|kshitijk4poor|fix(compression): heartbeat honours the quiet-engine contract and the single start line</p>
+<p>548e0ec92|2026-09-03|kshitijk4poor|fix(compression): route the heartbeat through the shared compaction status contract</p>
+<ul>
+<li>心跳走共享压缩状态契约，服从 quiet-engine 约定且只输出一条开始行。</li>
+</ul>
+<p>58a4a1172|2026-09-03|kshitijk4poor|fix(compression): release the reclamation no-op dedup key on every rearm reset</p>
+<p>9f1212120|2026-09-03|Justin Wilson|fix(compression): do not let prune rearm lock out over-threshold sessions</p>
+<p>d6de054ba|2026-09-03|kshitijk4poor|refactor(compressor): one helper for the last template-visible role</p>
+<ul>
+<li>#101889——仅消息重装可能刚好在正文估计之上，而 provider prompt_tokens（系统提示 + 工具 schema）已超 threshold_tokens，prune 永远 no-op 且无日志。</li>
+<li>修复：在计费口径上绕过该重装短路，超阈值回收 no-op 时告警一次。</li>
+<li>效果：超阈值会话不会再被 prune 锁死。</li>
+</ul>
+<p>定时任务：投递队列保留、重启不丢运行</p>
+<p>b440a492b|2026-09-03|kshitijk4poor|fix(cron): keep unsent worker deliveries queued, cheapen handoff polling</p>
+<ul>
+<li>问题：worker 等待超时时仍 pending 的投递行被标 failed 且永不排空——gateway 中断超过 300 秒预算（如跑 hermes update 的重启）就静默丢投递。未认领行显然是未发送而不是不确定，应留给下一个 gateway；只有发送中（mid-send）的行才标 unknown。</li>
+<li>修复：投递队列未认领行保留排队；整表 prune UPDATE+COUNT 不再放每个事务里（每次 get_status 轮询都付全表代价），轮询 250ms → 1s；父进程不再每 50ms 重开 executions 账本（每小时 ~2 万次打开），改为 1s 超时等进程；终态后回收遗留 payload/ack 文件。</li>
+<li>效果：重启/长中断不丢投递，调度器轮询开销大降。</li>
+</ul>
+<p>c3e9b28a4|2026-09-03|kshitijk4poor|fix(cron): key worker deliveries by the job&#x27;s own attempt; deferred send is not a failure</p>
+<ul>
+<li>投递按 job 自身 attempt 区分，延迟发送不再记成失败。</li>
+</ul>
+<p>3373e9769|2026-09-03|Brooklyn Nicholson|[verified] fix(cron): preserve active runs across gateway restart</p>
+<p>29e517248|2026-09-03|Brooklyn Nicholson|[verified] fix(cron): harden gateway restart handoff</p>
+<p>83efdf5e5|2026-09-03|Brooklyn Nicholson|[verified] fix(cron): close restart handoff races</p>
+<ul>
+<li>网关重启后保留进行中的定时任务运行，交接流程加固、竞态关闭（三条 [verified] 链路）。</li>
+</ul>
+<p>性能：共享传输池、流式线性化、线程与存储收编</p>
+<p>c3b411dfb|2026-09-03|Teknium|perf(agents): share one httpx transport pool across every agent&#x27;s client</p>
+<ul>
+<li>问题：30 个子代理 fan-out 建了 183 个 httpx.HTTPTransport（每个带独立 httpcore 池 + SSL 上下文），profile 显示 ~130 子代理时持 107 个到同一 provider 的 TLS socket；30 子进程峰值 RSS 286MB。</li>
+<li>修复：按 (scheme, verify, proxy, happy-eyeballs) 身份共享同步 HTTPTransport，模块级有界字典；每个 agent 的 httpx.Client 包装不共享，close() 只标视图关闭不碰池；跨线程中断只 shutdown 带自己 stamp 的在飞请求，不切断兄弟流的空闲连接。</li>
+<li>效果：30 子进程峰值 RSS 286 → 195 MB，活动传输对象 183 → 2，连接池 183 → 7；#10933 契约不变。</li>
+</ul>
+<p>7caee2898|2026-09-03|Adolanium|perf(agent): stop rebuilding the streamed reply text on every delta</p>
+<ul>
+<li>问题：_record_streamed_assistant_text 对属性做 += 追加，Python 只在目标是局部变量时才原地增长，所以每个 delta 都全文复制；回复长 N 就是 N 平方拷贝——200KB 回复以 4 字符 delta 到达要搬几十亿字符、烧数秒 CPU，被文件自己称为最热的循环。</li>
+<li>修复：文本改成碎片列表、读取时拼接；读取只在回合结束和中断时发生，整回合线性。</li>
+<li>效果：长流式回复的 CPU 占用从平方级降到线性。</li>
+</ul>
+<p>561b053f7|2026-09-03|Teknium|perf(agents): run per-child timers on one shared scheduler thread</p>
+<ul>
+<li>问题：N 个进程内子代理各加一个睡眠守护线程（delegate heartbeat 30s）+ 每个活跃回合一两根（turn-lease 刷新、存活看门狗），~130 子代理的 profile 里 ~1000 线程。</li>
+<li>修复：全部计时器集中到一个进程级守护线程上的堆序周期调度器；handle.cancel(wait=) 语义与旧 join 一致；回调抛错只记 debug 并重排，一个坏计时器杀不死其余。</li>
+<li>效果：线程数从 ~1000 降到 1 根调度线程。</li>
+</ul>
+<p>2b55ded1a|2026-09-03|Teknium|perf(state): keep delegate-child transcripts out of the trigram FTS index (schema v30)</p>
+<ul>
+<li>问题：fan-out 重的安装 state.db 到 3.4GB，70% 消息字节属于子代理会话，且每行都进了 messages_fts_trigram，其影子表 ~2.6 倍文本（1,029MB trigram vs 350MB 标准 FTS）；session_search 本来就隐藏 source=&#x27;subagent&#x27; 会话。</li>
+<li>修复：扩展 v29 cron 排除，共享谓词跳过 source IN (&#x27;cron&#x27;,&#x27;subagent&#x27;) 及 $._delegate_from 创建标记的会话；三同步触发器与两个延迟回填 INSERT 全部共用。</li>
+<li>效果：子代理会话不再进三角索引，几 GB 库明显瘦身。</li>
+</ul>
+<p>c96568f66|2026-09-03|Teknium|perf(delegation): finished delegate children no longer pin their transcripts in the parent heap</p>
+<ul>
+<li>问题：13 小时 fan-out 1320 个子代理的父进程到 2.6GB RSS（1.9GB 匿名堆）：每个关闭的子 AIAgent 仍可达、持有完整消息历史拷贝；bind_subagent_parent() 把 agent 强引用存进 ContextVar，子代理为自己的回合绑定自己，回合内每个 asyncio Handle/Future 都快照该 Context（56 个活 Context 钉住 14 个完成的子代理）。</li>
+<li>修复：ContextVar 改存弱引用（不可弱引用的 doubles 回退到闭包），get_active_subagent_parent() 解引用。</li>
+<li>效果：完成的子代理不再钉在父进程堆里，长跑 fan-out 内存平缓。</li>
+</ul>
+<p>ea65fcd98|2026-09-03|fangliquanflq|perf(state): exclude cron sessions from trigram FTS</p>
+<p>57162d0cc|2026-09-03|fangliquanflq|fix(state): bound FTS indexing for large tool results</p>
+<p>5a7bee0fa|2026-09-03|kshitijk4poor|fix(state): exclude tool calls from trigram FTS</p>
+<ul>
+<li>cron 会话与工具调用脚注 JSON 移出三角投影（标准 FTS 索引仍可搜），大工具结果索引有界，v1 布局走 optimize-storage 重建路径。</li>
+<li>配套：c917374ae 在 doctor/更新提示里宣传 v1 FTS 重建；46bcad0c2 清空空库的重建标记；c79df9c4d 停止在隔离（quarantined）SessionDB 上跑 housekeeping FTS 重试（#100108/#101095）。</li>
+</ul>
+<p>11ed84043|2026-09-03|John Paul Soliva|perf(mcp): skip npx&#x27;s resident parent when the package is already cached</p>
+<ul>
+<li>问题：npx 解析完包后 FORK 常驻成为真实 MCP 服务进程的父进程，整个生命周期不干活——实测 4-agent 主机每个 stdio MCP 服务 ~48MB 私有内存；Hermes 自己已有父死亡看门狗，npx 的监管没人读。</li>
+<li>修复：包已在 npx 缓存时直接起二进制、丢掉中间进程；缓存未命中行为不变（冷机器首次仍走 npx 安装）。</li>
+<li>效果：每个 stdio MCP 服务省 ~48MB 常驻内存。</li>
+</ul>
+<p>6064668c8|2026-09-03|fangliquanflq|perf(usage): prefer bundled pricing before metadata fetch</p>
+<ul>
+<li>用量统计优先用捆绑定价，命中就不发起元数据拉取，省一次往返。</li>
+</ul>
+<p>execute_code：内核进程不再孤儿化</p>
+<p>365e2835d|2026-09-02|Teknium|fix(execute_code): POSIX kernels exit when their host dies mid-cell (death pipe)</p>
+<ul>
+<li>问题：宿主进程 mid-cell 被 SIGKILL/OOM/崩溃时，内核进程曾无限期存活（stdin EOF 只在 cell 之间到达）。</li>
+<li>修复：内核继承一根只有宿主持有写端的管道，宿主死亡 = EOF，内核退出；集成测试在全部平台跑。</li>
+</ul>
+<p>32d5e9d35|2026-09-02|Dolverin|fix(execute_code): stop Windows kernels with backend parent</p>
+<ul>
+<li>Windows 内核跟随后端父进程停止（365e2835d 的 Windows 对应面）。</li>
+</ul>
+<p>4dac5f28a|2026-09-02|Teknium|fix(execute_code): parallel cells no longer orphan kernel processes; LSP stops treating package dirs as project roots</p>
+<ul>
+<li>问题：mid-spawn 的内核（proc=None）被当成已死，同一 owner 的并发 cell 互相替换注册表项，赢家的进程泄漏在注册表外（实测 4 上限进程下挂 110 个活内核、1.1GB、330 线程）；reap/evict 连有 cell 附着的内核一起拆，spawner 下的 staging 目录被 rmtree。</li>
+<li>修复：内核跟踪附着的 cell——只 reap/evict 已安定的内核，忙碌中被丢弃的内核由最后一个 cell 拆掉，cell 内注册表弹出不替换替代进程。</li>
+<li>效果：并发 cell 不再泄漏内核进程；另外 __init__.py 目录按包处理、不再当项目根。</li>
+</ul>
+<p>d4126c6f4|2026-09-02|nftpoetrist|fix(code-execution): reap idle and cap remote session kernels</p>
+<p>0177c1690|2026-09-02|Teknium|fix(code-execution): remote kernel reap/evict skip kernels with a running cell</p>
+<ul>
+<li>远程会话内核：空闲回收 + 数量上限，有 cell 在跑的内核跳过回收。</li>
+</ul>
+<p>agent 核心行为修复</p>
+<p>562ee8ab7|2026-09-03|Teknium|fix(prompt): agent routes task-learned knowledge (incl. user preferences/corrections) to skills; memory is the every-session exception</p>
+<ul>
+<li>问题：记忆引导把「主动保存」放前面、memory 工具 schema 把「用户偏好与纠正」排最高优先级，skills 的提示却是条件式的「建议保存」；实际结果是 agent 在会话结束时抢写 2200 字预算的 memory，反而跳过刚用过该更新的 skill。</li>
+<li>修复：两处表面统一为同一规则——做任务学到的（包括该任务的用户偏好/纠正）写进任务的 skill，memory 只留跨会话通用事实。</li>
+<li>效果：偏好和流程沉淀到 skill，memory 不再被 2200 字预算卡住。</li>
+</ul>
+<p>7b72fd124|2026-09-03|Teknium|fix(agent): stream cut mid tool-call markup no longer persists as assistant prose (#101899)</p>
+<ul>
+<li>问题：GLM 系模型把工具调用序列化成文本通道里的 XML；流在序列化中途断了（finish_reason=stop）时，孤立的 &lt;arg_key&gt;/&lt;arg_value&gt; 残片或裸的未闭合 &lt;tool_call&gt; 开启器既不匹配完整块剥离器也不匹配部分流守卫，被当普通助手内容存下并展示。</li>
+<li>修复：存储边界和 CLI 显示副本现在剥离未闭合块边界的工具调用开启器或任何带残留参数标记的行到文本末尾；响应读作空并走已有空重试路径。</li>
+<li>效果：工具调用残片不再污染对话历史。</li>
+</ul>
+<p>390c27c6d|2026-09-03|fangliquan|fix(agent): accumulate streamed tool arguments linearly</p>
+<ul>
+<li>流式工具参数改为线性累积，避免反复拼接的平方级拷贝（与 7caee2898 同族）。</li>
+</ul>
+<p>cf86c4762|2026-09-03|Christopher|fix(agent): evict stale screenshot payloads before send</p>
+<ul>
+<li>每回合清理时对 api_messages 克隆调用 keep-newest 视觉退役，OpenAI 系工具结果截图不再每回合重复上传。</li>
+</ul>
+<p>116ca1db1|2026-09-02|Teknium|fix: sibling Nous 401 recovery adopts a peer&#x27;s refresh instead of rotating again</p>
+<ul>
+<li>问题：多个子代理同时撞上每小时令牌过期时，只有凭证池调用方传了 stale_access_token 提示，主 agent 401 路径、辅助客户端重建、代理适配器都传 force_refresh=True 无提示——N 个子代理串行刷新 N 次、每次作废兄弟刚采纳的令牌。</li>
+<li>修复：所有路径都采纳兄弟进程刚轮换的令牌。</li>
+<li>效果：实测（假 Portal 上的 12 进程 A/B）：12 次刷新 POST / 9 个不同最终令牌 → 1 次 POST / 1 个令牌。</li>
+</ul>
+<p>推理修复：强制推理 400 不再打断回合</p>
+<p>f6bd1633f|2026-09-03|Teknium|fix(reasoning): GLM-5.3 on Nous/OpenRouter no longer 400s when thinking is disabled</p>
+<ul>
+<li>问题：推理强制路由对 reasoning:{enabled:false} 返 400（&quot;Reasoning is mandatory for this endpoint and cannot be disabled&quot;）；Hermes 对 /reasoning none、agent.reasoning_effort: none 及一次性思考耗尽续写都发该 disable；Nous profile 的目录守卫只在进程内能力缓存已说强制时才吞掉 disable——gateway 在路由翻转前热好的缓存会继续发，400 被分类成不可重试的 format_error 直接中断回合。</li>
+<li>修复：error_classifier 新增 reasoning_mandatory 原因（可重试、无 fallback、不压缩、在请求校验分支前匹配）；conversation_loop 一次性恢复——置 agent._reasoning_disable_rejected、给 provider 排一个目录刷新、重试。</li>
+</ul>
+<p>63279301b|2026-09-03|Teknium|fix(reasoning): retry after a mandatory-reasoning 400 resends the user&#x27;s own effort</p>
+<ul>
+<li>重试必须落在与本会话此前每请求相同的 provider 缓存键上；只丢弃一次性续写 disable，原样发 agent.reasoning_config；配置本身是 disable 的会话不发了（那会话从没发过别的，无暖缓存可丢）。</li>
+<li>实测：user effort=high、临时 disable → 400 → 重试携带 {enabled:true, effort:high}。</li>
+</ul>
+<p>配置安全：损坏的 config.yaml 不再产生副作用</p>
+<p>4d24f357a|2026-09-03|kshitijk4poor|fix(config): strict version check also refuses non-mapping config roots</p>
+<ul>
+<li>问题：config.yaml 顶层是列表或标量时解析照常成功，strict check_config_version(raise_on_parse_error=True) 仍返回 (0, latest)，migrate_config() 继续跑——sanitize_env_file() 重写 .env，然后 save_config() 的 fail-closed 守卫才抛 RuntimeError，即「无效配置先动副产物」。</li>
+<li>修复：该形状也前移抛 InvalidUserConfigError，两类无效形状都保证「无效配置浮出前零副作用」。</li>
+</ul>
+<p>a3ceee433|2026-09-03|EmanueleCornaggia|fix(config): refuse migration on malformed YAML</p>
+<ul>
+<li>校验与迁移路径区分解析失败与当前配置，损坏 YAML 不触发 .env / config 侧副作用（#101778 的补全）。</li>
+</ul>
+<p>MCP：Windows 启动器选型修正</p>
+<p>1a451bfae|2026-09-03|John Paul Soliva|fix(mcp): pick the Windows launcher, not the sh script, from an npx cache</p>
+<ul>
+<li>问题：Windows 的 npm .bin 里每个二进制有三个兄弟——无扩展名 sh 脚本、.cmd、.ps1；从 Windows 进程 spawn sh 脚本会失败，os.access(X_OK) 在那里形同存在性检查，之前的候选测试分不清三兄弟，可能选中跑不起来的文件、破坏本来走 npx 能正常启动的服务。</li>
+<li>修复：按扩展名选择（.cmd → .exe），与 hermes_constants._candidate_node_command_names 用同一优先级，无启动器时回退 npx。</li>
+<li>效果：Windows 上 MCP 服务启动不再撞 sh 脚本。</li>
+</ul>
+<p>其他修复</p>
+<p>6fdd93ab4|2026-09-03|RelaxJonh|fix(tools): release per-task file registry state (#86514)</p>
+<ul>
+<li>终端任务结束时释放文件操作跟踪、最后一个持有者/等待者退出后移除路径锁；长驻 gateway 进程不再无限保留文件状态，兄弟写跟踪与路径级串行化保留。</li>
+</ul>
+<p>b1bf099f1|2026-09-02|Zane Chee|fix(computer-use): distinguish doctor and gateway environments</p>
+<ul>
+<li>computer-use 的 doctor 与 gateway 环境判定区分开，不互相污染。</li>
+</ul>
+<p>dd3e6ed93|2026-09-03|Justin Wilson|fix(gateway): slash commands report an unreadable transcript instead of replying nothing</p>
+<ul>
+<li>问题：恢复路径半成品——load_transcript 抛 TranscriptReadError 时回合失败关闭，但 slash 命令处理函数和平台助手不捕获，异常到 dispatch 包装器只记日志、无任何回复。</li>
+<li>修复：所有读 transcript 的 slash 处理器捕获 TranscriptReadError，明确告知「历史存在但不可读」，不再静默无回复。</li>
+</ul>
+<p>914d8a0bd|2026-09-03|kshitijk4poor|fix(recovery): name the real state.db in the copy-pasteable recovery banners</p>
+<p>a15f96450|2026-09-03|kshitijk4poor|fix(recovery): make the printed salvage command satisfy the real CLI contract</p>
+<p>5d9a2110b|2026-09-03|sal|fix(recovery): stop pointing sqlite3 .recover guidance at the live state.db</p>
+<ul>
+<li>问题：恢复横幅把字面 ~/.hermes/state.db 打印成命令；印出的 hermes sessions recover 命令缺 --output 会 exit 2 拒跑；sqlite3 .recover 指导指向 live state.db，而带 WAL-reset 打开器 bug（3.51.3 前）的 sqlite3 CLI 会把 live -wal/-shm 拆成两个世代、已确认写入消失（#100368）。</li>
+<li>修复：横幅插值真实 _default_db_path()；五处 state-db 指导改印两阶段操作命令；不再把 .recover 指到 live 库。</li>
+</ul>
+<p>86c4a23d4|2026-09-03|joaomarcos|fix(state): avoid WAL unlink race during repair</p>
+<ul>
+<li>修复流程中避免 WAL 文件的 unlink 竞态，修复不再误删正在写的 WAL。</li>
+</ul>
+<p>46604fe7f|2026-09-03|kshitijk4poor|fix(backup): skip archive sidecars on import; count a refused live-safe restore as failed</p>
+<p>d47fe28fc|2026-09-03|joaomarcos|fix(backup): import SQLite databases without replacing the live inode</p>
+<ul>
+<li>问题：hermes import 用原子 rename 发布每个 zip 成员（含 state.db），换掉文件 inode——任何持库打开的 gateway/dashboard/WebUI 进程继续在已 unlink 的旧 inode 上服务，写的新会话别的进程看不到，且新文件旁的 sidecar WAL 描述的是刚被 unlink 的库；没有任何报错，「Import complete」后会话集体失踪。</li>
+<li>修复：.db 成员改为页级恢复进 live 文件；配对 -wal/-shm/-journal 成员跳过（当前备份本就不带它们）；restore_quick_snapshot 尊重 _safe_restore_db 的拒绝并计为失败。</li>
+<li>效果：import 不再换 inode，持库进程与磁盘状态一致。</li>
+</ul>
+<p>83ecb6e69|2026-09-02|Beto de Paola|feat(meta-ai): live-first model catalog + generic contributor warning</p>
+<ul>
+<li>meta-ai 模型目录改为 live 优先 + 通用 contributor 警示，定价指向实时页面。</li>
+</ul>
+<p>139396995|2026-09-02|Teknium|feat(opencode): send x-opencode-session on every OpenCode request for backend affinity</p>
+<ul>
+<li>OpenCode 请求带上 x-opencode-session 头，后端亲和会话路由。</li>
+</ul>
+<p>4a339ad37|2026-09-02|Alex Fournier|fix(relay): upgrade to 0.8.3</p>
+<ul>
+<li>relay 依赖升级到 0.8.3（连同此前 0.8.2 / 0.8.1 的三连升级一起合入）。</li>
+</ul>
+<p>98a6e4a90|2026-09-03|Jason Wu|fix(session-search): bound recent-session browsing</p>
+<ul>
+<li>最近会话浏览加数量上限，超大历史不再一次拉全。</li>
+</ul>
+<p>401ac7e1f|2026-09-03|fangliquanflq|fix(gateway): keep first model picker open responsive on cold pricing cache</p>
+<ul>
+<li>冷定价缓存下第一个模型选择器保持响应不卡死。</li>
+</ul>
+<p>fb723084b|2026-09-03|kshitijk4poor|fix(inventory): explain the locked Nous list while entitlement is pending</p>
+<p>b9dc79033|2026-09-03|kshitijk4poor|fix(inventory): reword pending-entitlement warning to avoid Windows footgun false positive</p>
+<ul>
+<li>只有常驻缓存时，冷 Nous 行在后台 prewarm 落地前全锁；行上现有警告位说明原因（entitlement 待定），并改写措辞避免 Windows 用户的误报。</li>
+</ul>
+    </section>
+    
     <section id="2026-09-03" class="day">
       <h2>Hermes 日报 2026-09-03：GitSpawn RCE 漏洞修复、桌面端 bot 列表自定义分组、核心工具延迟加载省一半 schema</h2>
       <p><strong>本期覆盖 9 月 2 日 10:30 ~ 9 月 3 日 06:30 合入 main 的提交，共 488 个 commit（不含 merge），另有 9 个 merge。新增 29 个功能、312 个修复、19 个性能优化。修复占比依旧很高，但本期有整类安全漏洞修复（GitSpawn RCE）和两个重量级桌面端功能（bot 列表自定义分组、浏览器评论增强），性能侧核心工具延迟加载把桌面端 schema 砍掉约一半。</strong></p>
