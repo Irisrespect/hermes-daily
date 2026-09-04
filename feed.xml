@@ -5,8 +5,61 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 04 Sep 2026 06:42:46 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 05 Sep 2026 07:05:00 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-05：大规模模块拆分重构合入 + 桌面端拖拽建会话</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-05</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-05</guid>
+      <pubDate>Sat, 05 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 4 日 ~ 9 月 5 日合入 main 的提交，共 3481 个 commit（不含 merge），另有 765 个 merge。新增 3 个功能、51 个修复、0 个性能优化。</strong></p>
+<p>本期主体是一波大规模架构重构（3302 条 refactor + 55 条 simplify 集中合入，多为 Teknium 的模块拆分与 god-file 提取，commit 日期集中在 9 月 2 日，属&quot;作者时间早、晚合入 main&quot;的正常口径），另有一批配套修复保障重构落地。用户直接可见的新功能集中在桌面端与网页搜索。</p>
+<p>📌 今日要点：</p>
+<p>桌面端新增拖拽创建会话，从新建、项目和 profile 分组直接拖出会话</p>
+<p>桌面端消息气泡透明度滑块上线，Appearance 里 0-100 实时调节</p>
+<p>Perplexity Search API 成为新的网页搜索后端，web_search / web_extract 都能走</p>
+<p>桌面端&quot;隐藏标签&quot;在多个标签的区域内恢复可用，皮肤与 tooltip 一系列小修</p>
+<p>大规模架构重构合入 main：模块拆分、god-file 提取，重构的配套修复同步落地</p>
+<p>桌面端新功能</p>
+<p>feat(desktop): drag to create sessions（6b1e12c7f4）</p>
+<p>从 New session 按钮、项目 + 控制区以及 profile 分组，都可以直接拖出并创建新会话。在这之前创建会话基本只能通过按钮点击、菜单或快捷键，拖拽是全新的一类交互入口，把会话创建变成了桌面端的直接操作。配合已有的拖拽式布局理念，多会话工作流可以更快铺开。</p>
+<p>feat(desktop): Message Bubble transparency slider（96e1e3f921）</p>
+<p>Appearance 设置里新增一条 0-100 的透明度滑块，专门控制消息气泡：0 保持实心是默认，100 只剩轮廓。它和已有的窗口半透明共用同一个滑块组件（带叠加预览），所以调的时候能直接看到效果。实现上只导出单一根 CSS 变量，只读气泡和行内编辑输入框会一起联动，没动过的滑块不会产生任何字节级差异。支持 Ctrl+K 搜索直达，文案覆盖全部六个语言。</p>
+<p>桌面端修复</p>
+<p>fix(desktop): Hide tabs works again（2c52945974）</p>
+<p>&quot;隐藏标签&quot;在多标签区域失效的回归被修好。根因是可关闭的 main 区面板在任意标签数下都强制标签条显示——会话标签和机器人聊天恰好就是这种面板，一个会话标签就足以让&quot;隐藏标签&quot;变成空操作，区域菜单和 Ctrl+Alt+T 都写了 `tabStrip: &#x27;never&#x27;` 但下一行又被解析器覆盖。现在&quot;孤立&quot;只针对最后一个手柄：两个及以上标签的栈保留标签条（承担标签轮换和 Ctrl+1~9 切换），单个面板和隐藏专用面板（会话/机器人）在任何数量下都能正常隐藏。隐藏/显示再次按预期工作。</p>
+<p>fix(desktop): tab close ✕ 淡出与布局系列（433f719676 / ff75ff2a18 / 87e78d668b）</p>
+<p>标签关闭按钮的淡出动画收尾一批小修：Glass 主题下 ✕ 淡出现在落在可见字段上；可关闭标签的文本裁剪保证 ✕ 淡出有字可溶；面板标签的 ✕ 只占用最小宽度下限，不再白占 36px 死空间。</p>
+<p>fix(desktop): multi-line tooltip / shared tooltip（a22b295dbd / 64534b4dd4）</p>
+<p>多行 tooltip 现在每一行都会绘制，之前只画第一行；列表画廊（listing gallery）复用共享 tooltip 组件，渲染一致。</p>
+<p>fix(desktop): skin 启动解析（1d1411df9c / 413d5ab863）</p>
+<p>皮肤名在注册表解析完成前保持显示（不再闪烁回默认），后端皮肤加了缓存，启动首屏能直接解析到已保存的皮肤。</p>
+<p>fix(desktop): transcript timestamps（59302ece0d）</p>
+<p>转录时间戳在明暗两种模式下都不再只显示 30% 墨色——之前在两个模式里都偏淡，几乎看不清。</p>
+<p>浏览器工具</p>
+<p>fix(browser): browser_exec local mode drives the packaged Chromium（9e13ac2f01）</p>
+<p>browser_exec 本地模式（默认模式、无云供应商/CDP 覆盖时）之前会去找用户自己安装的 Chrome：每条会话都要开 chrome://inspect 远程调试开关、弹&quot;允许远程调试&quot;确认框，Chrome 136+ 直接禁止该路径，无 Chrome 的主机直接报 &quot;chrome-not-running&quot;。现在第 4 步解析改为走 Hermes 自带的 Chromium（agent-browser 管理，含预检/自动安装、按 key 的会话缓存、闲置回收、退出清理），把返回的 ws 端点点填给 browser-use。每个缓存 key 独立 Chromium，命名会话私有且跳过自带标签页前奏；每次调用刷新闲置计时，回收后自动重启。冷启动、热复用、回收后重启、命名会话四个场景都实测通过，缺失时会给出安装提示。</p>
+<p>上下文与提示</p>
+<p>fix(context): subdirectory AGENTS.md hints ceiling 8k -&gt; 32k（d61cff60e3）</p>
+<p>子目录 AGENTS.md 提示加载器之前把超过 8,000 字符的内容静默截断，只留一个空标记、日志里没有任何提示——apps/desktop/AGENTS.md（11k）因此长期以残缺状态进入每个桌面端会话，而且没人能察觉。对比行业：Codex 把整个指令链上限设在 32KiB 且有文档，Claude Code 和 Cursor 对嵌套文件不设上限，OpenCode 根本没有嵌套发现。现在上限提到 32,000 字符，超限时走统一截断逻辑：保留开头 70% + 结尾 20%，标记里指明文件路径供 read_file 继续读，并在日志里输出 WARNING。区域 AGENTS.md 维持在 8k 左右仍然是对的——文本会在首次触达目录时进入工具结果。</p>
+<p>认证与网关</p>
+<p>fix(auth): qwen OAuth login reaches its moved owner（38742342b2）</p>
+<p>重构扫除时丢掉了 auth facade 对 _mark_qwen_oauth_active 的转发，导致 `hermes auth add qwen` 直接 AttributeError。现在改为从新位置 hermes_cli/auth_qwen 导入。该问题由 PR #102117 评审发现并上报。</p>
+<p>fix(gateway): stop dropping the first message after an Azure agent sleeps（a6e10e693f，PR #99736）</p>
+<p>修复了 Azure 托管 agent 休眠后首条消息丢失的问题，这是一条完整的休眠/唤醒链路修复：新增 going_idle 确认要求、休眠前等待 broker 确认、所有放弃路径释放重拨锁、冻结间隙封口、冷却中止、关闭排空不被覆盖。这条 commit 本身是一个合并了多个子提交的 PR（含 refactor 测试夹具），是本期少数的跨链路修复。</p>
+<p>搜索与网页</p>
+<p>feat(web): Perplexity Search API as a web_search + web_extract backend（f1ccf436a2）</p>
+<p>新增 plugins/web/perplexity 插件，把 Perplexity 的 Search API 接入成网页搜索后端：</p>
+<ul>
+<li>search 走 POST api.perplexity.ai/search（官方文档化的 Search API），search_context_size=low 让 snippet 保持描述级尺寸，results[].snippet 映射为 description，max_results 封顶在 API 的 20 条。</li>
+<li>extract 走 /sdk/content/snippets（CLI 的 content fetch 已在上游废弃），web_extract 没有 query，就用 URL 路径词当相关性查询；每条 URL 的 error 字段在 200 响应里也能保留。</li>
+<li>接入点与其它 keyed 供应商一致：传统后端集合、凭据阶梯、可用性探测、registry 偏好遍历、OPTIONAL_ENV_VARS、hermes config/status/dump 键列表、订阅直连检测、setup 摘要、测试 conftest、文档全覆盖。</li>
+<li>注意：Perplexity 没有匿名档位，必须配置 API key。历史上 #9192 / #23981 / #45225 三个相关 PR 都早于插件 ABC，这次是重新以插件形式落地。</li>
+</ul>
+<p>大规模重构（背景信息）</p>
+<p>本期主体是 Teknium 发起的一轮大规模模块拆分重构（3302 条 refactor + 55 条 simplify，含多个 god-file 提取），覆盖范围：hermes_cli（590 条）、tools（306 条）、gateway（257 条）、agent（132 条）、state（85 条）、computer_use（77 条）、tui（70 条）、cli（59 条）、mcp（51 条）、delegate（41 条）、更新与审批、上下文压缩等。这批 commit 的日期集中在 9 月 2 日，属于&quot;作者时间早、晚合入 main&quot;的正常口径——正式合入发生在本期窗口内。</p>
+<p>重构的配套修复也同步落地：约 40 条 compat/test-seams/ci-fallout/integration 类修复，把测试、docker、打包、跨模块引用全部指向拆分后的新模块，保证重构上线后行为不变（如 57 个测试文件的 monkeypatch 目标迁移、sys.modules 清除后恢复原对象、subprocess 的 stdin/编码防护回补等）。对用户而言这些不改变可见行为，但为后续功能开发铺平了道路。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-04：桌面端池设置可调、Muse Spark 1.3 入库、搜索整批加固、压缩与定时投递可靠性修复</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-04</link>
