@@ -22,9 +22,84 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 39 期 · 11807 个提交 · 每日自动更新 ·
+<p class="meta">共 40 期 · 11910 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-06" class="day">
+      <h2>Hermes 日报 2026-09-06：GPT-6 Astra 与新技能包上线，远程沙箱媒体投递补上沙箱化部署最后一环</h2>
+      <p><strong>本期覆盖 9 月 5 日 06:30 ~ 9 月 6 日 06:30 合入 main 的提交，共 103 个 commit（不含 merge），另有 0 个 merge。新增 6 个功能、46 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>新模型批量上线：GPT-6 Astra / Astra Pro 六个档位入驻 Nous Portal 和 OpenRouter，Qwen3.8-Max 升级到 0902 快照</li>
+<li>桌面端安全修补一个高危漏洞（CVE-2026-70608, High 7.2）：恶意 artifact HTML 可零交互强制打开浏览器，Electron 40.x 无修复版本，在窗口策略层独立拦截</li>
+<li>交互修复：agent 跑前台终端命令时你发的消息不再卡住几分钟，进程被收养为后台会话后消息立即送达</li>
+<li>Windows 文件同步修复数据丢失：两个叠加故障导致远端所有编辑被跳过，修复后 sync_back 不再丢编辑</li>
+<li>远程沙箱 MEDIA 投递补齐：SSH/modal/daytona 等后端里的 artifact 现在能通过 exec channel 拉回投递，此前直接 &quot;Skipping unsafe&quot; 丢弃</li>
+</ul>
+<p>重点条目：</p>
+<p>新模型与新能力</p>
+<ul>
+<li>GPT-6 Astra 和 Astra Pro 上线（f159e581c7）：Nous Portal 和 OpenRouter 新增六个 slug（gpt-6-astra 基础档 + fast/flex 两档速度 + Astra Pro 同构三档），context 105 万。Nous Portal 各档位作为独立 slug 服务（实测每个 slug 回显 id、service_tier 和 1x/2x/0.5x 价格）；OpenRouter 把档位实现为 base model 的 endpoint（openai/fast、openai/flex 标签），未知后缀静默回落到标准档位标准价，profile 把档位 slug 重写为基础 wire model 并 pin provider.only 到对应档位 endpoint，基础 slug 固定走 azure 端点避免默认路由落到 fast/flex 档。</li>
+<li>Qwen3.8-Max 升级到 0902 快照（d20a8e4475）：阿里发布 qwen3.8-max-0902（别名 qwen3.8-max-2026-09-02），1M context / 131K 输出，$2 进 $6 出。OpenRouter、Nous Portal、阿里 Token Plan 三个 picker 全部从裸 slug 切到 0902，旧裸 slug 从目录移除。</li>
+<li>内置技能包新增两个免安装技能（4dc9988f78）：reddit-reading（subreddit 列表、站内/版块搜索、帖子含评论、用户主页）和 rss-feeds，附多平台路由指引。实测从数据中心 IP 访问 Reddit：www.json、api.reddit.com、old.reddit、r.jina.ai 和浏览器工具全部 403/空壳/人机验证，Atom RSS 端点是唯一匿名可用通道且限速约 1 请求/分钟/IP，脚本会等 x-ratelimit-reset 窗口后重试一次。</li>
+<li>Slack /model 升级交互式选择器（1e69c12b64）：两步下钻（provider 静态选择 → model 静态选择），带 Back/Cancel 按钮，复用 Discord/Telegram 同一套 gateway 回调，持久化和切换失败回滚语义直接继承。</li>
+<li>Docker snap 兼容开关（256bd1adc9）：snap 打包的 Docker 在 AppArmor 下 --init / no-new-privileges 会失败，新增 terminal.docker_snap_compat 供退出这两个参数。</li>
+</ul>
+<p>安全</p>
+<ul>
+<li>window-open 高危漏洞修复（77ca6a6d12 + b51c055a12）：GHSA-9f4c-93c8-jc8g / CVE-2026-70608，High 7.2。setWindowOpenHandler 在拒绝前会先打开 details.url——沙箱 iframe（allow-scripts、无 allow-popups、无用户手势）可通过 OpenURL 路径触达该 handler，而桌面端在 iframe sandbox 里渲染不可信 artifact HTML，恶意 artifact 因此可以零交互强制打开系统浏览器访问攻击者 URL。Electron 40.x 没有修复版本（修复在 41.10.3+/42.0.1），所以在窗口策略层版本无关地关闭：新的 window-open-policy.ts 纯函数 always deny，handler 拒绝且绝不打开 URL；后续 b51c055a12 加固 deny 并覆盖 link-title 窗口路径。</li>
+<li>凭证不再落日志（aa0beef684）：损坏的 mcp-tokens/&lt;server&gt;.json 在 pydantic ValidationError 时 str() 会把 access token 原样打进警告日志；docker_env 拒绝警告用 %r 打印被拒值。现在只记失败的字段名和值的类型。</li>
+<li>MEDIA 投递封堵 SQLite 存储（4139695c97）：MEDIA:~/.hermes/state.db 在默认模式下可直接投递——此前 denylist 只点名单个凭证文件，没覆盖存着全部跨会话对话历史和聊过的一切密钥的 SQLite 库，及其 WAL/SHM 边车（mtime 永远新鲜，strict 模式的 recency 信任也会放行）。同样补上的还有 legacy sessions/ 记录、被复制的 browser-profile/ cookie 库、紧挨附件白名单的 kanban/boards/&lt;slug&gt;/kanban.db。现在这些存储一律拒绝投递。</li>
+<li>approvals.deny 在隔离容器内生效（1c37b9c457）：shell 命令守卫的两个入口都在评估用户的 approvals.deny 列表之前就从隔离容器快速路径返回审批结果，导致无宿主挂载的 Docker（singularity/modal/daytona/vercel 同样）整个跳过 deny 列表——而文档把 deny 定义为&quot;不可绕过：它规定 agent 可以做什么，不是能触达什么&quot;。现在 deny 列表在容器跳过逻辑之前评估；内置危险命令启发式仍然跳过。</li>
+<li>强制阻止立即打开浏览器的场景已被窗口策略层覆盖（见 GHSA-9f4c 条目），无独立提交。</li>
+</ul>
+<p>核心交互与数据</p>
+<ul>
+<li>中途插话不再等前台终端命令（463292351f）：CLI busy_input_mode=interrupt、gateway priority redirect、ACP redirect 三种路径下，agent 运行中用户键入的消息走 AIAgent.redirect()；工具执行期间 redirect() 退化为 steer()，消息搭工具结果的车——于是一条长前台命令（CI 轮询的 sleep 285、一次构建）会把你刚发的消息搁置到命令退出才送达，界面却早就打着 &quot;Redirected current turn&quot;。现在 redirect() 额外请求工具 workers 让出（tools/interrupt.request_yield），本地终端后端等待循环响应：停掉 drain 线程，还在跑的 Popen 被进程注册表收养为 notify_on_complete 后台会话（已有输出播种 buffer），消息立即处理。</li>
+<li>Windows sync_back 不再丢远端编辑（1bfbe19f5f）：两个 Windows 专属故障叠加。其一，staging tar 用 NamedTemporaryFile 且保持打开，后端 bulk_download_fn 重开同一路径写入时 PermissionError（Windows 独占句柄），改用 mkstemp + close + finally unlink；其二，staged 成员 key 来自 os.path.relpath、父目录映射来自 Path(remote).parent，Windows 上都会拼出反斜杠路径，任何 staged 文件都匹配不上 POSIX 远端 key，于是每条编辑都被当成&quot;无 host 映射&quot;跳过。key 改 as_posix()、父目录改 posixpath.dirname，映射后的宿主路径用宿主 Path 连接。</li>
+<li>每个 Windows 盘符都是 host cwd（bb504a2e14）：_HOST_CWD_PREFIXES 只列了 C:\ 和 C:/，D:\ 或 E:/ 工作目录会被当成容器内路径传到 docker run -w，容器在不存在目录启动。两个前缀扫描统一走 _is_host_cwd 判定，任意盘符配正反斜杠都算 host cwd。</li>
+</ul>
+<p>远程与沙箱</p>
+<ul>
+<li>远程沙箱 MEDIA 投递（70a64db532）：MEDIA:/path 此前只在文件存在于网关主机时才投递；ssh/modal/daytona/singularity/vercel 后端里 artifact 在另一套文件系统上，validate_media_delivery_path 直接拒绝、附件无声消失（日志一行 &quot;Skipping unsafe&quot;）——这是沙箱化部署的头号缺口。BaseEnvironment.fetch_file 现在能从任意后端经 exec channel 拉出常规文件：base64、marker 围栏、大小上限在沙箱内执行（/dev/zero 无法灌爆宿主内存），形状与 image_source 一致。配套 b499ab11fe：远程媒体拉取对无法解析的符号链接 fail closed、跳过 strict 模式、按 session id 键控沙箱。</li>
+<li>Desktop-over-SSH 隔离后端无客户端自动退出（fca7fdd35d）：serve --isolated 是刻意脱机启动（setsid/nohup、PPID 1）以在 SSH 通道关闭后存活，但所有 teardown 路径都挂在客户端侧。笔记本睡一半（暗醒重连隧道→spawn 后端→再睡）每轮留下一个新后端，每个都是 state.db 的额外写者——这正是 WAL 损坏事故的多写者根源。只对 --ssh-session-token-file 启动的后端生效：ASGI wrapper 在每条 dashboard 路由上数 WebSocket 会话但不碰 handler；无客户端超过 ssh_isolated_idle_grace_s 宽限期后 watchdog 请求优雅退出（WAL checkpoint、exit 0）。</li>
+<li>SSH 环境变量透传（7456081d2a + 33d6dab04c）：SSH 后端 spawn &quot;ssh … bash -c&quot; 时完全不转发环境变量，技能的 required_environment_variables 和 terminal.env_passthrough 只在本地和 docker shell 生效、远端永远看不到——技能报 ready 但每个远程命令都见不到变量。名字以 -o SendEnv=NAME 传输，值走 ssh 客户端自身环境，密钥绝不进远程 bash -c argv；Hermes provider 凭证沿用 docker 的同一份 blocklist，.env 补 shell 里未设置的变量。</li>
+<li>远程内核按工具集键控（c99dbba33e）：code-execution 远程内核以 sandbox 工具集为键，工具集变更即起新内核、新 stub，不会复用旧工具集的脏内核。</li>
+<li>Kimi Code 回退走 Anthropic Messages wire（4ee2c78324）：Kimi Code 的 fallback 用 anthropic_messages 协议线；外观酷似 Kimi 的 host 仍留在 chat_completions（562383ad31 把该用例拆成独立测试）。</li>
+</ul>
+<p>桌面端</p>
+<ul>
+<li>语音会话不再重播旧回合（a2e0ca7fc9 + 2516ed13d8）：lastSpokenId 缺失或过期时，collectUnspokenTurnSpeech 用索引 -1 把所有之前的助手回复拼成一段语音重念一遍。现在只收集当前回合（最后一个用户消息之后）的语音，null session 的 spoken anchor 随创建迁移到新 session，实况会话保持回合边界；配套提交让语音回合边界尊重隐藏用户行。</li>
+<li>桌面端 SSH 终端查找修复（2afd17a9d7 + dde7ed42b3）：v2 registry 和 v1 的 SSH 终端都用 bootstrap pool key 查找，桌面端 SSH 会话恢复不再找错终端。</li>
+<li>嵌入式 TUI 停止频繁重绘（04fd0172cd + a99340c247）：嵌入的 TUI 不再在每次 OS 应用切换时整屏重绘；dashboard 的 PTY 输入不再阻塞事件循环。</li>
+<li>macOS 父进程死亡看门狗（79445a496c）：ps 输出的 marker 漂移视为不确定结果而不是直接判死亡。</li>
+</ul>
+<p>更新稳定性</p>
+<ul>
+<li>更新模块清理保护（e17dd8b428 + fada877519 + 1cce7c6dd8 + b8e3c5c700）：整个 hermes_cli.update_* 家族从 stale-module purge 中保护；模块清理时保留激活的 receipt；未映射的 gateway stop 不再让 fleet 检查报 &quot;no rows&quot;；fleet 探针的运行时预期限定在 gateway 类型计划记录上。</li>
+</ul>
+<p>其他修复</p>
+<ul>
+<li>禁用 browser 不再剥掉 web_search（decacbac35 + 6ba09c8cc3）：toolsets 裁剪时禁用 browser 不再连带删 web_search；分组滚动下 browser+web_search 共现保持 97%。</li>
+<li>CLI radio 选项在长描述下仍可见（8f9d300ab9）。</li>
+<li>hermes auth reset 真正清绑定冷却（8378551311）：此前只走流程不清状态。</li>
+<li>沙箱不可执行命令时报 &quot;environment unavailable&quot; 而非 &quot;File not found&quot;（b1ea9bc47b）。</li>
+<li>被跳过的 MEDIA 警告会说明文件是缺失还是被拒（370ad21dea）。</li>
+<li>doctor 探测 Docker daemon 改用 docker version 而非 docker info（60ca93cebd）。</li>
+<li>定位 .git 时父目录不可 stat 不再崩溃（337113c1b8）。</li>
+<li>截断 footer 显示沙箱视角的路径而非宿主路径（d78cdd7119）。</li>
+<li>所有沙箱创建器共用 container_config shaper（7cad5da0f0）。</li>
+<li>docker_network: false 与 docker_extra_args 的 --network 冲突时 fail closed（722acd66f6）。</li>
+<li>egress-off 复用探测改用 label filter，不再用 Docker 专属 {{.Label}} 模板（8239ec4833）。</li>
+<li>profile terminal scope 的 list/dict 值 JSON 序列化（179e988493）。</li>
+<li>文件工具 cwd 守卫改用 _is_container_backend() 判定（c851ef4d0f）。</li>
+<li>terminal 配置 re-bridge 限定到真实进程 profile（2e24e06e55）。</li>
+<li>超大文件引用回退（cfa1a90b8c）。</li>
+<li>禁用组合工具集时部分 CLI 实例 guard 缺失修复（e2d738f89d + 2494eadb39 + 872be057e1）。</li>
+<li>Relay 的 chat-completions 响应从 collector 观察到的 chunk 构建，保留末尾 chunk 的 usage（74de0fd4fe + 2cf5e68c5d）。</li>
+</ul>
+    </section>
+    
     <section id="2026-09-05" class="day">
       <h2>Hermes 日报 2026-09-05：大规模模块拆分重构合入 + 桌面端拖拽建会话</h2>
       <p><strong>本期覆盖 9 月 4 日 ~ 9 月 5 日合入 main 的提交，共 3481 个 commit（不含 merge），另有 765 个 merge。新增 3 个功能、51 个修复（其中 39 条为重构配套的 review-fix，用户直接可见的修复约 12 条）、0 个性能优化。</strong></p>
