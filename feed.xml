@@ -5,14 +5,14 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 05 Sep 2026 07:05:00 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 05 Sep 2026 11:01:56 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
     <item>
       <title>Hermes 日报 2026-09-05：大规模模块拆分重构合入 + 桌面端拖拽建会话</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-05</link>
       <guid isPermaLink="false">hermes-daily-2026-09-05</guid>
       <pubDate>Sat, 05 Sep 2026 06:30:00 +0800</pubDate>
-      <description><![CDATA[<p><strong>本期覆盖 9 月 4 日 ~ 9 月 5 日合入 main 的提交，共 3481 个 commit（不含 merge），另有 765 个 merge。新增 3 个功能、51 个修复、0 个性能优化。</strong></p>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 4 日 ~ 9 月 5 日合入 main 的提交，共 3481 个 commit（不含 merge），另有 765 个 merge。新增 3 个功能、51 个修复（其中 39 条为重构配套的 review-fix，用户直接可见的修复约 12 条）、0 个性能优化。</strong></p>
 <p>本期主体是一波大规模架构重构（3302 条 refactor + 55 条 simplify 集中合入，多为 Teknium 的模块拆分与 god-file 提取，commit 日期集中在 9 月 2 日，属&quot;作者时间早、晚合入 main&quot;的正常口径），另有一批配套修复保障重构落地。用户直接可见的新功能集中在桌面端与网页搜索。</p>
 <p>📌 今日要点：</p>
 <p>桌面端新增拖拽创建会话，从新建、项目和 profile 分组直接拖出会话</p>
