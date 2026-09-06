@@ -22,9 +22,95 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 40 期 · 11910 个提交 · 每日自动更新 ·
+<p class="meta">共 41 期 · 12142 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-07" class="day">
+      <h2>Hermes 日报 2026-09-07：桌面端会话自动化控制上线，子代理压缩新增可配置绝对上限</h2>
+      <p><strong>本期覆盖 9 月 6 日 ~ 9 月 7 日合入 main 的提交，共 232 个 commit（不含 merge），另有 18 个 merge。新增 19 个功能、107 个修复、3 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端会话自动化控制上线，目标继续与心跳可操作、状态刷新保留；</p>
+<p>外来编码 Agent 会话可导入 Hermes，事务化导入按来源去重；</p>
+<p>子代理压缩新增可配置绝对上限，启用后实测可省约一半上下文花费；</p>
+<p>Gemini 3.7 / 3.8 Flash 加入模型列表，OpenRouter 支持按模型覆盖路由；</p>
+<p>search_files 本地 POSIX 改原生 rg，内容搜索 85ms 降到 15ms。</p>
+<p>重点条目：</p>
+<p>桌面端 · 会话自动化控制（新增）</p>
+<p>会话自动化控制上线：桌面端可以把目标继续（goal-resume）、心跳（heartbeat）等控制项结构化呈现出来，操作状态在界面刷新后仍然保留。配套修复保证心跳可靠运行并显示、控制项操作状态不丢失、每条控制变更路径都广播更新事件；忙碌时目标继续会排队等待，切换网关时旧控制项自动清理。</p>
+<p>支撑 commit：dffd8d62c2、8cb2bcc8c1、bfddf556bf、45b7dabfb9、4f008c36bb、b0f87d7a7a、efc30169c3、5106e939e0</p>
+<p>桌面端 · 侧边栏会话恢复与过滤器修复</p>
+<p>侧边栏会话列表此前会莫名消失（#97762），现在恢复显示。另一个问题：侧边栏的项目过滤器是节点 id 的白名单，跨 profile 选中的或项目删除后残留的 id 会把所有会话过滤掉，表现为&quot;headers 渲染了、会话数为零、直到清 Local Storage 才好&quot;。现在过滤器会先收敛到当前 profile 能解析的 id，失效 id 变为惰性、不再致命（#96246）。</p>
+<p>支撑 commit：28c508cce0、fd54282678</p>
+<p>桌面端 · 外来编码 Agent 会话导入（新增）</p>
+<p>桌面端新增会话导入视图：浏览后端主机上其他编码 Agent（如 Cursor/Codex 等 CLI 会话日志）的转录，只读预览后可以挑一个在 Hermes 里以所选 profile 继续。复用 hermes_cli.foreign_sessions 的解析器与可移植性校验/写入器，导入是事务化的，同一来源自动去重，发现过程跳过无权限日志。CLI 选择器与桌面端浏览器共用同一个外来日志遍历器。</p>
+<p>支撑 commit：9186e3ebc5、dfd0660fd7、0168bb27ad、fe49acb670、fa869157ce</p>
+<p>桌面端 · 助手回复不再从转录消失（老 bug）</p>
+<p>助手回复文本如果只存在于 reasoning / reasoning_content / codex_message_items 等旁路（sidecar）文件里，主 content 为空时，该行渲染出来会在会话/配置切换后从转录里消失——数据库里行还在，只是重水合后的渲染丢了它。自 2026-07-22 起 macOS 和 Windows 共 6 个独立确认，此前三个修复（#68329 信封归一化、#77644 回合中调和、#101470 压缩显示投影）都没命中这个根因。toChatMessages 水合的两个产生点均已修复（#68321）。</p>
+<p>支撑 commit：0b87e89d40</p>
+<p>子代理 · 压缩绝对上限配置（成本优化）</p>
+<p>此前 delegate_task 子代理的压缩阈值按模型窗口比例继承，1M 窗口配 0.85 就是 850K token 才触发——1393 个子代理的重构任务里 1373/1375 个一次都没压缩过，62% 的 API 调用携带 &gt;150K 上下文，其中 &gt;200K 的调用占了 $19.3k 账单里的 ~$10.9k（58% 是缓存写入，即每次重发 300-800K 前缀）。按 200K 上限/65K 下限对日志回放，上下文花费可省 ~49%（约 $7k）。新增 delegation.compression_threshold_tokens 配置：评审后定为默认关闭（opt-in），数值 &gt;=16000 才启用，0/false/null/未设置 = 关闭，非法值警告并忽略；启用时作用于子代理的 ContextCompressor（与全局 compression.threshold_tokens 取较小者），父代理自身触发阈值不受影响。同时修复了批次编号改为按会话计数。</p>
+<p>支撑 commit：40da0fd52f、ec4c1e0c98、0cb996d977</p>
+<p>子代理 · 完成分组与失败即时上报</p>
+<p>后台 delegate_task 调用以前是一个整体单元：要等最慢的子代理完成后才有一条合并结果回会话。现在每个任务带可选 group，按分组各自派发——未分组子代理各自完成各自返回，需要合并的任务共享 group 仍一起返回。容量不变（同一调用的所有分组共用第一个分组的池槽位）。另一个修复：分离式 fan-out 里某个子代理失败时立即向父级上报（[ASYNC DELEGATION TASK FAILED] 提示），不用等整批；1393-agent 任务里 wave-1 全部死在 401 风暴、父级 66 分钟后才得知（该任务全程最大空闲间隙），本次修复就是针对这种情况。</p>
+<p>支撑 commit：028fe2c4c8、6767c06d34、c5594ec4b3</p>
+<p>模型 · Gemini 3.7 / 3.8 Flash 支持（新增）</p>
+<p>新增 gemini-3.7-flash 与 gemini-3.8-flash：Gemini 3 思考配置的模型前缀匹配泛化到 gemini-3*，添加定价快照条目，Google、OpenRouter、Vertex 三个平台的模型列表同步，附 gemini-3.8-flash thinkingLevel 配置测试与文档。</p>
+<p>支撑 commit：b0adce1cbf、b706529476</p>
+<p>OpenRouter · 按模型覆盖路由（新增）</p>
+<p>provider_routing.models.&lt;model-id&gt; 现在支持 only/ignore/order/sort/require_parameters/data_collection 等键，在 agent 使用该模型时覆盖全局 provider_routing 值。解析集中在所有请求路径共用的唯一节点，CLI、网关、TUI/桌面端、cron、/model 切换、回退激活、不同模型的委托子代理全部生效，无需各界面单独接线。匹配容忍拼写差异。另一个修复：不再把 OpenRouter 专属的 provider_routing 配置转发给 Nous Portal（Portal 会拒绝 provider 对象）。</p>
+<p>支撑 commit：12871bd01e、ba7d2a8633</p>
+<p>工具 · search_files 原生 rg 提速（性能）</p>
+<p>read_file 在本地 POSIX 环境早已绕过后端 shell，search_files 每次调用仍要付两次 bash spawn（存在探测 + `set -o pipefail; rg ... | head`），每次零命中还要再付一次。现在本地 POSIX 直接跑原生 rg：内容搜索 85ms→15ms、无命中搜索 179ms→44ms、文件名搜索 73ms→12ms。与读文件同一开关（LocalEnvironment 且非 win32，HERMES_NATIVE_FILE_READ=0 可关）。rg 静默时也遵守 deadline 与 /stop，截断输出保持纯 JSON。</p>
+<p>支撑 commit：83063aeb87、ef5a534c9a、2d77992750、478e66475b</p>
+<p>工具 · write_file 大文件改写提示改用 patch</p>
+<p>1393-agent 重构任务里 write_file 携带了 92.8M 字符内容（23.2M 输出 token，约 $580，占全部输出 token 的 20%），其中 661 次是&quot;读→整文件重写已有 &gt;20k 字符文件&quot;，只改几行却把 13 万字符的文件整个重发。现在覆盖已有文件且新旧内容都 ≥20k 字符时，write_file 按行 diff（difflib，关闭 autojunk），若 ≥80% 行未变则在结果里加 hint 提示&quot;用 patch&quot;，写入本身照常执行；新文件、小文件、真重写不加提示。</p>
+<p>支撑 commit：a1ffb27ef8</p>
+<p>Webhook · 标准签名支持（新增）</p>
+<p>webhook 现在接受标准签名（Standard Webhooks，whsec_ 密钥等）。配套修复：GitLab 每次投递都带 webhook-id / webhook-timestamp，但只有配置了签名 token 才带 webhook-signature——只在签名头出现时才走 HMAC 路径，否则所有旧 X-Gitlab-Token 安装升级 GitLab 19 后都会 401；svix-* 保持原有任意头选择逻辑。</p>
+<p>支撑 commit：cb3b5bb64c、e40192118e</p>
+<p>Telegram · 群提及保留</p>
+<p>Telegram 消息的群提及现在能保留，并暴露逐轮寻址；仅当自己是唯一收件人时才剥离自己的 handle，保持身份行会话稳定。</p>
+<p>支撑 commit：bc233501aa、bc31e04d83</p>
+<p>网关 · 健壮性修复（多条目）</p>
+<ul>
+<li>时间戳重放时保留精确的 API 内容，混入解析后的完整回复上下文（08f269fa13、6efca62c20）</li>
+<li>回复指针展开 @ 引用前先做扩展，保持引用文本字面原样（43ddf50b04）</li>
+<li>统一关机退出判定；启动收到 SIGTERM 后能正常重启（e24047d8bd、51ddff0bb1）</li>
+<li>可重试 5xx 遵守 Retry-After，解析嵌套 retry_after 体并发出长 5xx 冷却（a227484906、c6ef075613）</li>
+<li>洪峰限发送遵循服务器 retry_after，不再降级为纯文本回退；内联服务器等待上限 60s（dc4b88714b、dfffd0ee1e）</li>
+<li>孤儿定时器与重连中断声明加围栏（8513c5984c）</li>
+</ul>
+<p>内存与压缩 · token 记账系列</p>
+<ul>
+<li>usage anchor 跨数据库重载与进程重启存活，修复本地估算把不透明 encrypted_content 计为 0（c0aaa238f6、562e6e4824）</li>
+<li>图片 token 成本不再用固定常数（1500/1600），改为从 provider 自身 usage 校准学习（EMA、每模型@主机缓存），触发估算与尾部预算同源（be58c276ee）</li>
+<li>API 调用日志行携带缓存写入数、provider 响应 id 与服务上游（6d2645e64e）</li>
+<li>compaction 的每个门先问真实 usage，粗略估算只决定是否等待（0f4587e336）</li>
+</ul>
+<p>记忆与技能 · 杂项修复</p>
+<ul>
+<li>超大外部预取会溢出到外部存储（d932fa5929）</li>
+<li>拒绝会清空非空存储的批量删除（#103419，c3718d5500、7602b33d79）</li>
+<li>技能运行时缓存不计入 bundled 所有权哈希（25a80b3bb6）</li>
+<li>mem0 插件加载改为懒导入，避免加载时 ImportError（e8521f47f9）</li>
+</ul>
+<p>其他值得注意</p>
+<ul>
+<li>MCP 工具别名与内置工具集冲突时合并而非覆盖，列表展示合并视图（3bc1780f2d、245e48008f）</li>
+<li>MCP 暴露 profile 级缓存的连接健康状态（a6699d60f4）</li>
+<li>nous.anthropic_wire=auto：根据首个响应判断会话走 native Messages wire 还是 chat wire（45646f4d09、54e24ae1fa）</li>
+<li>子代理不继承 1 小时 prompt-cache 档位（0edb6b928a）</li>
+<li>会话压缩后的显示历史保持受保护尾部副本的原始时间顺序（63316c74a8）</li>
+<li>CLI 拒绝把截断的 JSON 回复持久化为 profile 描述（1f16bbf108）</li>
+<li>本地运行时能在 WSL 驱动路径找到 nvidia-smi（485aaf69b7）</li>
+<li>更新收据因 stop_reason 成功而不再被误判未完成（6e0fba4e58、cd27df3c2e）</li>
+<li>IMAP 只在服务器公告能力时发送 ID（25be5e2120）</li>
+<li>克隆清理时保留共享 store（5e108489a0）</li>
+<li>SessionDB 关闭与活跃写入者协调（aad74f26f9）</li>
+<li>前缀缓存：会话边界丢弃 workspace pin，/context 绑定会话 cwd（311b980bb6、0ed7acb051、c6cb7111a2）</li>
+</ul>
+    </section>
+    
     <section id="2026-09-06" class="day">
       <h2>Hermes 日报 2026-09-06：GPT-6 Astra 与新技能包上线，远程沙箱媒体投递补上沙箱化部署最后一环</h2>
       <p><strong>本期覆盖 9 月 5 日 06:30 ~ 9 月 6 日 06:30 合入 main 的提交，共 103 个 commit（不含 merge），另有 0 个 merge。新增 6 个功能、46 个修复、0 个性能优化。</strong></p>
