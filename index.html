@@ -22,9 +22,51 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 42 期 · 12550 个提交 · 每日自动更新 ·
+<p class="meta">共 43 期 · 12800 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-09" class="day">
+      <h2>Hermes 日报 2026-09-09：桌面端子代理实时工作区上线——能看、能指挥、能停止，GPT Image 2.5 同步加入图像生成</h2>
+      <p><strong>本期覆盖 9 月 8 日 6:30 ~ 9 月 9 日 6:30 合入 main 的提交，共 250 个 commit（不含 merge），另有 8 个 merge。新增 24 个功能、117 个修复、2 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端每个输入框上方新增子代理实时工作区，可以看到子代理正在干什么、直接指挥或停止，会话重连后状态保留；</p>
+<p>图像生成新增 GPT Image 2.5（Flare 快生成 / Sunburst 精准编辑双变体），OpenAI 和 FAL 两条后端都支持；</p>
+<p>桌面端侧边栏会话按网关和 Profile 分组，Group Chat 房间支持手动排序，Hide tabs 恢复正常；</p>
+<p>CLI/TUI 的输入框上方新增子代理 dock，实时状态一眼可见，Classic CLI 按 F7 折叠，Shift+字母和 Ctrl+Shift+Z 在扩展键盘终端上修好；</p>
+<p>RSS 和 Reddit 阅读技能从默认技能改为可选技能，不需要的安装可以更轻。</p>
+<p>重点条目：</p>
+<p>桌面端 · 子代理实时管理（本轮最大头）</p>
+<p>此前桌面端发起的子代理只能看到最终结果，运行过程不可见，出了岔子只能干等超时；会话重连后子代理列表还经常丢。本轮把子代理变成&quot;实时可见、可干预&quot;的完整闭环：1) 每个输入框上方（composer 的 status stack 区域）新增子代理工作区，实时显示各个子代理当前在做的事（092ed67532），会话重连后按所有权契约恢复列表和实时转录（975699714d、c2a0a188c1），列表和详情可以折叠收起（7568fb6727）；2) 通过父会话可以直接指挥（steer）或停止（stop）子代理（98aa270978），指挥草稿和 worker 定时器来源在重连后保留（fd3932c416），停止按会话作用域隔离、进度以权威状态发布（924c5ded2e）；3) 后端配套新增会话级子代理花名册和实时尾部 RPC，共享给 TUI 和桌面端消费，复用排队指挥语义（8b01df963d）。配套修复：review 子代理在实时查看器里可辨识（9e048186a9）、重连后子代理控制不丢（fb5715c19f、7befa11bf2）、输入框光标在代理监控期间保留（0a3b7fdce2）。</p>
+<p>支撑 commit：092ed67532、98aa270978、975699714d、7568fb6727、c2a0a188c1、fd3932c416、924c5ded2e、8b01df963d、9e048186a9、fb5715c19f、7befa11bf2、0a3b7fdce2</p>
+<p>图像生成 · GPT Image 2.5（新增模型）</p>
+<p>图像生成插件接入 OpenAI 的 GPT Image 2.5，OpenAI 后端描述更新为 GPT Image 2 与 2.5 Flare/Sunburst（7777f8c350）；FAL 目录同步新增 openai/gpt-image-2.5/flare 和 /sunburst 两个变体（b1f003e186）：flare 偏快，主打日常创作、自然光照和纹理；sunburst 偏慢，主打精准编辑、主体与构图一致性。两者都支持文生图与图片编辑两条端点，编辑支持 16 张参考图、mask 遮罩、背景、压缩和同步模式。生成结果默认存到 $HERMES_HOME/cache/images/。</p>
+<p>支撑 commit：7777f8c350、b1f003e186</p>
+<p>桌面端 · 侧边栏会话按网关/Profile 分组，Group Chat 房间可排序</p>
+<p>侧边栏会话列表新增按网关和 Profile 分组组织（77a5457343），Profile 会话嵌套在所属网关分区下（a529ecfeb5）；Group Chat 的房间支持 Move up/down 手动排序（9d66e76c5d），只改变房间顺序、不影响 bot 和文件夹排序，显式移动前保留默认 pin/活动排序，隐藏房间槽位保留，桌面端本地顺序在房间更新、镜像合并和水合后都能维持；会话侧边栏的 Hide tabs 功能恢复（960dee7fe5）。另有：Import 会话从侧边栏导航移除改走导入入口（be4bd24a50）、属性卡片引导改为按需加载（78afbc3c37）。</p>
+<p>支撑 commit：77a5457343、a529ecfeb5、9d66e76c5d、960dee7fe5、be4bd24a50、78afbc3c37</p>
+<p>桌面端 · 其他修复</p>
+<p>任务状态卡片滚动时保持不透明（dec10c9177）；有焦点 bot 的&quot;思考中&quot;姿态正确显示（ab6f4c5408）；设置里复用已保存的 Cloud 网关（6909604f97）；设置页补上插件安装入口（8aa219ef60）；显式打开忙碌中的 bot 聊天时刷新内容（9a017b9691）；工作区 dock 显示区分主题表面、经典 dock 保持紧凑（a0fa236ed4、8a23f14df3）。</p>
+<p>支撑 commit：dec10c9177、ab6f4c5408、6909604f97、8aa219ef60、9a017b9691、a0fa236ed4、8a23f14df3</p>
+<p>CLI/TUI · 输入框上方子代理 dock</p>
+<p>TUI/CLI 同样强化了子代理可见性：输入框上方固定停放（dock）实时子代理列表（2a908d762b、6f68394eac），支持实时尾部查看（Enter 进入 live tail，f7fe32bfde）、全屏展开花名册查看实时输出并直接指挥（f3a9ca089f、84100efae3）；Classic CLI 按 F7 折叠/展开子代理 dock（34e539ebeb）。配套修复：监控台在新提示输入时让位（d99a63b645）、子代理计数按子进程而非异步单元算（1c55bc92fa）、尾部视图跟随最新输出（8e4b4e0cc8）、窄终端上控制按钮不消失（1ae7389502）。</p>
+<p>支撑 commit：f7fe32bfde、2a908d762b、f3a9ca089f、84100efae3、6f68394eac、34e539ebeb、d99a63b645、1c55bc92fa、8e4b4e0cc8、1ae7389502</p>
+<p>TUI · 扩展键盘终端修复（Shift+字母、Ctrl+Shift+Z）</p>
+<p>Ghostty 等支持 CSI-u / modifyOtherKeys 协议的终端会把 Shift+R 以小写键码加 shift 修饰发送，此前 composer 收到的是小写 r，大写输入被静默吞掉——现在恢复字母大小写（c3ce41645c）；重做快捷键 Ctrl+Shift+Z 同理被当成普通字符插入，现在大小写不敏感匹配，两个路径都能触发重做（6e2b8e070d）。</p>
+<p>支撑 commit：c3ce41645c、6e2b8e070d</p>
+<p>技能 · RSS/Reddit 阅读改为可选</p>
+<p>rss-feeds 和 reddit-reading 两个技能从默认技能目录移到 optional-skills，不再随安装默认加载；competitor-news-monitor 等引用它们的技能文案同步更新（改用 blogwatcher 或其他路径）。默认安装体积更小，需要时手动启用。</p>
+<p>支撑 commit：abd83ab560</p>
+<p>Gemini · 两个兼容性修复</p>
+<p>保留原生 Gemini union 类型约束，翻译工具 schema 不再破坏联合类型（bbcf1ee180）。数组类型的工具 schema 翻译不再崩溃，而是折叠处理（6a04ea67c0）。</p>
+<p>支撑 commit：bbcf1ee180、6a04ea67c0</p>
+<p>浏览器 · 认证镜像与备份修复</p>
+<p>真实 profile 的认证镜像在目标被锁定时不再永久挂起（b4d7cf735d）；认证备份改为有界复制、不覆盖正在使用的 SQLite 文件（58d6d5223a）。</p>
+<p>支撑 commit：b4d7cf735d、58d6d5223a</p>
+<p>内部 · 测试基础设施（约五分之一提交）</p>
+<p>本期有大量 e2e/install-e2e/windows-e2e 提交（多为 8 月 10~12 日编写、近日合入）：Windows 安装器端到端测试的按钮识别改走 ImageSearch、AHK 驱动多处修复、更新流程驱动改按 marker 文件判定交接、iperf 超时上限等（含 2 条 perf：装更新器等待 35 分钟后判失败、任务 60 分钟上限——848bea416b、2f25c07a2c）。属内部 CI 质量投入，用户无直接感知。</p>
+<p>支撑 commit：e3d22b5b29、746aca2654、f4243c0c7c、2f25c07a2c、848bea416b</p>
+    </section>
+    
     <section id="2026-09-08" class="day">
       <h2>Hermes 日报 2026-09-08：桌面端 Windows 更新链路加满验证防&quot;假成功&quot;，子代理后台进程可交接给父代理</h2>
       <p><strong>本期覆盖 9 月 7 日 ~ 9 月 8 日合入 main 的提交，共 408 个 commit（不含 merge），另有 0 个 merge。新增 13 个功能、239 个修复、2 个性能优化。</strong></p>
