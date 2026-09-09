@@ -22,9 +22,48 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 43 期 · 12800 个提交 · 每日自动更新 ·
+<p class="meta">共 44 期 · 13133 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-10" class="day">
+      <h2>Hermes 日报 2026-09-10：插件目录成为唯一发现体系，桌面端大波稳定性修复，连接器工具可搜索可调用</h2>
+      <p><strong>本期覆盖 9 月 9 日 ~ 9 月 10 日合入 main 的提交，共 333 个 commit（不含 merge），另有 9 个 merge。按提交前缀统计，新增 22 个功能、201 个修复、4 个性能优化（另有不带前缀的大改动，如连接器工具）。</strong></p>
+<p>📌 今日要点：</p>
+<p>插件目录（plugin catalog）正式成为唯一的插件发现系统，3 官方 + 4 社区条目上线，本期又收编 netbox 与 rustpush-imessage，CLI 全套操作</p>
+<p>桌面端 29 条修复：provider 不可达不再卡死、后台会话平静化、空闲渲染器停止烧 CPU，流式工具事件提速 4 倍多</p>
+<p>登录 Nous 账号后 Gmail/Linear/Notion 等连接器工具可通过 tool_search 搜索并直接调用</p>
+<p>Matrix 消息支持 LaTeX 公式渲染，Signal 的 markdown 表格改为等宽对齐</p>
+<p>mem0 记忆同步字符上限可配置，WebSocket 发送卡死有了独立超时时钟</p>
+<p>重点条目：</p>
+<p>插件目录体系（10 条 feat）：插件目录成为唯一发现系统</p>
+<p>插件目录（plugin catalog）此前一直是分散的实验代码，本期由 41b4555ed9 收口：目录成为唯一的插件发现系统。结构上新建 plugins_cmd_catalog.py 统一负责解析、.hermes-catalog.json 来源侧车文件、搜索/信息/校验、更新时重新钉住版本，以及 dashboard 和 TUI 的载荷构建；旧的社区索引（plugin_index.py）删除。目录数据源从 GitHub contents API（限额 60 次/小时、每个条目一次请求）换成发布在 /docs/api/plugin-catalog.json 的单份文档，6 小时缓存 + 内置回退，缓存过期也永远不会把条目误判为可安装。TUI 的 plugins.manage 增加 catalog_name 安装、目录行字段和更新动作。安装后状态合并优先按侧车文件的 catalog_name 匹配（目录名很少等于清单名）。</p>
+<p>2ed70eefd6 为目录灌入首批种子：3 个官方 + 4 个社区条目。每个条目在钉住的 commit 上都通过 `hermes plugins validate` 校验。hermes-media-studio 因注册了 media_studio_generate 和 post_tool_call 却没在清单里声明而被拒绝准入。社区条目署名了索引提交者。</p>
+<p>配套的 CLI 面在 f1b30414d5 落地：search/browse/info/install/update/doctor 全套命令。8b70bf4c40 实现实时目录索引（6 小时缓存 + 回退），dc4d991373 增加安装时检出被钉 commit 和已删除插件黑名单检查，dcdb9b25e4 增加 requires_hermes 版本门槛、配置规范和 ctx.plugin_config 注入，a22d2918d6 是内置目录模块与 in-tree 目录的底座。docs 侧 fb40a768fc 上线 /docs/plugins 目录页，CI 侧 8dd07bd517 增加 plugin-validate 可复用 action 和目录准入门槛，任何新插件进目录都要过校验。</p>
+<p>dcf725e6d2 本期又收编两个社区插件：hermes-plugin-netbox 和 hermes-rustpush-imessage。</p>
+<p>桌面端（29 fix + 4 feat + 1 perf）：稳定性与流畅度一批修复</p>
+<p>桌面端本期修复密集，三个&quot;停止&quot;最显眼：</p>
+<p>48b8528e7c 修复 provider 不可达时 UI 冻结（#81123）——之前连不上模型服务商会把整个界面卡死，现在不会。</p>
+<p>b9fea361ec 停止空闲渲染器空转烧 CPU（#88275）。</p>
+<p>b4ccbccf9c 平复后台会话（#73287）。</p>
+<p>性能大头是 544169a41a：流式工具事件（tool.start/progress/complete）之前每个事件都跑三遍全时间线分配（map+spread 每行一个包装对象、pending 行扫描 map→filter→map、图片回显 flatMap 加一次性数组），去重后还要再复制一次数组、给 React 一个新身份。改成单循环原地处理后，实测 2000 start + 2000 complete 交错场景从 618ms 降到 138ms，纯工具场景 252ms → 67ms，行为完全不变。</p>
+<p>交互改动：342f76a7c2 消息可以显示在线程视口下方；1175ac4bb9 侧边栏玻璃默认 29% 色调；3ec8042483 顶边滚动翻页更早的对话，474143da81 收紧了自动 Show-earlier 的门槛并端到端验证；03b5460ad9 侧边栏项目概览区分自动发现的仓库与显式项目（辅助名称也写明&quot;Auto-discovered&quot;，fc36288832）；8d93081971 本地/LAN 辅助任务钉住（如家里 Ollama、局域网 IP）不再被误标为 stale——之前设置里一直提示&quot;仍跑在 openai 上&quot;并建议&quot;重置全部&quot;，会把正常本地配置抹掉，现在后端给每个辅助任务标注 local_endpoint；51fa04d49d Electron 启动前选择已安装的 WSL D3D12 驱动；6efe3a45c1 直播所有者独占被拒时提供&quot;开始新会话&quot;选项；c2524736d1 / 5353fc9b32 / 140eaf9e03 修了一组 i18n locale 读取时序问题（后端启动竞态、重试次数有界、保留英文回退）；bf28c2fe1f 本地端点探测忽略 HTTP(S)_PROXY 环境变量，非 2xx 直接点名状态码；677e8ed8a4 SSH 远程后端不再跟随主机的 sticky active_profile；0b8dbd5b66 俄语 locale 的 agent 插件块跟随 Capabilities 迁移；8d93081971 前述 local_endpoint 标注；35af06c009 项目/树侧边栏扫描合并、raw config 解析记忆化；7b639164cf 并行化 roster 源请求；42f2067092 合并 MCP 重连扫描；3d4c537584 合并待处理 live 状态刷新；5a2ccffd41 WSL 盘符路径跳过发行版探测、ef677265d2 复用已检测到的 SSH 平台；153da9569f macOS HUD 失焦时保持可见；9e8c1569b6 宠物和星图失焦仍动画；3cad0f312b 失焦时可见渲染动画继续运行；2b6a5181a3 浏览所有 profile 时允许创建项目；610b6731d4 Windows 更新交接目录钉住；258b351fc1 后台报告保持有界披露。浏览器工具超时也统一了：60debff28d 浏览器执行超时会把整个 browser-use CLI 进程组杀掉（之前只杀主进程、子进程残留），7416201baf 把 POSIX-only 的 killpg 排除出 Windows 误报扫描，85e423482a 确认 Windows 上超时也会清理整个 CLI 进程树。</p>
+<p>桌面端插件目录 UX（cbf86f4265 + dcb3e27b23）：Capabilities 增加第 4 个 tab「Plugins」，内嵌 live 插件目录选择器，卡片上&quot;+ Add to this Agent&quot;一键双目标安装（agent 半侧按目录审定的版本钉入、桌面半侧本地安装）；设置页漂移徽章变为按钮直接打开双目标弹窗；目录安装跳过原始 git 仪式（审核标题替代惊吓卡片、无 force 开关、启用预勾选、成功 toast 内联&quot;重启网关&quot;）；plugins.manage 列表带目录来源和 update_available，新增 update 动作把目录安装重新钉到当前目录 SHA（非目录安装拒绝，归 CLI 管）。8d93081971 的本地端点标注同样避免误清配置。</p>
+<p>连接器工具与 tool_search（b4d04eb8fd + 2 fix）</p>
+<p>b4d04eb8fd 是本期功能亮点：登录 Nous 账号后，Gmail、Linear、Notion 等连接器工具现在能通过 tool_search 搜索到并直接调用。之前 dispatch_tool_search 先对本地目录做 BM25、填满 limit 再只用空槽补连接器命中——300 工具的目录下永远没有空槽，导致&quot;send gmail email&quot;返回五个 betterstack 工具、零个连接器工具。现在网关把连接器命中转成目录条目（连接器名、slug 词、描述作搜索文本）和本地工具同轮 BM25 排名、同一准入规则、limit 按查询总计，两个来源共用 _shared_tool_record 构造器。网关搜索超时从 8 秒放宽到 30 秒（一次六个用例的请求实测 7 秒，8 秒卡在线边切掉真实答案）。另一个修复：可用性判定是 tools.connectors.enabled 配置 AND 门户授权两腿，此前移植带进来的免费层快捷方式读不存在的 anon_auth 会抛 ImportError、把整个连接器面静默熄灭，本期删掉了它（连接器可用性 = 配置开关 AND 授权）。</p>
+<p>配套 cf4b78e91f：查询没有工具能回答时返回空结果，而不是硬凑五个只共享一个词的无关工具（#106676）。ae43fd6df6：TUI 中裸 URL 原样显示，不再派生一个站点标签。</p>
+<p>Matrix / Signal 平台渲染升级（3 feat）</p>
+<p>Matrix：199f4d5b96 让消息里的 LaTeX 公式在 Element 客户端正确渲染。Element 的 feature_latex_maths 会在显示时排版 data-mx-maths=&quot;TEX&quot; 标记的元素，但出站 HTML 清理器只放行白名单标签属性，标记到不了 Element，$...$ 只能原样显示为美元符号。修复：markdown 转换前把 $...$（行内）和 $$...$$（块级）替换成不透明哨兵 token，清理后展开回 data-mx-maths 标记——token 是纯文本无 HTML/markdown 含义，转换器和清理器都不会碰；不成对的美元（价格、字面量）不受影响，与哨兵格式冲突的对抗文本原样通过。1d651b3bb2 让 cron 独立发送器同样生效（它走自己的 markdown 调用，之前公式还是裸美元）。</p>
+<p>Signal：0edc47debf 让 markdown 表格用等宽对齐渲染（#106181）——之前 GFM 表格直接透传，Signal 的比例字体把列错开；现在代码块提取后检测表格块、用 realign_markdown_tables() 重排，再整个覆盖一个 MONOSPACE 样式区间。</p>
+<p>记忆与循环（2 feat）</p>
+<p>322905e91b：mem0 同步字符上限可配置。固定 450 字符的上限适配 512 token 嵌入器（bge-small-zh-v1.5、all-minilm），但 8192 token 模型（text-embedding-3-small、jina-embeddings-v3、bge-m3）只能存下窗口约 5%，记忆质量反而退化。现在 initialize() 从 mem0.json 读 sync_max_chars（默认 450）传给截断逻辑，配置优先于自动探测（自动探测要加网络调用和猜测表，操作者本来就知道自己用啥嵌入器）。</p>
+<p>37f42713ef：loop 每次结果信封导出 {turn_id, current_turn_user_idx}。靠索引对齐转写的宿主（hermes-webui）在 loop 重写历史（交替修复、压缩、回合后微压缩）后无法证明 messages 哪行是当前用户回合——实例侧旧索引早于重写，文本匹配还可能把历史里相同的提示认成当前回合。现在 run_conversation 每次出环（成功/部分/错误/中断/重试耗尽/工具上限/预检超时/codex 运行时）都精确导出该对坐标。</p>
+<p>网络与压缩稳定性（3 fix）</p>
+<p>WebSocket 发送卡死：2371921543 给 _safe_send_many 加发送截止时间，卡住的 send_text 能锁死传输关闭；ecfcbb6276 给它独立的 30 秒时钟并关闭卡死 socket——此前复用 10 秒工作线程等待常量，但那是等事件循环排上发送的等待，GIL 密集回合拖住循环超 10 秒是常态，不代表传输死亡（#48445/#55545）；新时钟只在协程真正跑起来后计时，健康 socket 的 send_text 立即返回，只有真正的内核背压才会耗尽它（3.11/3.12/3.13 均验证循环卡 3 倍时长不会误触发）。</p>
+<p>2db0c7a2d8：辅助压缩任务之前无条件改写成 custom + api.openai.com/v1，key 发现用的还是注册表默认端点——走代理/网关的用户（OPENAI_BASE_URL 或 providers.openai）压缩请求跳到公共端点、代理签发的 key 打上去 401，key/池被隔离、会话一直超压缩阈值。现在 providers.openai 条目保留自己的 base_url/key，OPENAI_BASE_URL 优先于公共默认；会话绑定该 provider 时用它的端点和 key；来自非会话配置主机的拒绝按端点不匹配处理，不轮换不标记池。</p>
+<p>其他性能（3 perf）</p>
+<p>167448edca 网关启动预热里提前暖 Python 工具链探测；57e03e2be6 auth 持久化 fork-OAuth 干净标记，新进程跳过 heal 的锁；a74e76632c 构建 picker 行时只读 Nous 定价缓存。</p>
+    </section>
+    
     <section id="2026-09-09" class="day">
       <h2>Hermes 日报 2026-09-09：桌面端子代理实时工作区上线——能看、能指挥、能停止，GPT Image 2.5 同步加入图像生成</h2>
       <p><strong>本期覆盖 9 月 8 日 6:30 ~ 9 月 9 日 6:30 合入 main 的提交，共 250 个 commit（不含 merge），另有 8 个 merge。新增 24 个功能、117 个修复、2 个性能优化。</strong></p>
