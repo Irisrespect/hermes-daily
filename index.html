@@ -22,9 +22,169 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 44 期 · 13133 个提交 · 每日自动更新 ·
+<p class="meta">共 45 期 · 13308 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-11" class="day">
+      <h2>Hermes 日报 2026-09-11：Nous 免费档上线、凭据保险库大扩展、插件体系整合成单页</h2>
+      <p><strong>本期覆盖 9 月 10 日 06:30 ~ 9 月 11 日 06:30 合入 main 的提交，共 175 个 commit（不含 merge），另有 3 个 merge。新增 30 个功能、102 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>Nous 免费档全面落地：全新安装免配置，一条命令登录即用，聊天里 /login 也能登录</p>
+<p>凭据保险库大扩展：agent 帮你登录网站、自动填卡号和地址、2FA 验证码自动填</p>
+<p>桌面端插件体系整合成单页：agent 插件与桌面插件一个表管理，支持固定到指定 commit</p>
+<p>DeepSeek V4.1 Flash 进入模型选择器，1M 上下文 + 600 秒推理超时保护</p>
+<p>从私有 git 仓库安装插件，自动复用你已存的 GitHub 凭据</p>
+<p>重点条目：</p>
+<p>桌面端插件管理整合成单一页面</p>
+<ul>
+<li>61afcde8f9 | refactor(desktop): one Plugins surface — Capabilities → Plugins owns agent + desktop plugins, install, and the catalog</li>
+</ul>
+<p>之前插件散落在两个页面：Settings → Plugins 只管桌面插件和&quot;从 Git 安装&quot;，Capabilities → Plugins 只管 agent 插件和目录选择器。&quot;什么扩展了我的 Hermes、在哪里加更多&quot;要跑两个页面才能看全。现在 Capabilities → Plugins 是唯一的插件页：agent 插件区块（跟随 profile 选择器）带&quot;从 Git 安装&quot;按钮，桌面插件区块放在同一页（对所有 profile 一致），下面接目录选择器。Settings → Plugins 移除，旧链接和书签通过重定向表落到新页对应行。</p>
+<ul>
+<li>248ff2d3e8 | feat(desktop): one row per plugin; desktop halves are app-level copies, never profile-scoped</li>
+</ul>
+<p>插件表改成每个包一行：一个 PACKAGE 对应一行，带 Desktop 列（本应用）和 Agent 列（所选 profile），同包的桌面半区和 agent 半区合在一行。桌面半区不再从 profile 目录加载，Electron 会把它复制到 ~/.hermes/desktop-plugins/ 并保持同步：源更新就重新复制、卸载就删除、同名手工安装的文件夹不会被覆盖。渲染端只扫一个根目录，所以切换 profile 时插件面板不会再消失或换作用域。</p>
+<ul>
+<li>6d89c1afde | feat(plugins): pin a plugin to a commit from Desktop, and show pins in every list</li>
+</ul>
+<p>以前只有 CLI 能安装插件到指定 commit（--ref &lt;sha&gt;），桌面端&quot;从 Git 安装&quot;对话框、TUI 网关和 dashboard 的安装方法都不带 ref，团队想全员跑同一个私有插件版本必须离开应用去开终端。现在桌面端对话框新增&quot;Pin to commit&quot;字段（仅自定义源，40 位校验），dashboard 安装端点也接受 ref；列表里显示 pinned @ &lt;sha8&gt; 徽章，hermes plugins list 也在 Source 列打印 pin 标记，可以一眼看出谁没有对齐。</p>
+<ul>
+<li>ff93f0ee9b | fix(desktop): desktop plugins are app-level, not per profile; catalog gets a drag sash; Accent Picker moves to its own repo</li>
+</ul>
+<p>跟随修复：桌面插件按 profile 存导致切换 profile 后消失，现在根目录统一为 &lt;HERMES_HOME&gt;/desktop-plugins（与 profile、网关、远程机器无关），并带一次性迁移把旧的 per-profile 文件夹提升到应用根（冲突时根目录版本优先）。页面上 profile 选择器移进 agent 插件区块作标题，桌面插件区块在外框，作用域边界一眼可见。</p>
+<p>Nous 免费档：免费推理和连接器开箱即用</p>
+<ul>
+<li>a2db110ccc | feat(auth): Nous free tier: free inference and connectors out of the box, one command to sign in</li>
+</ul>
+<p>通过 HERMES_GUEST_ONBOARDING=1 环境变量在启动时开启（期终状态见 4bdd64b334 的收口：免费档创建统一在启动时、仅开关开启时进行；开关关闭时不再凭空铸造身份）。开启且全新安装没有配置任何 provider 时，不再强制走设置向导，而是自动铸造一个匿名的 Nous 免费身份：免费推理（nous/welcome 模型）+ 连接器开箱即用。身份走与真实登录相同的持久化路径，两个接缝不同：token 获取会重新交换匿名凭证（无 refresh token），路由固定在 welcome 主机的单一模型上。一个共享存储对应一个身份，nous.guest: false 可关闭免费档。登出免费档是空操作（它本来就不是登录），登出真实 Nous 账号则同时清空跨 profile 存储，避免下次启动被静默重新收养。</p>
+<ul>
+<li>3b01b4ce0f | feat(desktop): Nous free tier on Hermes Desktop</li>
+</ul>
+<p>桌面端完整接入免费档：首次启动进入就绪屏（免费档带推理时）或编辑器上方的一次性提示条；设置 → Billing 新增 free_tier 视图（说明 + 登录、计划/模型/连接器摘要、计划卡）；状态栏芯片显示当前档位和模型；所有入口汇聚到同一个登录对话框，走扩展的 oauth/nous 路由，轮询结果映射到对应界面；登录完成会结算 billing、模型选项、提供商，并把还在 nous/welcome 上的会话重新安置。</p>
+<ul>
+<li>cbcf7b72f7 | feat(gateway): sign in with a Nous account from a chat (/login), one shared sign-in flow</li>
+</ul>
+<p>签入流程统一到一个 SignInState，CLI 和桌面端共用；gateway 支持从聊天（DM）直接 /login 登录 Nous 账号，/signin 更名为 /login 作为聊天签入命令；/status 会显示免费档状态行（所有语言目录同步）。</p>
+<ul>
+<li>04a76c4109 | fix(auth): a sign-in from the free tier settles the default model and route</li>
+</ul>
+<p>免费档用户登录后，model.default 仍指在 nous/welcome 并钉在 welcome 主机上，但账号 token 会被 welcome 主机拒绝、portal 主机又把它当付费模型卖。现在登录后 anon_auth.settle_after_upgrade 会把免费档路由上的配置迁移到账号的推理主机和计划推荐模型（CLI 和桌面端走同一个 models.recommended_nous_default_model），用户自选的模型配置则保持不动。</p>
+<ul>
+<li>4bdd64b334 | The free tier is created in one place, at boot, only behind HERMES_GUEST_ONBOARDING=1</li>
+</ul>
+<p>免费档创建统一在启动时、由 HERMES_GUEST_ONBOARDING=1 开启：CLI 和 hermes serve 原先会跑 bootstrap，但独立运行的 messaging gateway 不会——新 HERMES_HOME + 开启开关时 gateway run 会在没有任何身份可消费的情况下进入解析，/login 返回 Unavailable。现在 GatewayRunner.start 在启动恢复后、任何适配器连接前就在执行线程上跑 free_tier_bootstrap（开关关闭时只做本地清单、不碰网络）。另外收紧了免费档对 welcome 网关合约的四个缺口：辅助调用在 welcome 主机改用 nous/welcome 并跳过视觉模型；结构化 429 的 reason/retry_after/alternates/upgrade_url 被解析，model_not_free 等非重试门禁直接回退、限流则遵守 retry_after 且不轮换唯一凭证；x-nus-model-switch 头被记录并让下一次调用换到网关指定的模型；guest 不再意外回退到付费主机。</p>
+<p>凭据保险库：agent 帮你登录网站、自动填表、2FA</p>
+<ul>
+<li>cde0ad0edd | feat: agent signs into sites from an encrypted local vault (CLI, browser fill, Desktop Settings)</li>
+</ul>
+<p>从 Merit-Systems/OpenInstinct 移植的 opaque-handle 自动填表设计：模型只看到保险库句柄和登录元数据，密码在服务端通过受监督的 CDP 套接字解析并填充，填充值被无条件脱敏注册表从所有浏览器工具结果里抹掉。CLI 有 vault 子命令、浏览器工具集派生自核心工具、vault/ 加入凭证目录拒绝读取表。</p>
+<ul>
+<li>8e7e9be217 | feat(vault): sign in with 1Password or Bitwarden logins, unlocked per session</li>
+</ul>
+<p>保险库现在有三个登录源共用一个句柄形状：本地加密保险库（vault_…）、1Password Login 条目（op:…）和 Bitwarden 登录（bw:…）。外部管理器锁定到用户在当前会话解锁为止：新的 browser_vault_unlock 工具和填充路径会在 CLI 面板 / TUI / 桌面端弹蒙面主密码提示，密码走 stdin 进 op signin --raw / bw unlock --raw，绝不进 argv 或 env；只保留内存中的会话 token，30 分钟空闲过期，会话关闭或 vault.lock 即清除。无头环境（cron/webhook/api/-q）永不弹窗，报告为锁定且 unlock=unavailable_in_this_session。1Password service-account token 可跳过提示用于无头场景。</p>
+<ul>
+<li>92e0de0ac4 | feat(vault): Desktop, TUI and CLI surfaces for password-manager unlock</li>
+</ul>
+<p>桌面端 设置 → 凭据保险库 新增&quot;Password managers&quot;区：每个管理器一个开关（CLI 未安装时禁用并提示）、Locked/Unlocked 状态胶囊、解锁（蒙面主密码对话框 → vault.unlock）和锁定按钮。会话中途的 vault.unlock.request 在聊天里渲染成蒙面卡片（与 secret/sudo 卡片同一契约：拒绝 = 保持锁定，迟到回答可容忍，阻塞输入框）。Ink TUI 通过 MaskedPrompt 显示解锁浮层（Esc 保持锁定）；CLI 有 hermes vault sources [--enable|--disable NAME] 和带源列的 hermes vault list。</p>
+<ul>
+<li>98d11c95f4 | feat(vault): zero-setup UX — save a login on the page that needs it, managers auto-detected, one &quot;Passwords &amp; Logins&quot; surface</li>
+</ul>
+<p>agent 到达登录页且没有已存登录时，会在用户自己的界面弹保存卡片（CLI 两步面板：显示标识符、密码蒙面；桌面端卡片：邮箱/用户名 + 密码字段），答案存进绑定页面 origin 的加密保险库并立即填充，模型只拿回句柄和标识符，聊天里永不见密码。1Password / Bitwarden 只要装了 CLI 自动成为登录源（vault.&lt;name&gt;.enabled 变成 opt-out 开关），设置页显示 Detected/Locked/Unlocked/Off/Not detected。桌面端导航改名 &quot;Passwords &amp; Logins&quot;，空状态告诉用户不需要预先添加任何东西。</p>
+<ul>
+<li>c8998c3957 | feat(vault): fill payment cards and addresses at checkout, cards behind a confirm prompt</li>
+</ul>
+<p>付款卡和地址此前能存不能填，等于一个存着真实卡号的死表面。browser_vault_fill 现在处理全部三种类型，走同一个 origin 绑定、监督者专属、脱敏路径：WHATWG autocomplete token 分类（cc-number/cc-exp/csc/address-line1/2/postal-code 等）加 label/name 启发式兜底，支持合并的 &quot;MM/YY&quot; 控件和 &lt;select&gt; 选择。每次填卡都先过请求确认（网关按钮往返或 CLI 面板），拒绝即 payment_declined，无头会话直接拒绝——到达结账页的提示注入只能请求，不能花钱。卡号和 CVC 同样进脱敏注册表，结果只列目标字段 token。</p>
+<ul>
+<li>d9ca9c974d | feat(vault): two-factor codes — automatic from a saved authenticator key, otherwise asked for in the user&#x27;s UI</li>
+</ul>
+<p>网站要验证码时 agent 不再卡住。browser_vault_enter_code 填当前页面要的一次性验证码，两个来源同一条铁律（验证码经监督套接字进页面、永不进模型上下文）：登录条目带 TOTP seed（本地 vault otp_secret，RFC 6238 标准库实现并验证过测试向量；1Password op item get --otp；Bitwarden bw get totp）就自动填、无人询问；没有 seed 就在用户界面弹&quot;Verification code for {site}&quot;，用户输入手机/邮件/应用上的码，Enter 提交、空输入/Skip 返回 code_declined（本回合不再追问）。站点要 passkey/硬件钥匙/应用批准时，no_code_field 告诉模型把设备交给用户等待跳转。逐格 OTP 框（maxlength=1）按 DOM 顺序逐格填入。</p>
+<ul>
+<li>f98cb00a8b | fix(vault): 2FA review follow-ups — per-digit fill only for an unmistakable maxlength=1 widget; honour otpauth digits/period/algorithm</li>
+</ul>
+<p>2FA 回顾修正：逐格填充只用于明确的 maxlength=1 组件；尊重 otpauth URI 里的 digits/period/algorithm 参数。</p>
+<p>DeepSeek V4.1 Flash 上线</p>
+<ul>
+<li>073c57872a | feat(models): DeepSeek V4.1 Flash on the Nous Portal and OpenRouter pickers</li>
+</ul>
+<p>deepseek/deepseek-v4.1-flash 进入 OpenRouter 模型表（Nous 列表派生自它），文档清单重新生成，slug 有自己的 1M 上下文条目和 600 秒推理超时底线——否则最长键优先扫描会把新 slug 落到 128K 的 deepseek 兜底且无超时。两条路由都实测过：模型回显匹配、usage.cost 正常计费。</p>
+<ul>
+<li>aeecb110f8 / 8435a3ae00 / 696d078959 | fix(deepseek): deepseek-flash 是规范的 Flash id，历史拼写统一折叠到它；识别不带版本的 deepseek-flash；只折叠 deepseek-* 拼写</li>
+<li>215fd0ecb9 | fix(models): 当前提供商自己就能服务的模型不再重路由到 OpenRouter</li>
+</ul>
+<p>从私有 git 仓库安装插件</p>
+<ul>
+<li>9886f6e53b | feat(plugins): install plugins from private git repos using the user&#x27;s stored credentials</li>
+</ul>
+<p>hermes plugins install owner/private-repo 之前对每个私有仓库都失败，即使同一用户在自己的 shell 里能 git clone：加固的 noninteractive_git_env 禁用了凭据助手、askpass 和全局配置（防止恶意仓库诱骗管道弹窗或挂起），也把用户自己存的凭据挡在门外，报&quot;could not read Username&quot;或挂在 GUI askpass 上 60 秒。新增 hermes_cli/git_credentials.py 先从用户已有的来源解析凭据——GITHUB_TOKEN/GH_TOKEN（profile 级）、gh auth token、再退回 git credential fill（禁用提示）——以一次性 http.&lt;origin&gt;/.extraheader 通过 GIT_CONFIG_* 环境块交给 git，不落 URL、.git/config 或安装元数据。plugins update、目录 MCP git 安装和 profile 分发共用同一修复；没有凭据时快速失败并给出可操作的提示。</p>
+<p>Telegram 桌面端快速配置</p>
+<ul>
+<li>52dea2c7d9 | feat(desktop): Telegram QR quick setup + persistent restart banner on Messaging</li>
+</ul>
+<p>把 dashboard 的 Channels 流程移植到桌面端 Messaging 页面：Telegram &quot;Quick setup&quot; 由 Nous 配对服务铸造 bot，页面显示 QR / 深链、轮询直到 Telegram 确认、自动预填检测到的 owner id 到白名单并应用；后端把 token + 白名单写进作用域 profile 并重启网关，页面监视重启子进程退出，重启失败会浮出而不是静默&quot;gateway stopped&quot;。另外：每次凭据保存/清除/开关切换后保留&quot;Restart now&quot;横幅直到重启真正完成（之前的 toast 一消失、凭据其实还没加载）。</p>
+<ul>
+<li>d5495e762c | fix(desktop): messaging restart banner lives in the detail column; drop duplicate toast CTA</li>
+</ul>
+<p>种子会话重启不丢</p>
+<ul>
+<li>c22a8d8e3f | Seeded sessions survive a gateway restart and store their seed once (tui_gateway)</li>
+</ul>
+<p>session.create 接受开场消息，但这条路径有三个缺陷：无父节点的种子会话在创建时从不持久化，重启后丢失、session.resume 报 4007（分支子会话反而会持久化）——现在父级种子在创建时就落库（标题、转写一起），空草稿保持惰性；_coerce_seed_history 丢掉 display_kind，隐藏的种子行被渲染成用户气泡——现在只保留 &quot;hidden&quot; 标记；分支子会话的 seed 被写两次——现在创建路径直接标记 _branch_seed_persisted，恢复的会话不会再重挂转写。</p>
+<ul>
+<li>d5aaaa4a1b | fix(tui-gateway): a hidden seed row stays out of search, a partial seed copy is rolled back, live resume counts the wire</li>
+</ul>
+<p>两轮独立复查又找到三处：消息搜索（dashboard 搜索和 session_search 工具）没有 display_kind 过滤，隐藏种子行会匹配到用户从没见过的查询——共享搜索谓词现在跳过隐藏行；_seed_row 在转写复制失败后留下已提交的会话行，第一次提示的重试会复制整个 seed，导致保留的半截副本被重复——复制未完成时删除该行；live resume 现在按实际传输计数。</p>
+<p>Radio 收音机插件</p>
+<ul>
+<li>3f53719c1d | feat(desktop): ship Radio as an opt-in SDK plugin</li>
+</ul>
+<p>桌面端把 Radio 作为可选 SDK 插件发布（默认关闭，需要手动开启）。</p>
+<ul>
+<li>983f0c2870 | feat(desktop): link radio credits directly to artist profiles</li>
+</ul>
+<p>电台版权信息直接链接到艺术家主页。</p>
+<p>机器人作者身份体系</p>
+<ul>
+<li>a42388b3a9 | feat(agent): a2a_key names a bot author&#x27;s turns</li>
+<li>f7d5ac3230 / 6aff2fc65b / 46d625b097 / 88fc9402d8 | feat(honcho): bot 私信写进独立的 a2a 会话；每轮对话按作者 peer 记录；bot 作者映射到自己的 profile peer；声明 identity_signature 并移除网关的 honcho keys</li>
+<li>16d15869ba | feat(bot-mode): carry the sender through local and relay deliveries</li>
+<li>3a37785f7f | fix(gateway): add bot-to-bot loop guard for Telegram</li>
+<li>a40deb0301 | feat(gateway): bust the cached agent on provider-declared identity values</li>
+</ul>
+<p>修复一批随之而来：bot 作者永远不会落到会话的人类运行时 peer 上；每个 bot 作者都有自己的 peer 否则跳过该轮；pinUserPeer 折叠的是操作员的账号而不是 bot 作者。</p>
+<p>桌面端：登录过期一键重登、通知路由回原窗口、最近会话展开</p>
+<ul>
+<li>97ca90f184 | fix(desktop): expired OAuth grant shows a one-click &#x27;Sign in again&#x27; instead of a retryable Provider error</li>
+</ul>
+<p>OAuth token 被拒（Nous Portal、Codex、xAI 等返回 401 &quot;User not found&quot;）时桌面端原本显示可重试的 Provider 错误，Retry 只是重放同一个死凭据。现在错误表面识别 auth 类描述（oauth/api_key + 提供商名），渲染 &quot;Authentication error&quot;，解释签名已过期/被撤销，提供一键 &quot;Sign in to &lt;provider&gt; again&quot;（启动该提供商已有的 OAuth 流程，作用域指向失败会话的网关 profile）。</p>
+<ul>
+<li>7107458d96 / 85571c16b6 / f557829bff / a245d9aaa4 | fix(desktop): 原生通知回到发起它的源窗口；点通知打开原会话而非替换标签页；横幅关闭后保留通知处理器；修正通知动作索引解析</li>
+<li>a6474766c8 / 32f3c908ff | feat(desktop): 项目分组里显示展开的最近会话，预览数量限制在完整分组边界</li>
+</ul>
+<p>新技能：archify 进入官方可选技能目录</p>
+<ul>
+<li>2feb546828 | feat(skills): archify joins the optional-skills catalog as an upstream-maintained stub</li>
+</ul>
+<p>tt-a1i/archify（MIT，57k star）把类型化 JSON 规格转成经过验证的自包含交互式 HTML 图表（架构/工作流/时序/数据流/生命周期），带 9 项校验的交付回执、Mermaid 导入和 PNG/SVG/WebM 导出。上游仓库已自带完整技能目录，目录里放一个 metadata.hermes.upstream 指针的 stub，hermes skills install official/creative/archify 拉取实时树，不 vendored 任何可执行内容、副本不会过期。</p>
+<p>Actual 提供商路由修复</p>
+<ul>
+<li>d7b0a72c2a / 8b2b83a906 / 4135933ec9 / 8a6b5b67a7 | fix(providers): Actual 全部路由钉死走 chat completions（含启动保持与 Responses 拦截）</li>
+</ul>
+<p>Actual 提供商（E-1047）的四连修：路由到 chat completions、所有路由钉死到该端点、启动和密钥重载时路由保持、Responses 发送点被拦截——不再 401。</p>
+<p>其他值得知道的修复</p>
+<ul>
+<li>77e55b4d1f | fix(desktop): 应用内提示每条只显示一次，不再循环播放整个目录</li>
+<li>50ea107d9d | fix(desktop): HUD 打开时自动 TTS 回复只朗读一遍</li>
+<li>f2b33fb4a2 / 00c0259bbc | fix(desktop): PATH 探测子进程超时即杀；登录 shell PATH 探测超时强制结算</li>
+<li>62081b87b7 | fix(desktop): Hyprland 下 HUD 浮动/固定提升给迟到的客户端留出空间</li>
+<li>f44b0fd342 | fix(desktop): 模型选择器停留在当前选中的提供商</li>
+<li>bbe212de9b | feat(desktop): 面板标签保留在标题栏</li>
+<li>ff7a1e8953 | fix(desktop): clarify 表单恢复 Cmd/Ctrl+Enter 提交</li>
+<li>b8d09d785d | fix(desktop): 排除过期的 Windows 信任根证书（真实证书覆盖）</li>
+<li>f6ddd89692 | fix(dashboard-auth): 原生登录提供全部已配置提供商</li>
+<li>edac5f6378 | fix(auxiliary): origin 作用域 key 盾，命名提供商上的任务覆盖，仅协商的流回退</li>
+</ul>
+    </section>
+    
     <section id="2026-09-10" class="day">
       <h2>Hermes 日报 2026-09-10：插件目录成为唯一发现体系，桌面端大波稳定性修复，连接器工具可搜索可调用</h2>
       <p><strong>本期覆盖 9 月 9 日 ~ 9 月 10 日合入 main 的提交，共 333 个 commit（不含 merge），另有 9 个 merge。按提交前缀统计，新增 22 个功能、201 个修复、4 个性能优化（另有不带前缀的大改动，如连接器工具）。</strong></p>
