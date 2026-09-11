@@ -22,9 +22,149 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 45 期 · 13308 个提交 · 每日自动更新 ·
+<p class="meta">共 46 期 · 13554 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-12" class="day">
+      <h2>Hermes 日报 2026-09-12：multiplex 多 profile 彻底隔离、桌面端视频可拖动进度条、state.db 打开提速 300 倍</h2>
+      <p><strong>本期覆盖 9 月 11 日 06:30 ~ 9 月 12 日 06:30 合入 main 的提交，共 246 个 commit（不含 merge），另有 5 个 merge。新增 4 个功能、175 个修复、2 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端标题栏按钮可选左右，聊天里的本地视频终于能拖进度条、能全屏了</p>
+<p>multiplex 多 profile 隔离大修：config.yaml 不再污染进程环境，每个 profile 的密钥、适配器、cron、DM 路由各回各家</p>
+<p>state.db 打开不再抢写锁：2117ms 降到 4ms，健康库打开零写语句</p>
+<p>一行坏时间戳不再杀死 sessions list、导出和 insights；批量清理突破 SQLite 变量上限</p>
+<p>DeepSeek Flash 的 1M 窗口和原生视觉修复，128K 旧缓存被清掉</p>
+<p>hermes update 网络卡死不再永远挂起，桌面端更新检查失败会分类给出真实原因</p>
+<p>重点条目：</p>
+<p>桌面端：标题栏按钮位置可选，本地视频可 seek、可全屏</p>
+<ul>
+<li>837e4b0942 | feat(desktop): let Appearance choose left or right for titlebar app actions</li>
+</ul>
+<p>外观设置（Appearance）新增标题栏应用操作按钮的位置选项：Settings、Layout、HUD 默认放右侧，标签页留在左侧标题栏；想要旧的左侧布局可以在 Appearance 里手动切回 Left/Right。这是桌面端本期唯一的 feat。配套修复 a09368fcd6 把设置布局和 HUD 固定回右侧标题栏。</p>
+<ul>
+<li>73a2597c81 | fix(desktop): serve local hermes-media ranges so chat video can seek</li>
+</ul>
+<p>聊天里的本地视频（hermes-media 协议）之前无法拖动进度条：Electron 的 file:// 加载器忽略 Range 请求头，媒体范围处理虽然早就有但没接上这条路径。现在 fetchLocal 改走 media-range 处理，长视频可以正常 seek 了。</p>
+<ul>
+<li>360c1ee836 | fix(desktop): allow HTML5 video fullscreen through permission handlers</li>
+</ul>
+<p>桌面端自定义的权限检查处理器只放行 media/audioCapture/videoCapture，把 HTML5 视频全屏要用的 automatic-fullscreen 权限也拦掉了——聊天里 &lt;video controls&gt; 的全屏按钮点了没反应。现在两个权限处理器都放行 fullscreen + automatic-fullscreen，用户实测打包后的桌面端全屏恢复正常。</p>
+<ul>
+<li>244a42f636 | fix(desktop): media-range review follow-ups — ignore multi-range as a whole, fstat the handle being streamed, 404 for missing files</li>
+</ul>
+<p>媒体范围处理的收尾修复：多段 Range 请求（带逗号）整体回退为完整 200 响应而非只发第一段；先打开文件再对同一句柄 fstat 和流式发送，消除 stat/stream 竞态；文件不存在返回 404 而不是直接 reject。</p>
+<p>multiplex 多 profile 隔离修复潮（本期最大主题）</p>
+<ul>
+<li>545e74d0ea | fix(gateway): a secondary profile&#x27;s config.yaml no longer poisons the process env under multiplex</li>
+</ul>
+<p>多 profile 共用一个网关时，第二个 profile 的 config.yaml 会污染整个进程的环境变量（此前多个 profile 的环境读取都直接看 os.environ）。现在每个 profile 的配置读取限定在自己的 profile 作用域内，副 profile 的配置不再外溢。</p>
+<ul>
+<li>1271622e4b | fix(file-safety): resolve HERMES_HOME/config per call so multiplex profiles don&#x27;t poison the write guards (#107327)</li>
+</ul>
+<p>文件写保护（write guard）的 HERMES_HOME/config 解析改成每次调用实时解析，多 profile 下不再互相污染——某个 profile 的写保护规则不会因为共享的解析结果误伤另一个 profile。</p>
+<ul>
+<li>7af5006b24 | fix(file-safety): bind the write-guard resolver fallback to the active profile</li>
+</ul>
+<p>写保护解析器的回退绑定到当前活跃 profile，兜底路径也不会跨 profile 串用。</p>
+<ul>
+<li>ceaf622c6d | fix(mcp): same-named MCP servers with different credentials connect per profile; owner /reload-mcp keeps adopters&#x27; tools</li>
+</ul>
+<p>MCP 连接账本原来按服务器&quot;名字&quot;做键：每个租户都把自家服务器叫 github/notion 时，只有第一个 profile 能连上，第二个 profile 看到同名就当作&quot;已连接&quot;拒绝接管，静默变成没有工具但状态显示正常（#106005、#91654）。连带修掉三个同源 bug：A profile 失败的服务器会把 B profile 的健康服务器拖进冷却、A 的断路器会短路 B 的调用、工具集解析不按 profile 分键导致 B 解析到 A 的工具名。现在连接账本按 profile 作用域分键，同名不同凭据各自连接；拥有者 /reload-mcp 重新加载时保留采用方（adopter）的工具。</p>
+<ul>
+<li>27768a9fa5 | fix(gateway): profile_routes no longer hijack DMs to a dedicated secondary bot (#104933)</li>
+</ul>
+<p>Telegram 的 DM chat_id == user_id，给共享 bot 的一条 chat_id 路由会把用户发给专用副 bot 的 DM 也劫持过去：会话、密钥、state.db 都归了 ops profile，回复却从 team_b 的传输层发出。ProfileRoute 现在带可选的 bot_profile 判别字段，matches() 要求它等于接收适配器的所属 profile，只有显式命名 bot 才能走副 profile 到副 profile 的路由。</p>
+<ul>
+<li>cbd03e6e4c | fix(gateway): secondary-profile adapters no longer inherit the default&#x27;s allow-all / allowlists</li>
+</ul>
+<p>multiplex 下 os.environ 装的是默认 profile 的 .env，适配器级授权门（GATEWAY_ALLOW_ALL_USERS / GATEWAY_ALLOWED_USERS 及各平台 allowlist）直接读环境变量，导致：默认 profile 开了开放访问，所有副 profile 的邮箱/QQ/WhatsApp/Matrix/Teams/Slack/LINE/DingTalk bot 对任何发件人都放行（邮箱还跳过了 From 认证）；默认 profile 的 Matrix allowlist 决定副 bot 上谁能批准工具调用；只在自家 .env 开了访问的副 profile 反而被静默 deny-all。现在所有这类读取都走适配器的 profile 作用域读取器（profile 优先，缺失回落默认，不再直接读 os.environ）。</p>
+<ul>
+<li>a9838c2100 | fix(multiplex): tool and memory-provider env reads stay inside the routed profile</li>
+</ul>
+<p>工具和内存提供方（memory provider）的环境读取限制在路由 profile 内，副 profile 的沙箱/工具子进程不会读到默认 profile 的环境。</p>
+<ul>
+<li>45a6101f36 | fix(gateway): secondary-profile send_message, notices and /loop wakeups go out via their own bot</li>
+</ul>
+<p>副 profile 的 send_message、通知消息和 /loop 定时唤醒改走自己的 bot 发送，不再从默认 profile 的传输层发出。</p>
+<ul>
+<li>1c08edccf0 + 0e57543908 + 32c538851a | fix(gateway/desktop/cron): cron 归属理顺</li>
+</ul>
+<p>几个 cron 相关修复：命名 profile 的 multiplexer 现在会跑自己 profile 的 cron 存储、共享适配器归启动 profile 所有；桌面端 cron 计时器跟随 multiplexer 的 allowlist，对 serve 出来的卫星实例让位；单 profile 时桌面端 cron 让位给正在运行的网关。路由到副 profile 的 cron 任务通过共享 bot 投递。</p>
+<ul>
+<li>45a6101f36、c3e01c753d、e253ea0233、8099745a4e、08830efd96、580322ef1e、89fb1d028e、2952dc62bc、2b4deeb32b、173105ce6f、3b044261b6 等一批 | 其余 multiplex 修复：副 profile 的 send_message/通知/loop 唤醒走自己的 bot、/p/&lt;profile&gt;/ webhook 与 api_server 回调留在路由 profile、副 profile 适配器不再把凭据发给默认 profile 的主机、env_passthrough 配置按 profile 分键、TWILIO_PHONE_NUMBER 按 profile 隔离、secret 源重新拉取不再清空兄弟 profile、stdio MCP 子进程拿到路由 profile 的保险库密钥、飞书 drive 评论和 WS 线程回调在自家 profile 下运行、凭证内存按 profile home 分键、媒体黑名单覆盖所有 profile 的凭据。</li>
+</ul>
+<p>性能：state.db 打开提速两个数量级</p>
+<ul>
+<li>ef8d682200 | perf(state): stop taking the state.db write lock to open a database that needs no writes</li>
+</ul>
+<p>每次打开可写 SessionDB 原本会发三条&quot;通常什么都不改&quot;的写语句（世代戳 INSERT OR IGNORE、NULL active 修复 UPDATE、fts 版本戳），而写语句即使匹配不到行也会拿数据库写锁；连接超时只有 1 秒，兄弟进程持锁时每次打开都等满 busy 超时，最终可能直接抛 database is locked。现在三条写全部先读后写：实测 99MB 的 state.db（239 会话、6470 条消息），打开耗时从 2117-2136ms 降到 3.6-7.1ms；兄弟进程每 200ms 写一次的竞争场景下 p50 从 894.6ms 降到 9.6ms、p90 从 1094.7ms 降到 13.9ms；健康库现在打开时零主库写语句。读探针几乎不耗时（主键寻址 2 微秒）。</p>
+<ul>
+<li>78f85112d9 | perf(state): batch message hydration in export_all</li>
+</ul>
+<p>导出接口 export_all 的消息读取改为批量水合（批量获取而非逐条），大数据量导出更快。</p>
+<p>state.db 加固：一行坏数据不再杀死所有命令</p>
+<ul>
+<li>496eb13bd7 | fix(state): one corrupt timestamp row no longer kills sessions list, export or insights</li>
+</ul>
+<p>SQLite 动态类型允许一行坏时间戳（文本、inf/nan、损坏页救出来的垃圾 double）躺在 REAL 时间戳列里。每个读取方直接对裸单元格做 datetime/浮点运算，一行坏数据就让 sessions list/浏览表（#102399）、三种导出器 JSONL/MD、QMD、HTML（#102352）和 insights（#99959）整体抛异常退出。现在统一走 hermes_cli.timefmt.coerce_epoch()：单元格在 1970..2103 合理窗内转浮点秒，否则警告并返回 None，该行显示 ?/N/A 而命令照常完成。写入侧同步加了同窗校验，新越界时间戳回退为 now()，Hermes 自己不再写入坏行。</p>
+<ul>
+<li>acfda37598 + 25670cd9e3 | fix(sessions/state): chunk IN-list ids in bulk delete</li>
+</ul>
+<p>hermes sessions prune 在大仓库上批量删除会直接报 sqlite3.OperationalError: too many SQL variables——SQLite 绑定参数上限 999（3.32 前）或 32766，而 bulk delete 把整个 id 列表绑进一个 IN 子句（约 6 万条 cron 会话、5 万条匹配就炸）。现在 IN 列表按 900 个一批分块绑定，同一事务、同样的级联/孤儿清理契约，只是参数绑定拆分。</p>
+<ul>
+<li>5a2f512390 | fix(cli): exit non-zero from `sessions repair --check-only` on an unhealthy store</li>
+</ul>
+<p>sessions repair --check-only 之前打印损坏原因却返回退出码 0，脚本和启动器把它当健康。现在 CLI 处理器返回 1，控制台处理器把状态转为带打印原因的 ConsoleCommandError。</p>
+<ul>
+<li>3d167a8271 | fix(doctor): name structural state.db corruption honestly and route it to sessions recover</li>
+</ul>
+<p>doctor 诊断如实命名结构性损坏（而不是含糊的&quot;数据库有问题&quot;），并指路 sessions recover 修复命令。</p>
+<p>DeepSeek Flash 1M 窗口与原生视觉修复</p>
+<ul>
+<li>759024bdff | fix(deepseek): honor Flash 1M window leftovers and native vision</li>
+</ul>
+<p>原生 DeepSeek 用户被建议手动在 config.yaml 里钉 model.context_length 和 supports_vision——这是错层修复：1M 窗口本来就在 DEFAULT_CONTEXT_LENGTHS 里，全局 supports_vision 会把纯文本的 deepseek-v4-pro 也误标成多模态。真正的两个缺口：旧的 deepseek 128K 缓存条目（context_length_cache.yaml）没被 _PRE_CATALOG_STALE_KEYS 清理；models.dev 空/冷启动时 Flash 没有能力记录、图像路由落到有损文本。现在丢弃 128K 遗留缓存、通过内置模型元数据给 Flash（含退役别名）补齐 1M 窗口和原生视觉，Pro 保持仅目录来源。</p>
+<p>更新体验：update 不再永久挂起，失败原因分类显示</p>
+<ul>
+<li>9ce7547faf | fix(update): bound network git in hermes update and prune shallow grafts on apply</li>
+</ul>
+<p>hermes update 的网络 git 操作原来没有超时，网络卡死（某些网络下 HTTP/2 连 GitHub、黑洞代理）会永远停在 Fetching updates...（#93759、#95777）。现在网络 git 带 300 秒超时，卡死会以失败结束并在 stderr 点名卡的原因；本地 git 仍不设限。应用更新路径顺带清理历史 depth-1 检查积累的 .git/shallow 残留（#105951 实测 57 条），下次更新自动愈合而不只是 --check 时。</p>
+<ul>
+<li>5bfa389e8a | fix(cli): prune stale shallow grafts left by depth-1 update checks (#105951)</li>
+</ul>
+<p>CLI 侧同样修剪 depth-1 更新检查留下的浅克隆残留。</p>
+<ul>
+<li>66a13703b3 | fix(desktop): update-check failures name the real cause instead of &#x27;couldn&#x27;t reach the update server&#x27;</li>
+</ul>
+<p>桌面端更新检查失败之前统一显示&quot;无法连接更新服务器&quot;——GitHub 故障、限流、企业代理拦截 TLS、DNS 失败全都渲染成同一句话（#105855 在 GitHub 事故期被误报为 Hermes 的 bug）。主进程现在分类失败：HTTP 状态码（含 403/429 限流措辞、5xx 故障措辞）、DNS、超时、连接拒绝/重置、TLS，生成一句可操作提示；弹窗标题下显示，About 页追加到状态行。</p>
+<ul>
+<li>338bf9ea9a + 6dfcf15685 | fix(cli/desktop): passive update checks use the GitHub API, cached 24h</li>
+</ul>
+<p>CLI 的 banner/TUI/dashboard 更新检查和桌面端的被动更新检查改为走 GitHub API 并缓存 24 小时，不再触发 git fetch（避免无谓网络 git 操作）。</p>
+<p>其他小亮点</p>
+<ul>
+<li>fc3d60af09 | feat(compression): provider-scoped model_thresholds keys (&quot;&lt;provider&gt;:&lt;substr&gt;&quot;)</li>
+</ul>
+<p>压缩阈值 model_thresholds 支持 provider 前缀：`&quot;openai-codex:astra&quot;: 0.85` 只在该会话 provider 是 openai-codex 时生效，裸键保持全路由行为。背景：为 Codex OAuth 路由（Astra 窗口 272K）写的裸键 astra，因为按模型名子串匹配，把 OpenRouter/Nous 上 1.1M 窗口的 openai/gpt-6-astra 也套上了 0.85——用户全局 0.5 阈值被静默覆盖成 0.85，会话堆到 620K（59%）不压缩。现在键按模型子串长度排序、同长按作用域决胜，/model 切换路由时重新定向覆盖。</p>
+<ul>
+<li>f8456248d9 + 942973ae90 | fix: Bedrock Guardrails enforced on the Claude route and blocks surface as refusals</li>
+</ul>
+<p>Bedrock Guardrails 之前只挂在 Converse 路由（body 里的 guardrailConfig），Claude 路由走 AnthropicBedrock SDK 的 InvokeModel，body 没有 guardrailConfig——默认 Claude 路由完全没防护（#52179，社区实测被拦截的词原样返回）。现在通过 X-Amzn-Bedrock-GuardrailIdentifier/-Version/-Trace 请求头挂到每个 AnthropicBedrock 客户端（初始化、/model 切换、回退、按请求重建、辅助），拦截结果映射为 content_filter 让循环走拒绝处理而不是把罐头文本当正常回复；同时修了每次 Bedrock 客户端重建都落在启动链路上的问题（Claude SDK、Converse 区域、Guardrails 三处统一）。</p>
+<ul>
+<li>6ee218602d | feat(relay): pass API request metadata to Relay tracking</li>
+</ul>
+<p>Relay 跟踪现在接收 API 请求元数据（请求级信息随调用传给跟踪后端）。</p>
+<ul>
+<li>954113839b | fix(discord): apply YAML allow_bots to ingress policy</li>
+</ul>
+<p>Discord 适配器现在真正按 YAML 里的 allow_bots 配置处理机器人消息的准入，之前该配置没有应用到入口策略。</p>
+<p>已知情况：Collective Wisdom V1 当天合入当天回滚</p>
+<ul>
+<li>a6ee31f55a 合入 Hermes Collective Wisdom Agent V1（org 技能市场 hermes_wisdom 包、三个模型工具、CLI/网关/桌面端/dashboard/Telegram/Slack 表面），随后 0dcadf6f41 在同一天 revert 移除（#94266）。共享文件上的后续非 Wisdom 改动保留，Wisdom 专属调用点和配置被剥离。该功能不计入本期亮点。</li>
+<li>939e45c91d | chore: release v0.21.2 (2026.9.11)，本期有版本发布。</li>
+</ul>
+    </section>
+    
     <section id="2026-09-11" class="day">
       <h2>Hermes 日报 2026-09-11：Nous 免费档上线、凭据保险库大扩展、插件体系整合成单页</h2>
       <p><strong>本期覆盖 9 月 10 日 06:30 ~ 9 月 11 日 06:30 合入 main 的提交，共 175 个 commit（不含 merge），另有 3 个 merge。新增 30 个功能、102 个修复、0 个性能优化。</strong></p>
