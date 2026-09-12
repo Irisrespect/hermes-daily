@@ -5,8 +5,89 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 12 Sep 2026 07:51:49 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 13 Sep 2026 07:34:23 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-13：桌面端 GPT-Live 全双工语音聊天 + 一键迁移到单一 multiplexed 网关</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-13</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-13</guid>
+      <pubDate>Sun, 13 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 12 日 06:30 ~ 9 月 13 日 06:30 合入 main 的提交，共 317 个 commit（不含 merge），另有 0 个 merge。新增 22 个功能、178 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端新增 GPT-Live 语音聊天模式，一个边听边说的语音模型，听到的请求全部委托给 Hermes 执行，回复用语音复述出来</li>
+<li>语音引擎选择直接放进输入框旁边，不用再跑设置页切换</li>
+<li>桌面端连接器授权卡片重做 + 引导式首次启动，登录流程不再靠 agent 即兴发挥</li>
+<li>视频生成 OpenRouter 后端不再写死单个模型，25+ 模型全目录可用，新增 Hailuo 3 Max</li>
+<li>多 profile 安装可一键迁移到单一 multiplexed 网关（CLI / dashboard / update 自动迁移三条路径）</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端（7 条 feat/fix）</p>
+<ul>
+<li>GPT-Live 全双工语音聊天模式（f923faa0b8）：桌面端原来的语音是「听一句→生成→回复」的链式循环，现在设置里把 voice_chat_mode 切成 gpt-live 后，整体换成 OpenAI 的 gpt-live-1：一个语音模型，边听边说、自己没有工具。它听到的每句真实请求都会变成普通 Hermes 回合——走当前会话选的任何模型/提供商、完整工具集、记忆、审批——然后由语音把回复复述出来。OpenAI 密钥只停留在服务端（POST /v1/live/sessions 交换 SDP offer，字节级保真），渲染进程永远拿不到密钥。没有配置 OpenAI 密钥时自动回退到链式模式并给出提示。</li>
+<li>输入框直接选语音引擎（20816c13cd）：切 GPT-Live 原本要去 设置 → Voice → Voice Chat Mode，现在把选择放在你想说话的地方：折叠布局（HUD/窄窗）的语音菜单里出现「Voice chat engine」单选组，展开布局是语音按钮旁的小箭头，悬停提示当前要挂载的引擎。选择经 config.set 写到活网关（本地/SSH/云都一样），只影响下一段会话、不碰正在跑的会话。网关太旧不报模式时不显示切换行。</li>
+<li>连接器登录卡片 + 引导式首次启动（4f1966edac）：Connect/Approve 按钮新增 loading 态，转圈时文字保留在框内不塌陷（审批栏也同步改造）。连接器卡片现在由卡片本身驱动 agent 走进 manage_connections 等待登录：点 Connect 打开浏览器并发一行隐藏指令让 agent 停在等待该应用的授权，不再像以前那样把用户丢在聊天里让 agent 即兴操作；「Not now」也走自己的指令行；连续点两次同一应用会先取消正在进行的授权再发起。MCP 设置与连接器共用同一套卡片组件（键盘快捷键、来源行、问题标题），Gmail/Calendar/Drive/Discord/Telegram/Spotify 有品牌标识（Slack 用 Tabler 替代，simple-icons 已删该标）。</li>
+<li>大段粘贴自动转 .txt 附件（22e3888543）：桌面端输入框粘贴超过 1 万字符的纯文本时，自动转成「Pasted content (NN KB)」.txt 附件 chip 走 @file: 管道，不再灌爆输入框——参考 ChatGPT 2026-08-04 发布说明的同类处理。短粘贴照旧内联；文本逐字节保存在 Hermes 管理的 composer-pastes 文件；桥接缺失或写入失败时回退内联插入，内容永不丢失。</li>
+<li>新手教程满月自动退役（995e79afe4）：首次启动满一个月后教程自动下线，设置里有说明（99d7f17a1c），不再反复骚扰老用户。</li>
+<li>空 MCP include 列表 = 全部封禁（88d84beede）：桌面端显式配置空的 MCP include 列表会按「禁止全部工具」处理，而不是被误读成「全部开放」（b70e0f4603 让 CLI 读者同步修正）。</li>
+<li>Bot Mode 宠物选择修复（9c021a6bde）：宠物选择器能正确选中本地孵化的宠物（走 pet.thumb），Linux 终端 locale 修复（6f8d975fe7）。</li>
+</ul>
+<p>视频生成（2 feat）</p>
+<ul>
+<li>OpenRouter 后端覆盖 live catalog 全部模型（c6f87deb2c）：此前视频插件写死单个模型（minimax/hailuo-3-max），其他 id 一律拒绝。现在直接读 OpenRouter 公开的 /api/v1/videos/models 目录（5 分钟 TTL + 离线快照兜底）：25+ 个生成式视频模型全部可列（编辑/放大/头像等不吃时长的行除外），每个模型按自身能力动态出 schema——时长、分辨率、画面比例、音频、种子、参考图按所选模型就近收敛或丢弃，不再无脑传参触发 400。密钥只发给配置的源站，绝不给 provider 指定的 unsigned_urls 主机。文档把 OpenRouter 和 DeepInfra 列为内置视频后端。</li>
+<li>OpenRouter Hailuo 3 Max 提供商（387ac50d85）：新增 Hailuo 3 Max 条目，配合上面全目录支持一块用。</li>
+</ul>
+<p>网关与 multiplex（3 feat + 一串 fix）</p>
+<ul>
+<li>hermes gateway migrate --multiplex / --standalone（e2fc493427）：多 profile 多网关安装可一键迁移到单一 multiplexed 默认网关：表驱动预检（重复凭据指纹、没有 /p/&lt;profile&gt;/ 入口的次级端口绑定器）、--dry-run、apply（停服并卸载各次级网关服务、记录到 gateway_migration.json、翻转 gateway.multiplex_profiles、同一服务管理器重启/安装默认网关、验证 served_profiles）、--standalone 按清单回滚。幂等，已 multiplexed 或被阻塞时干净拒绝。hermes profile create 检测到活 multiplexer 时改指向 hermes gateway restart（served 集合启动时快照）。</li>
+<li>dashboard 一键迁移按钮（df95f378a6）：System 页网关卡片对「多 profile 且尚未 multiplexed」的安装显示迁移按钮，GET /api/gateway/migrate/plan 返回 CLI 计划 JSON，POST 以 detached 方式跑迁移命令，动作日志 gateway-migrate.log；已有阻塞项时按钮禁用并列出原因。</li>
+<li>hermes update 自动迁移（07a4ae016a）：fleet 重启验证健康后，对 ≥2 profile 且至少一个 per-profile 网关的安装自动跑迁移预检：无阻塞直接迁移（同 --multiplex --yes 路径，确定性、零交互）；有阻塞打印原因和修法、不动任何东西；单 profile 安装和 stale fleet 退出路径跳过。</li>
+<li>multiplexer 热服务新建 profile（d1dbb0ac9e）：运行期间新建的 profile 会被 multiplexer 热接入，删除的 profile 自动取消路由；池化本地后端也正确汇报服务中的 profile 生命周期（b0c383cdf7、2d121aa322）。</li>
+<li>其他重要修复：适配器设置按 profile 解析、不再读默认 profile 的环境（199c66f70f、5725efaf09），适配器声明 serves_profile_prefix 支持 /p/&lt;profile&gt;/ 入站（bcdb49ac7b、6fc76ce751、c0d8d6b5d5）、/stop 槽位释放按 token 身份（436ec48985、18da3f673a）。</li>
+<li>multiplex 白名单移除（9848e22ed6）：gateway.multiplex_profile_allowlist 配置项删除，multiplexer 默认服务全部 profile，不再需要人工维护可服务名单。</li>
+<li>共享监听器入站（65fd3a2b9c、6fc76ce751、c0d8d6b5d5）：所有入站端口适配器统一走 shared_ingress.bind_listener，次级 profile 的入站平台（QQ/Telegram 等）在默认网关的共享监听器上服务；status 命令显示每个被服务 profile 的共享监听回调 URL。</li>
+</ul>
+<p>新插件与技能（4 feat）</p>
+<ul>
+<li>Snyk 安全扫描（53c57871d6）：Snyk 以 Agent Plugins v1 独立包形式进插件目录（NousResearch/hermes-plugin-snyk）：npx -y snyk@1.1306.0 mcp stdio 启动（关 CLI 遥测）+ snyk-security-scan 技能二合一，一条 hermes plugins install snyk 同时拿到工具和「什么时候用哪个扫描器」的剧本。替代旧的 optional-mcps 清单方案。</li>
+<li>TouchDesigner 目录插件化（f364c19775）：原可选技能（setup.sh 手写 mcp_servers 块）退役，换成 catalog 插件 hermes-plugin-touchdesigner（mcp.json 注册 twozero Streamable HTTP hub + 技能打包）。清单名用 td 是因为 mcp__agent_plugin_ 前缀 + 工具命名有 64 字符上限，touchdesigner 最长工具名 71 字符会超。</li>
+<li>科学技能桶（850c48cd84）：Skills Hub 新「science」分类：K-Dense-AI/scientific-agent-skills（165 个，MIT）+ synthetic-sciences/openscience（314 个，Apache-2.0）共 ~480 个科研技能可直接搜索安装，零 vendoring；tap 级 bucket 键给没有 skills.sh.json 分组的仓库批量打分类；两个仓库保持社区信任级，安装逐个过安全扫描。</li>
+<li>dynamic-workflow 编排技能（351041463d）：把 Claude Code research-preview 的动态工作流（计划即代码、每会话数百子代理）移植到 Hermes 不变量：核心机制是 plan/loop/中间状态出上下文（不是堆子代理）。讲清两层真实编排边界——Layer A execute_code（确定性扇出，仅 SANDBOX_ALLOWED_TOOLS，不能调 delegate_task）vs Layer B delegate_task 批量（LLM 判断扇出）；点明同步陷阱（delegate_task 按轮次作用域、新消息即取消，可恢复路径走 kanban swarm）；新增对抗收敛验证配方（N 个不同措辞的独立尝试 + M 个反驳者，只保留经受反驳的定位结论，迭代至收敛）。可选技能发货（bf867d3c74）。</li>
+<li>群聊成员活动 hook（fafb27ee5c）：新增 on_room_member_activity 插件 hook，把群聊的成员运行时事件（进出群等）投射给插件，插件可以基于成员动态做响应。</li>
+</ul>
+<p>技能管理（1 feat）</p>
+<ul>
+<li>curator 清理提速（be2f7e9c36）：一个月没人加载的技能是提示词负担而不是知识——stale 默认 30→14 天、归档 90→30 天（归档可 hermes curator restore 恢复）；config v44 只重写旧默认值，显式自定义的窗口保留；hermes curator prune 的 --days 默认改为 archive_after_days，手动和自动路径口径一致。</li>
+<li>技能体感相关修复：非 ASCII 字符允许进技能命令名（036b3ff5ba）、HOME 字面替换修正（66dbb656be、86211492d1）、技能库 stale 条目如实命名而不是笼统报抓取失败（257a704d18、08bb58bd4a）。</li>
+</ul>
+<p>模型与路由（fix）</p>
+<ul>
+<li>选中的模型 id 不再被悄悄改写（d595e636c8）：用户在自己端点选了 deepseek-v4.1-flash，实际落地却是 deepseek-v4-flash-0731——三处代码各自&quot;好心&quot;地把用户选择对目录做 difflib 0.9 相似度模糊比对并自动纠正，而版本号/日期快照/限定词全部落在 0.9 内，导致新版被换成目录里的旧兄弟。现在匹配器只做精确匹配 + 建议提示，id 原样直通；真拼错时拒绝并列出相近可用项。providers.&lt;key&gt; 裸键与 custom:&lt;key&gt; 两种拼法现在都按用户自定义端点验证。</li>
+<li>其他模型修复：OpenRouter 的 :nitro/:floor 路由变体在 models.dev 目录查询里正确解析上下文长度（284ee03df1、f28c52845a）、provider:model 在聚合器上也按 provider/model 解析（d267bc7f78）。</li>
+</ul>
+<p>cron 调度（1 feat + 2 fix）</p>
+<ul>
+<li>计划停机跳过错过的循环运行（df51797e2e）：维护窗口期间错过的周期任务可以直接跳过，不再堆积补跑。</li>
+<li>重启间隙只补跑一次（eaa5ac94ea）：重启间隙错过的任务槽只补跑一次，修复此前可能重复触发的问题（#107485）；配合 2bc471cb35：只有未来锚点存在时才跳过补跑，避免误跳。</li>
+<li>其他 cron 修复：job workdir 在 inline 脚本路径和 pre-run 脚本上都正确生效（66884c4397、62b0235d45）、systemd user scope 不可用时优雅降级（560b6d2e81）、heartbeat save_jobs 期间不持 fire fence（87b013b21e）。</li>
+</ul>
+<p>平台与消息（fix 批）</p>
+<ul>
+<li>WhatsApp 引用回复媒体修复：引用机器人自己发的图片/语音/文档现在会正确附带原文件（c8b56d43da），裸引用回复带已解析媒体不再被丢弃（e948ea8347），引用媒体回复能解析出原始媒体（cd89e4b4a6）。</li>
+<li>飞书修复：批处理事件里 source.message_id 与事件 id 保持同步（2175df4034）、入站消息 message_id 正确进会话源（6f7847bbd3）、入站富文本不再被 markdown 转义破坏（d131391ff9）。</li>
+</ul>
+<p>其他修复（选）</p>
+<ul>
+<li>邮件：线程附件按调用方 reply_to 发送，不再发错地址（b146cf1d0e）。</li>
+<li>MCP：工具错误熔断的文案改为「rejected」而不是误导性的「unreachable」（d62716c704）；应用层错误恢复后保留下熔断次数（5dca47a651、02b398bda5）；桌面/TUI 的发现槽按 profile home 键控（edff87fa1e）。</li>
+<li>CLI：custom 端点不带 /models 时只提示一次「未验证」而不是反复纠缠（71c72e078a、eda1e6cb15、a3671787b0）；「preparing 工具…」每批每个工具只播报一次（cc269866aa、7aa8249876）；Enter 在粘贴中到达按换行而不是逐行转向（40f123ceab）。</li>
+<li>插件：异步 hook 回调正确 await，不再收集裸协程（24444e52eb）；helpers 线程跑在调用方 ContextVars 下（12fe7684e1）；requires_hermes 从清单模块校验（c4c508579d）。</li>
+</ul>
+<p>已知情况说明</p>
+<ul>
+<li>本期无 Revert 类、无 release commit（chore: release 未出现在本期窗口）。</li>
+</ul>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-12：multiplex 多 profile 彻底隔离、桌面端视频可拖动进度条、state.db 打开提速 300 倍</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-12</link>
