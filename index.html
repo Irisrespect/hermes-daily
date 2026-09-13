@@ -22,9 +22,121 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 47 期 · 13871 个提交 · 每日自动更新 ·
+<p class="meta">共 48 期 · 14271 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-14" class="day">
+      <h2>Hermes 日报 2026-09-14：桌面端推理强度独立按钮、iPhone 照片终于能分析、Meta 图像模型入目录</h2>
+      <p><strong>本期覆盖 9 月 13 日 ~ 9 月 14 日合入 main 的提交，共 400 个 commit（不含 merge），另有 0 个 merge。新增 27 个功能、229 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端输入框新增独立的推理强度按钮，改档位不用再钻模型菜单。</p>
+<p>vision_analyze 支持 iPhone 的 HEIC/AVIF 照片，魔数嗅探直接识别格式并自动转 PNG。</p>
+<p>FAL 目录新增 Meta Muse Image（$0.01/张）和 MiniMax H3 Max Turbo 视频家族（含 1080P）。</p>
+<p>cron 任务没跑到模型会自动按 5/15/30 分钟阶梯重试，新增 resnap 重采全局默认模型。</p>
+<p>CLI 输入框支持 vi 编辑模式，状态栏新增 git 分支字段。</p>
+<p>配置文件读取统一脱敏，云服务器元数据端点（IMDS）取凭据改为需要审批。</p>
+<p>桌面端（3 条 feat + 6 条 fix）：</p>
+<p>桌面端推理强度独立按钮</p>
+<p>hash: b05a47b9d2</p>
+<p>问题：推理强度之前挤在模型 pill 里，只显示&quot;模型 · Med&quot;，想改强度得打开模型菜单、找到当前模型的行、悬停到子菜单里找选项，很多人把 pill 读成&quot;这个模型只有中等档&quot;，压根没发现子菜单。</p>
+<p>修复：输入框模型 pill 旁边新增独立的 ReasoningPill，直接显示当前会话的实时档位（会话值优先、否则 profile 默认；档位为 Low / Med / High / XHigh / Max / Ultra 等级别，另有 Thinking 开关控制是否推理），点开就是给当前模型切档的菜单；模型不支持推理时自动隐藏，能力未知时不闪烁。模型菜单和推理菜单共用同一套会话写回逻辑，从哪个入口改都是一条代码路径。</p>
+<p>效果：改推理强度从&quot;三层菜单&quot;变成&quot;原地一键&quot;，桌面端和 tile 各自绑定自己的会话，不会改错对象。</p>
+<p>桌面端 MCP 服务器每日重新认证提醒</p>
+<p>hash: 68eb059863</p>
+<p>问题：MCP 服务器的 OAuth refresh token 失效时，每个应用会话只在转入 needs-auth 状态时弹一次警告，之后服务器就静默停摆，用户得碰巧打开 Capabilities → MCP 才能发现。</p>
+<p>修复：健康检查在服务器持续损坏期间每天重新提醒一次（按 profile+server 持久化 24 小时 snooze，与更新/skew toast 同一套模式）；toast 新增次要按钮 Disable，一键写入 enabled: false，网关配置调和与 serve 后端的热重载都会跟进这个改动。</p>
+<p>效果：死 token 从&quot;静默停摆&quot;变成&quot;每天都提醒直到处理&quot;，且提供了第二条出路：直接禁用。</p>
+<p>桌面端视频播放倍速记忆</p>
+<p>hash: e1c05ffa32</p>
+<p>问题：transcript 视频的播放倍速是每个视频独立的，2 倍速党每打开一个新视频都要重新调一次。</p>
+<p>修复：播放倍速作为设备级偏好持久化，新播放器和其他窗口（通过 persistentAtom 存储同步）直接按上次的倍速起步；越界/损坏的存储值回退 1x，切回 1x 会清除存储键。</p>
+<p>效果：看 2x 的观众不用每个视频重选倍速，跨窗口一致。</p>
+<p>桌面端 tab 路由与归属修复（5 条）</p>
+<p>hash: 3bad7e72db、2292c64738、88a7e6f96a、771b947a43、ecdd72d17b</p>
+<p>（另有 5b9d387cee 为纯 import 排序格式化，不属功能修复）</p>
+<p>问题：桌面端多 profile 场景下，tab 在选中切换、升入 MAIN、多 profile 混排时会出现会话路由错乱——routed transcript 被选择抖动清掉、tab 升 MAIN 后 session.control.read 失去 owner、草稿归属错误 profile。</p>
+<p>修复：选择抖动时保留已路由的 transcript；tab 升入 MAIN 保留 owner 权限；tab-strip 草稿从草稿 profile 认领；未列出的 profile tab 保留 owner，未列出的 tile 草稿记录 owner stub 让 session.resume 正确路由。</p>
+<p>效果：多 profile 并排使用时会话归属和路由更稳定，不会窜会话说错身份。</p>
+<p>视觉（1 条 feat）：</p>
+<p>iPhone 照片（HEIF/HEIC/AVIF）终于能分析了</p>
+<p>hash: 0a545f7fa5</p>
+<p>问题：vision_analyze 拒绝 iPhone 照片，报 &quot;source is not a recognized image&quot;。iPhone 默认拍 HEIC（ISO-BMFF/HEVC），很多上传管道还把它错标成 .jpg，魔数嗅探没有 HEIF 分支，字节在进入归一化之前就被拦下。</p>
+<p>修复：按 ISO-BMFF ftyp 盒子嗅探，识别 HEIF/HEIC（heic/heix/heim/heis/hevc/hevx/mif1/msf1）和 AVIF（avif/avis）品牌；注册 pillow-heif 解码器，HEIF/AVIF 先重编码为 PNG 再嵌入（与 SVG 栅格化同一套软依赖模式）；缺解码器时报可操作的 &quot;pip install pillow-heif&quot; 而不是泛化失败。pillow-heif==1.4.0 成为核心依赖（预编译 wheel 自带 libheif）。非图像的 ftyp 品牌（如 mp4）保持不识别，误判边界有测试覆盖。</p>
+<p>效果：iPhone 原图直接拖给 vision_analyze 就能分析，不再要求先转格式；格式判断仍以魔数嗅探为准，不信任扩展名。</p>
+<p>图像/视频生成（2 条 feat）：</p>
+<p>Meta Muse Image 加入 FAL 目录</p>
+<p>hash: 82199439c7</p>
+<p>内容：FAL 目录新增 Meta 的 Muse Image：文生图 meta/muse-image/text-to-image + 图生图编辑 meta/muse-image/edit，按 Meta Model API 定价 $0.01/张。文生图固定传 16:9 / 1:1 / 9:16 尺寸族保证构图确定性，编辑模式故意不传尺寸让 Muse 跟随输入图；编辑最多带 1-10 张参考图。schema 已对照 FAL OpenAPI 验证，上线实跑被 FAL 账户余额锁挡住（403），与之前目录新增同款情况。</p>
+<p>MiniMax H3 Max Turbo 视频家族</p>
+<p>hash: 63584da036</p>
+<p>内容：fal 9 月 3 日上线 H3 Max Turbo——H3 Max 的吞吐优化后训练版本，补齐了 Max 没有的 1080P 档位：480P $0.025/秒、768P $0.04/秒、1080P $0.08/秒（9 月 14 日前有促销价）。文生视频、图生视频两个端点，时长 5-15 秒，schema 复用现有 family 能力标志 + Turbo 专属分辨率别名表。实跑同样被 FAL 余额锁挡住。</p>
+<p>新技能 ×4（打包）：</p>
+<p>hash: 47c029927f、f41b2c615d、b35c0284a1、d7a56474fc</p>
+<p>内容：本期合入 4 个移植技能（均 optional-skills/ 放置、MIT 许可）：</p>
+<p>dream-loop（achimala/dream-loop，400+ star 48h）：概念美术保真度构建循环——生成写实概念图 → 用 three.js/WebGL/Blender 搭场景 → 截图 → 用 vision_analyze 按 5 档阶梯评审截图 vs 概念图 → 迭代收敛并给出明确退出条件。重绑到 Hermes 原生工具（image_generate / vision_analyze / browser_exec / delegate_task）。</p>
+<p>system-atlas（inkboard/system-atlas）：可探索的等距架构图册，把系统结构渲染成等距视角的架构总览。</p>
+<p>mono-color（yanliudesign/mono-color-skill）：单色/双色印刷风编辑图片，报纸式观感。</p>
+<p>pr-lens（coldteadotai/pr-lens，3 周 1.1k star）：把 PR diff 或子系统表示成 graph.json，用 MIT 的 npx CLI 渲染成可下钻的动画 SVG 架构/数据流图，可选发布成可共享的 canvas 链接——给 PR 评审和架构讲解替代手绘 Mermaid 的方案。</p>
+<p>cron（2 条 feat + 4 条 fix）：</p>
+<p>cron 任务没跑到模型自动重试</p>
+<p>hash: ec58e08a35</p>
+<p>问题：定时任务如果撞上瞬时网络/DNS 故障、在发出任何一次模型调用之前就失败，会直接空等一个完整周期——每日任务在 VPN 重连期间触发一次就直接跳过一天。</p>
+<p>修复：调度器现在沿 5/15/30 分钟阶梯把下次运行时间提前；重试挂起期间抑制中间的失败通知；任何一次运行真正到达模型就重置阶梯。刻意比通用重试更窄：零 API 调用 + 瞬时故障分类意味着什么都没执行、什么都没花钱，重跑不会重复副作用。一次性任务不参与（at-most-times 派发记账）；重试永远不会越过计划中的下一次触发；可用 cron.retry_unreachable: false 关闭。</p>
+<p>效果：网络抖动不再吞掉整天的定时任务，且没有重复执行的风险。</p>
+<p>cron resnap：重采全局推理默认</p>
+<p>hash: 0037a4b17a</p>
+<p>问题：未 pin 模型的 cron 任务在创建时快照全局 provider/model，全局默认漂移后这些任务会按漂移保护 fail-closed（拒绝执行）。之前唯一的出路是 pin 死，但 pin 了就不再跟踪全局变化。</p>
+<p>修复：新增 resnap 动作——把未 pin 任务的快照刷新为当前全局解析结果但同时保持&quot;未 pin&quot;状态，继续跟踪未来变化。单个任务 cronjob(action=&#x27;resnap&#x27;, job_id=...) / hermes cron resnap &lt;id&gt;，批量 cronjob(action=&#x27;resnap&#x27;, all=true) / hermes cron resnap --all；两者都不给时拒绝猜作用域。漂移告警现在同时指向 pin 与 resnap 两个选项。不产生任何推理调用，只重算快照字符串。</p>
+<p>cron 修复集群</p>
+<p>hash: 24c136e8af、157aa716b7、a7810a7a6e、579dbe0c71</p>
+<p>内容：显式指定 MCP server 的任务在该 profile 作用域解析为 0 个工具时走 blocked_config 路径（之前会&quot;成功&quot;空跑且 quiet_mode 藏掉唯一诊断）；外部 worker ack 期限与交接收养宽限对齐；允许冷启动的外部 worker；sqlite_util 导入延迟到运行时，调度器在磁盘升级中存活。</p>
+<p>CLI（2 条 feat）：</p>
+<p>CLI 输入框 vi 编辑模式</p>
+<p>hash: 750b2fc5e2、2a5373da2c</p>
+<p>问题：CLI 输入框只有 emacs 绑定，Vim 用户没法用熟悉的模式编辑（feature request #4254，最早由 #4325 提出但该 PR 已对 main 过期）。初版实现同时注册了 /vim slash 命令，但维护者裁定不新增 slash 命令（08a2e7dbcc 同窗口内移除），最终形态为纯配置。</p>
+<p>修复：display.vim_mode 配置（默认 False，不影响现有用户）开启 vi keybindings；开启时输入框用 EditingMode.VI，运行时切换立即生效不用重启，状态栏显示 NORMAL/INSERT/REPLACE 指示。</p>
+<p>效果：Vim 用户在 Hermes CLI 里可以原生模式编辑（配置文件里开），不习惯的人完全无感。</p>
+<p>状态栏 git 分支字段</p>
+<p>hash: 7b037f0efa</p>
+<p>内容：状态栏新增可选的 git_branch 字段（⎇ 当前分支），灵感来自 MiniMax Code CLI 0.3.1。直接读 .git/HEAD（5 秒每目录 TTL 缓存，不每帧起子进程），跟随 gitdir: 指针文件支持 worktree/submodule，detached HEAD 显示缩写 commit。默认关闭，默认字段集不探测文件系统。</p>
+<p>安全与隐私（1 条 feat + 4 条 fix/refactor）：</p>
+<p>配置文件读取脱敏统一</p>
+<p>hash: 0997a23e57、8ab9e79d0a、6e7ea9cbdc、f80ea9987b</p>
+<p>问题：agent 读取 .env / shell rc / config.yaml 等含密钥文件的内容时，密钥原文会以可读形式进入对话上下文；且 $HERMES_HOME 前缀和带引号的路径会被当成未解析路径漏掉；grep/awk/sed 加入读文件命令列表后，pattern 操作数也会触发密钥谓词，导致读源码文件也被过度脱敏。</p>
+<p>修复：合并为唯一的 _command_reads_secret_file 谓词——.env 风格 basename 与 shell rc/profile 到处生效，config.yaml 只在 .hermes 目录或 $HERMES_HOME 下；grep/awk/sed 只对真实文件操作数生效（跳过首个非 flag 位置的 pattern 操作数），$HOME/ 与 ${HOME}/ 前缀剥除后再判 .hermes 段；管道只在未加引号的 |;&amp; 处切分，$HERMES_HOME 按已解析路径处理。</p>
+<p>效果：密钥文件读取统一脱敏、源码读取不再被误伤，脱敏测试改用真实的凭据形状值验证两条路径。</p>
+<p>IMDS 云元数据凭据抓取改为需要审批</p>
+<p>hash: 24692ee790</p>
+<p>问题：云 VM 上实例元数据服务会把 IAM/服务账号凭据直接发给任何本地进程且无认证——curl 一下 169.254.169.254 就等于凭据外泄，而 detect_dangerous_command() 之前自动放行这类命令。</p>
+<p>修复：DANGEROUS_PATTERNS 新增一条覆盖 169.254.169.254（AWS/Azure/GCP/OpenStack）、AWS IPv6 形式 fd00:ec2::254、metadata.google.internal 和阿里云 100.100.200.200；lookaround 排除其他 169.254.x.x 链路本地地址与更长的主机/点分串。</p>
+<p>效果：命令里出现云元数据端点会触发审批（合法用途如在真云 VM 上取凭据仍然可放行），不是硬性封杀，与既有凭据路径检测同级。</p>
+<p>账号与平台（1 条 feat）：</p>
+<p>OpenRouter OAuth PKCE 登录</p>
+<p>hash: 0007a4c2f9</p>
+<p>内容：hermes auth add openrouter --type oauth 走浏览器登录 openrouter.ai/auth（S256 PKCE，绑定首个 OS 分配的 loopback 端口，POST /api/v1/auth/keys 换码），换来的 key 存为普通 api_key 池条目（source manual:openrouter_pkce），轮换与解析跟粘贴的 key 完全一致。OpenRouter 不回显 state，CSRF nonce 放在回调路径里（猜对端口猜不对 nonce 就是 404）。远程/SSH 会话自动切换成 OpenRouter 文档化的无头粘贴代码模式，而不是不可达的 loopback 监听。--type 缺省时保持原有 --api-key 形式不变。</p>
+<p>后台进程完成通知精简</p>
+<p>hash: f1d5c99fe5</p>
+<p>问题：子代理完成事件已经精简成一行&quot;Subagent Task Completed: &lt;goal&gt;&quot;，但后台进程完成（terminal background + notify）仍把整块 [IMPORTANT: Background process …Command: … Output: …] 原文装成用户输入回显出来。</p>
+<p>修复：复用委托机制——TimelineNotification 携带 display_kind + display_text，后台进程完成渲染成一行标题：&quot;Background Process Finished: &lt;cmd&gt;&quot; / &quot;Background Process Failed (exit 1): &lt;cmd&gt;&quot; / &quot;N Background Processes Finished&quot;，TUI 网关同一套 kind/metadata。</p>
+<p>效果：后台任务结束的通知从&quot;通知墙&quot;变成一行摘要，进程输出不再污染时间线。</p>
+<p>Kanban（9 条 fix）：</p>
+<p>hash: 907f409dc4、053f8b1b17、2710d85914、0c9aa10f41、ae076bc465、ba65ce668a、f3357b5031、9541317aee、ad0398eed8</p>
+<p>内容：归档任务现在真正杀掉 worker 进程（此前只是标记归档，worker 继续跑）且终止过程做成竞态安全 + 审计；网关通知轮询加门控；worker 环境清洗前先装好 assignee 的密钥作用域；auto-decompose tick 在 multiplex 下限定默认 profile；review 交接回滚时丢弃暂存的拷贝、不重复上传，review 任务在 request_review 里暂存交接产物；以 initial_status=blocked 创建的任务保留 sticky block 标记。</p>
+<p>迁移与更新防护（1 条 feat + 2 条 fix）：</p>
+<p>hash: 8ed2fec94c、0abfd1105c、10654711fa</p>
+<p>内容：自动 multiplex 迁移加了边界守卫（服务域、UNIX 用户、HERMES_HOME 树三个维度，uid 比较而非字符串），hermes update 拒绝折叠跨用户/跨作用域的网关，dry run 显示发现但明确命令不被守卫拦截；同时新增 gateway.auto_multiplex_migration 配置项可整体关闭自动迁移（显式 migrate --multiplex 命令不受影响）。更新等待网关排空时会写明在等什么工作。</p>
+<p>Honcho（3 条 feat + 43 条 fix(honcho) + 1 条 perf）：</p>
+<p>hash: dc7c8673d1、0a7c17159c、21180ae7e8、476dbfed3a</p>
+<p>内容：hermes honcho peers map 交互式账号-对等映射（工作区 peers 与 state.db 网关账号双向对照，输入错误目标不会静默建 peer）；sessionAiPeerPrefix 按 AI 对等方隔离会话；设置向导的网关映射步骤围绕 peer 模型重做。43 条 fix 覆盖 peer 解析缓存、观察标志同步、孤儿清理、thread registry、会话前缀切换等稳定性修复。唯一 perf（476dbfed3a）：peers map 扫描 profile 目录从&quot;每账号行一次&quot;改为一次。另有 feat(tui-gateway) c5973cd540：TUI 网关用已认证的 dashboard 用户做 agent user_id。</p>
+<p>其他值得一提的修复（20+ 条集群）：</p>
+<p>gateway：/usage 计费路由跟随最新模型；/save 正确投递导出文档不再崩 get_adapter；profile secret 快照失效清理与重试；代理模式 SSE 流 3 个韧性 bug；独立回滚可恢复。</p>
+<p>agent：promoted clean-stop 推理持久化并 pin 长度负值；reasoning-only clean stop 正确返回；reasoning-only 流断线按断线处理而非干净停止。</p>
+<p>vision：主模型原生看图时正确宣传 vision_analyze / browser_vision 工具。</p>
+<p>TUI：reload.mcp 刷新所有活会话的工具；口令/状态模型跟随最新计算主机；会话上下文切换保持同会话路由；A2A orphan 宽限有界、断线清 _active_tasks。</p>
+<p>插件：安全扫描器不再读取测试树，测试树的 critical 降级为 caution；安装块中的 critical 发现能识别。</p>
+<p>桌面端（其他）：Star Map 节点菜单在窗口边缘保持可见；右键菜单里的星图播放热键不再误触发。</p>
+    </section>
+    
     <section id="2026-09-13" class="day">
       <h2>Hermes 日报 2026-09-13：桌面端 GPT-Live 全双工语音聊天 + 一键迁移到单一 multiplexed 网关</h2>
       <p><strong>本期覆盖 9 月 12 日 06:30 ~ 9 月 13 日 06:30 合入 main 的提交，共 317 个 commit（不含 merge），另有 0 个 merge。新增 22 个功能、178 个修复、0 个性能优化。</strong></p>
