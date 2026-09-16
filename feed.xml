@@ -5,8 +5,91 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 16 Sep 2026 08:10:41 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 17 Sep 2026 07:33:22 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-17：桌面端技能/插件目录当天回滚又回归，多 profile 复用默认开启，审批流支持批量堆叠</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-17</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-17</guid>
+      <pubDate>Thu, 17 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 15 日 ~ 9 月 16 日合入 main 的提交，共 492 个 commit（不含 merge），另有 0 个 merge。新增 27 个功能、318 个修复、7 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端技能/插件目录经历一波三折：早晨合入、上午被整体回滚、下午以卡牌浏览形态恢复，还带上了首任务建议和版本标签。</p>
+<p>多 profile 体系大改：桌面端新增 profile 窗口和默认 profile 持久化，网关多 profile 复用默认开启，命名 profile 不再继承根 profile 的凭据。</p>
+<p>桌面端审批流重做：审批请求堆叠成栈、Enter 精确推进，撤回提示不再被误判成用户拒绝。</p>
+<p>浮动输入框跨聊天窗格共享，麦克风语音开关扇出成 FanMenu 菜单。</p>
+<p>性能 7 连击：时间线虚拟化、渲染包每窗口只解析一次、会话侧栏索引不再水合完整 transcript。</p>
+<p>桌面端与目录（feat 为主 + 55 条以上 fix）：</p>
+<p>技能/插件目录一波三折后恢复，升级为卡牌浏览</p>
+<p>hash: b0e78e60fb、07c9088460、9796235822、4718ba7352、cbd76e4ea3、cf59980e2c、4e9d3c713a</p>
+<p>问题：桌面端浏览技能/插件目录的能力此前处于过渡期：此前的目录工作带出了「桌面端打开网站安装」「本地目录浏览」两个入口（b0e78e60fb、07c9088460 当天先合入），但随后被整体回滚（9796235822、4718ba7352 等 6 个 Revert），目录浏览入口一度消失。</p>
+<p>修复：同日下午以 restore 形式重新合入——共享浏览器、协议处理、安装确认完整恢复（cbd76e4ea3，commit body 说明「为继续 UI 迭代」），网站安装链接同步回归（cf59980e2c），并新增卡牌式浏览 + 保存列表选项（4e9d3c713a）。</p>
+<p>效果：目录浏览不仅回来了，还换上了卡牌视图，支持把常用条目存进列表。</p>
+<p>首任务建议 + Blender 桥</p>
+<p>hash: 4716ec0ba4、12f495feac</p>
+<p>问题：新用户打开桌面端不知道该从哪个集成、哪个任务开始，目录里堆着一堆条目无从下手。</p>
+<p>修复：桌面端首次使用会从真实集成推荐多种首任务（4716ec0ba4）；MCP 目录补齐首任务示例，并新增 Blender 桥接示例（12f495feac）。</p>
+<p>效果：首次上手的引导路径从「自己翻目录」变成「照着推荐任务点一下」。</p>
+<p>目录条目增强</p>
+<p>hash: 034313e7cd、bd46352705、aca6c1c84a、bb0c230366、873a7bbb6f</p>
+<p>目录条目可以带可选版本标签和卡片图（034313e7cd），图片槽位规范为 2:1、版本标签做成 pill 样式（bd46352705）；UI 层支持纯图标分段控件（2e05fcf524）。本期还入库一批新插件：usage-stats（aca6c1c84a）、hermes-telemetry / openalex / yantrikdb（bb0c230366）、Gondola / intelligent-memory / inkbox / home-dashboard 等 5 个 sweep 补录（873a7bbb6f）。</p>
+<p>桌面端 profile 窗口与默认 profile</p>
+<p>hash: 09aaa4cc41、63d129bf17、8eaf776c3b</p>
+<p>问题：多 profile 用户在桌面端切换、指派默认 profile 只能走命令行，新聊天和启动时也没有「默认走哪个 profile」的概念。</p>
+<p>修复：新增 profile 窗口和默认上下文操作（09aaa4cc41）；启动和新聊天应用默认 profile（63d129bf17）；默认 profile 持久化并对等窗口之间路由（8eaf776c3b）。</p>
+<p>效果：桌面端可以管理默认 profile，新会话自动落在默认 profile 上，多窗口场景下会话路由更可控。</p>
+<p>桌面端更多细节</p>
+<p>hash: c7580f0e06、bc722dcb85、087fbe3847、ca6bfe2b6c、56ea9bab92、cb95c278af、2e05fcf524</p>
+<p>浮动输入框在所有聊天窗格共享（087fbe3847），写了一半的内容切换窗格不丢。麦克风按钮的语音开关扇出成 FanMenu 菜单（c7580f0e06 + bc722dcb85），新增浮动按钮变体。排队 toast 有界卡片深度（ca6bfe2b6c），通知多了不糊墙。</p>
+<p>网关与多 profile（1 条 feat + 27 条以上 fix）：</p>
+<p>网关多 profile 复用默认开启</p>
+<p>hash: a10bbf95bb</p>
+<p>问题：多个 profile 共用一个网关（multiplex）此前需要显式配置开启，默认是单 profile 单网关，多 profile 用户要手动迁移。</p>
+<p>修复：DEFAULT_CONFIG 现在默认 gateway.multiplex_profiles: true，但由启动时的 serve guard 把关——默认 profile 存在、≥2 个 profile、没有别的 profile 在单独跑网关、没有重复凭据/端口冲突、主机可迁移，全部通过才启用；不满足就记录警告并照常单机启动，`--standalone` 仍固定关闭。</p>
+<p>效果：满足条件的多 profile 环境升级后自动进入复用模式，无需手动改配置。</p>
+<p>profile 凭据与清理修复</p>
+<p>hash: 93889b770d、8a2c9edac6、b1b0cb230b、a41552fad4、43e28551bb、aa90c01e9a</p>
+<p>命名 profile 不再继承根 profile 的 auth.json（93889b770d，#111724）——多 profile 凭据隔离更干净。重命名 profile 保留 checkpoint 历史（8a2c9edac6），部分重命名重加密重试时新名下的 checkpoint 也不丢（b1b0cb230b）。删除 profile 时清理会话/路由身份（a41552fad4）、释放路由日志锁（43e28551bb），settle-pending 删除报告为类型化部分成功（aa90c01e9a）。</p>
+<p>网关修复</p>
+<p>hash: 595d4cfe45、f27c719a93、51c4b6ba9d、99f68e730b、a09195b1e8、1db1303964</p>
+<p>停止的 profile 在 Channels 页不再显示「Start failed」（595d4cfe45）；mirror 会话索引在调用时解析而不是导入时定死（f27c719a93）；独立网关在宿主激活后绑定启动 profile 自己的作用域（51c4b6ba9d、99f68e730b）；双活和跨 profile 的服务 profile 卡片不变量加固（a09195b1e8）；忽略服务 profile 过期的自身运行时记录（1db1303964）。</p>
+<p>桌面端审批流（3 条 feat + 4 条 fix）：</p>
+<p>审批堆叠 + Enter 精确推进</p>
+<p>hash: 56ea9bab92、cb95c278af、dd68d17567、42e933b411</p>
+<p>问题：多个审批请求同时到来时只能逐个处理，执行过程中审批栈还可能被任务推进打乱；GUI 终端询问没有预先准备，执行途中才弹出。</p>
+<p>修复：审批请求堆叠成栈，Enter 精确推进指定请求（56ea9bab92）；执行期间审批栈保持稳定（cb95c278af）；GUI 终端询问在执行前准备好（dd68d17567）；桌面会话来源的审批批次预处理（42e933b411）。</p>
+<p>效果：连续审批可以一口气过，执行中的审批流不再乱。</p>
+<p>撤回不再是拒绝</p>
+<p>hash: 2dfb795cb7、1e2cb57973、6332216384</p>
+<p>问题：未送达或未回答的 CLI 审批提示、会话拆除、被中断的任务、撤回的网关审批，之前都会被记成「用户拒绝」，把模型往错误方向引导。</p>
+<p>修复：未送达/未回答的提示不构成用户拒绝（2dfb795cb7）；会话拆除和中断时撤回提示而不是否认（1e2cb57973）；撤回的网关审批不再读作用户拒绝（6332216384）。</p>
+<p>效果：只有用户真正点「拒绝」才算是拒绝，语义干净了。</p>
+<p>性能（7 条 perf）：</p>
+<p>hash: 2efbbef981、ab4bfda360、7e69873ca6、fd304509ec、fa148ce1b7、691228447d、1e39c93710</p>
+<p>桌面端时间线虚拟化并限制历史跳转（2efbbef981）——长对话滚动不再卡；renderer 包每个窗口只解析一次而不是两次（ab4bfda360）；会话侧栏索引提示词不再水合完整 transcript（7e69873ca6）；关闭的 action 菜单延迟到内容挂载后再加载（fd304509ec）；关系型样式失效隔离在相关窗格内（fa148ce1b7）；工作区帧率监听不再创建合成会话（691228447d）；批量 chat-completions 载荷绕过 SDK 请求转换（1e39c93710）。</p>
+<p>模型与凭据（1 条 feat + 1 条 fix）：</p>
+<p>Union Alpha 免费入库</p>
+<p>hash: d0aecdf352、61154b6f68</p>
+<p>OpenRouter 免费目录新增 stealth/union-alpha：262,144 上下文、支持工具和 tool_choice、图文输入，$0 隐身模型（d0aecdf352）。显式标记「free, stealth model」，加入 DEFAULT_CONTEXT_LENGTHS 让离线解析返回 262144，并加 _OPENROUTER_ONLY 条目防止混入 Nous Portal 派生列表。Union Alpha 的调用路由也修正为走 messages（61154b6f68）。实测 tool-calling 完成返回 200、usage.cost=0。</p>
+<p>凭据池编号轮换</p>
+<p>hash: 996f7bc563</p>
+<p>问题：想给某个供应商配第二个池化 key（做轮换/负载分配），之前要改配置 key，门槛高。</p>
+<p>修复：现在在 NVIDIA_API_KEY 旁边放 NVIDIA_API_KEY_2 就是全部操作——_seed_from_env 对每个声明变量依次试 VAR_2、VAR_3…直到第一个空档，通用注册表和 openrouter 分支同样生效（#76593）。密钥留在环境/密钥管理器，只持久化引用行。</p>
+<p>效果：多 key 轮换从「改配置」降级成「加一个环境变量」。</p>
+<p>Kanban 看板（16 条 fix）：</p>
+<p>worker 生命周期加固</p>
+<p>hash: 9977df914d、db54f5448d、3b9c1118cd、3abeca16e6、2bd0f1c59e、bd63866253、aa5817d9be</p>
+<p>子任务不再操作父任务的 HERMES_KANBAN_TASK 环境变量（9977df914d）；worker 指纹带启动见证，未捕获的指纹永远不能授权信号（db54f5448d）；死 worker 收割时展示它最后的输出（3b9c1118cd）；5xx 和超时把任务重新排队而不是消耗重试预算（3abeca16e6）；停止提示只作用于分派器拥有的 worker（2bd0f1c59e）；完成的 worker 在终局收割前有宽限期（bd63866253），活过自己运行的 worker 会被收割（aa5817d9be）。</p>
+<p>看板数据健壮性</p>
+<p>hash: 4465b8d7d5、a647c6cb2d、85d4415bed、72916de360、0959224313、c7f4bc5bd7、ec64ec0d24、f7ea39481a、058e620bef</p>
+<p>BLOB 单元格在评论/事件/运行行里像 BLOB 任务体一样降级（4465b8d7d5）；单个无法解码的任务字段不再弄坏整块看板列表（a647c6cb2d）；request_review 与 complete_task 共用活 worker 围栏（85d4415bed）；活声明守卫键控在活 worker 进程而不是任何声明上（72916de360）；无声明的 complete 不再关闭活 worker 的运行（0959224313）；文本派发输出和「分派器卡住」警告都指名卡住原因（c7f4bc5bd7）；dispatch --json 报告 respawn_guarded 等抑制原因（ec64ec0d24）；看板估算调用和 headless 的 specify/decompose 辅助调用都带 relay 亲和键（f7ea39481a、058e620bef）。</p>
+<p>更新系统（12 条 fix）：</p>
+<p>hash: 5f071fb3ad、1259b140c9、d2f1587aa2、5a942f95fc、7c6b8c7a8d、99b727bd96、efc2b8e28d、a1b997beb9、2f3d0b5cc2、882c59ee93、de93cb05fd、29979b8c25</p>
+<p>失败的仪表盘清理不再中止集群验证和回执（5f071fb3ad）；更新回执在混合 sys.modules 图中存活、丢失的写入可见（1259b140c9）；submodule 清理按对象身份解绑而不是按名字（d2f1587aa2、5a942f95fc）；桌面端托管的 serve 不再让更新失败或卡住 fleet_restart_pending（7c6b8c7a8d）；launchd 托管的后端通过 launchd 重启而不是游离 respawn（99b727bd96），launchd 作业以新 PID 回来并跟随 wrapper plist、--stop 时警告（efc2b8e28d）；每个修复结果一条回执、原因不重复打印（a1b997beb9）；SQLite 运行时修复结果进回执（2f3d0b5cc2）；候选运行时同步失败会说明原因（882c59ee93）。</p>
+<p>其他修复：</p>
+<p>hash: 1c7bc44eda、c11b0a07e7、f1b7ae7206、5ad9ee8630、d5b3cad7b9、a38d544f1b、74ca4f28ba</p>
+<p>工具回放前不再发明空的 assistant 轮次（1c7bc44eda）；周期回调上下文在代理里保留（c11b0a07e7）；Nous 账户抓取保留路由 profile 上下文（f1b7ae7206）；过期 finalization 留在来源 profile（5ad9ee8630）；MCP 隔离不支持的推断应用标签（d5b3cad7b9），本地应用发现作为可选能力暴露（a38d544f1b）；引导流程消费未来目录条目不再需要自定义元数据（74ca4f28ba）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-16：插件目录一次入库 66 个社区插件，视频生成新增 LTX 2.5 与可灵 O3</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-16</link>
