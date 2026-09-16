@@ -5,8 +5,224 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 14 Sep 2026 07:41:43 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 16 Sep 2026 08:10:41 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-16：插件目录一次入库 66 个社区插件，视频生成新增 LTX 2.5 与可灵 O3</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-16</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-16</guid>
+      <pubDate>Wed, 16 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 15 日 ~ 9 月 16 日合入 main 的提交，共 732 个 commit（不含 merge），另有 7 个 merge。新增 35 个功能、442 个修复、1 个性能优化。（口径：按合入 main 的时间算；原始数据含部分 commit date 为 09-14 的提交，晚合入 main，属正常。）</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端新增可隐藏的 profile 栏，隐藏后状态栏出现 profile 下拉，本地引擎支持一键更新。</p>
+<p>视频生成三连：LTX 2.5 与可灵 Kling O3 上架 FAL，Happy Horse 升级到 v1.1 完整 schema。</p>
+<p>插件目录一次入库 66 个社区插件，按类别分架、按 GitHub stars 排名。</p>
+<p>免费层把所有欢迎 API 失败都规范化：友好文案、可重试、桌面端登录失败提示，附故障注入排练服务器。</p>
+<p>update 和 doctor 现在会提示回滚检查点占用：开启且超过容量的用户会被点名给出退出口径。</p>
+<p>桌面端（1 条 feat + 40+ 条 fix）：</p>
+<p>可隐藏的 profile 栏 + 状态栏 profile 下拉</p>
+<p>hash: 043632e283</p>
+<p>问题：把 profile 当 bot 跑的用户，侧边栏底部的彩色 profile 条和会话列表内容重复（社区反馈）；同时在用多个 gateway 的用户在窄窗口里 profile 条占地方。</p>
+<p>修复：新增持久化设置 hermes.desktop.profileRailVisible（默认开），可从 Sessions 视图菜单、shell 右键菜单、Ctrl+K（&quot;Toggle profile rail&quot;）切换，另有一个未绑定的 view.toggleProfileRail 快捷键。</p>
+<p>效果：隐藏后状态栏出现 ProfileSwitcher 下拉（在 gateway 切换器旁边），提供同样的选择：本网关的 profiles、All profiles、fleet 模式下其他网关的 agent、New / Import / Manage；profile.create 热键也由它接管，所有入口不丢。</p>
+<p>桌面端本地引擎一键更新</p>
+<p>hash: de5a1da632、e9e363c856</p>
+<p>问题：本地推理引擎（llama.cpp 等）升级要自己到命令行操作，桌面端用户没有入口。</p>
+<p>修复：桌面端新增一键本地引擎更新（de5a1da632）；本地运行时默认档提升到 llama.cpp b10964（e9e363c856）。</p>
+<p>效果：本地引擎版本跟进从命令行活变成桌面端点一下的事。</p>
+<p>桌面端交互修复群（选中条目）</p>
+<p>hash: 2179a279ae、d128ce2e25、825324fdc9、05e82b741d、36010d0bba、69fd61b0ef</p>
+<p>从浏览器拖链接到聊天窗现在自动变成 @url 指令芯片，不用手动粘贴再转（2179a279ae）。</p>
+<p>输入 sudo 密码前命令保持可见，不会被密码输入弹层盖掉（d128ce2e25）。</p>
+<p>主本地描述符没有 profile 时，恢复上次使用的 profile（825324fdc9）。</p>
+<p>Tab Strip 的 Auto copy 正确命名另一个 zone 的例外；单条聊天在另一个聊天 zone 打开时仍保留自己的 tab strip（05e82b741d、36010d0bba）。</p>
+<p>首帧回填加了锚点，长会话不再来回晃（69fd61b0ef，#99920）。</p>
+<p>视频生成（1 条 feat）：</p>
+<p>LTX 2.5 + 可灵 O3 上线，Happy Horse 升级 v1.1</p>
+<p>hash: 37286d3064</p>
+<p>问题：FAL 视频端点只剩旧家族，新模型（Lightricks 的开源音视频模型、快手的多镜头模型）没有接入；Happy Horse 还挂在文档稀疏的 1.0 端点上。</p>
+<p>修复：新增两个 FAL 视频家族并升级一个——</p>
+<p>ltx-2.5（便宜档）：Lightricks 开源音视频模型，原生音频、6-20 秒整数时长、720p-2160p（图生视频）、720p 下 0.09 美元/秒。</p>
+<p>kling-o3（高档）：快手可灵前沿多镜头模型，3-15 秒、可选原生音频（关 0.084 美元/秒、开 0.112 美元/秒），图生视频丢弃宽高比参数。</p>
+<p>happy-horse 升级到 alibaba/happy-horse/v1.1 完整 schema：9 种宽高比、720p/1080p、3-15 秒整数时长、支持 seed、原生音频。</p>
+<p>效果：三个端点全部按各自 llms.txt schema 生成 payload 并本地断言，旧 happy-horse 的 prompt-only 契约测试同步更新为 v1.1。</p>
+<p>插件目录（8 条 feat + 零散新增）：</p>
+<p>一次入库 66 个社区插件</p>
+<p>hash: 5d59366010</p>
+<p>问题：Discord #plugins-skills-and-skins 频道积累了大量社区插件，目录里只有零星几个。</p>
+<p>修复：批量收录 66 个社区插件，每个都 pin 在 2026-09-15 审核过的 commit，并通过四重检查：hermes plugins validate（声明工具/钩子/中间件与注册匹配、无内置工具冲突，主 venv 和裸 pip install -e . venv 双环境）、tools.plugin_guard.scan_plugin 非危险判定、每个 .js 文件的自更新器 grep、每个 .py 文件的供应商凭据存储写入 grep；能力与 requires_env 照抄 plugin.yaml，类别手工分配。</p>
+<p>效果：插件目录单日净增 66+ 个条目，社区插件的可发现性大幅提升。</p>
+<p>目录按类别归档 + 按 stars 排名</p>
+<p>hash: 55dbd7f6e1、3e2e2c50eb、2de17e5d40</p>
+<p>问题：插件目录只有平铺列表，找插件靠翻；排序也没有客观依据。</p>
+<p>修复：目录按类别分架（Memory、Desktop、Platforms 等，55dbd7f6e1），默认架 Desktop、兜底 General（2de17e5d40）；条目按 GitHub stars 排名，每天最多探测一次（3e2e2c50eb）。</p>
+<p>效果：目录变成可浏览的货架，热门插件靠前。</p>
+<p>零散新增插件（hash: cd14f06dbf、913ce5b64a、a982d2c882、3bec474211、cb84ee770f、e7bd70d92a、0491ae8101、4b8e183912、2c70c41adc、23effb598d、eab8871978、681d6c63fb、50551b24fa、603bc6ed44、144942734e、63839f98fc）</p>
+<p>hermes-newswire（新闻订阅）、hermes-live-voice（实时语音）、hermes-auto-titler（自动起标题）、hermes-tailscale、hermes-ssh、shodan（网络资产测绘）、hermes-terminal、hermes-rss、hermes-resetwatch、hermes-office（Office 文档）、hermes-nous-prices、hermes-ledgerline、metamask-wallet、Octen（Web 供应商）、hermes-pets-all（桌面宠物）、grill-tab 等 16+ 个社区插件条目入库；hermes-live-voice 还有一长串 pin 更新（b0bc5f54ad、ae6e572074、543fd29a8a 等，修配额 UX、打断、静音、自包含 vendored 回退、委托加固）。</p>
+<p>免费层（1 条 feat + 6 条 fix）：</p>
+<p>所有欢迎 API 失败都有明确规则和友好文案</p>
+<p>hash: 51e39af967</p>
+<p>问题：免费层依赖账号服务（NAS）和 welcome 推理主机，大部分拒绝/失败方式 Hermes 没有合理回应：NAS 发来的编码从没送出去、tier-dark 403 没有可匹配的消息、一次启动抖动就让整个进程禁了 mint、结构化限流拒绝到不了跨会话守卫，&quot;登录获取更大额度&quot;提示成了死代码。</p>
+<p>修复（后端）：把 NAS 实际发送的 404 not_found / 503 temporarily_disabled / 429 + Retry-After / 428 pow_* / 403 account_locked 分类成 ANON_* 代码（带 retry_after / retryable）；进程级 mint 记忆换成 per-profile 冷却，尊重服务器等待、服务不可达时短阶梯退避、终态代码不重试、用户强制重试（force=True）优先；启动失败记录 error_code，有界后台循环重试瞬时失败并重新广播 setup.ready；推理侧把 welcome 主机的通用 403 判定为 tier 拒绝（按路由键），model_not_free 转到网关备用路由一次，长限流拒绝触发跨会话守卫，锁定账号退休不替换。</p>
+<p>修复（桌面端）：provider 选择器上方新增设置失败提示——每码一句话、后端说能重试才给重试按钮、只有账号服务答过话才指向登录；登录对话框新增 busy / unreachable / unavailable 三个状态页；背景成功时 overlay 收到 setup.ready 自动消失。</p>
+<p>文案：全部重写给首次用户——不说&quot;免费服务挂了&quot;（挂的是免登录使用，登录本身免费）、没有术语、等待时间口语化。</p>
+<p>配套：scripts/free_tier_fault_server.py 故障注入排练服务器，按真实线协议模拟两个服务，HERMES_EXTRA_WELCOME_HOSTS 让路由规则把它当 welcome 主机，开发文档见 website/docs/developer-guide/free-tier-fault-rehearsal.md。</p>
+<p>free-tier 修复群</p>
+<p>hash: 2a94ca80e7、2e3b8ecc82、16def7b8cc、683ca44046、658f319147、95dba8d9a5</p>
+<p>额度判定加了路由门控、保留 policy/billing 的 403、provision RPC 走池化、重试竞态加守卫（2a94ca80e7，评审第二轮）。</p>
+<p>桌面端免费层卡片不再带&quot;To sign in&quot;尾巴，按钮就是门（2e3b8ecc82）；免费层拒绝渲染成独立卡片而不是 OAuth 重新登录（16def7b8cc）。</p>
+<p>welcome 主机 403 点名免费层本身 = tier 拒绝，不是计费墙（683ca44046）；setup.ready 的失败块形状展平，与 setup.status 一致（658f319147）；未编码 AuthError 的等待提示保留（95dba8d9a5）。</p>
+<p>更新与维护（1 条 feat + 修复群）：</p>
+<p>update/doctor 提示回滚检查点占用</p>
+<p>hash: f9c3a8a186</p>
+<p>问题：检查点 2026-03-16 起默认开启、05-06 改回默认关，但中间窗口期把 checkpoints.enabled: true 写进了用户配置，后来的默认翻转够不着它。从不敲 /rollback 的用户一直背着 GB 级 ~/.hermes/checkpoints/store（实测一台机器 250 个项目 1.2 GB，多数是一次性工作树和 /tmp 目录），容量上限也降不下来（每个项目至少保留一个快照）。</p>
+<p>修复：不静默翻 key（那等于覆盖真实选择），改为提示：checkpoints 开启且 store 达到 max_total_size_mb 时输出一行，命名退出口径（hermes config set checkpoints.enabled false + hermes checkpoints clear）和保留旋钮。hermes update 在更新后提示里打印；hermes doctor 在 state.db 检查后作为 warning 报告。</p>
+<p>效果：背着 GB 级检查点的用户第一次知道这东西可以关。</p>
+<p>更新流程修复群</p>
+<p>hash: f81c33cb6a、c99fee4e0a、5341f135a5、29758a4eb2</p>
+<p>restarted unit 已死时提前停掉 fleet settle 轮询（f81c33cb6a）；监督重启后等待 fleet 状态发布再继续（c99fee4e0a）。</p>
+<p>purge 保留 hermes_constants（原地刷新替代删除，5341f135a5）；CLI purge 清理所有顶层 checkout 模块而不只是五个包（29758a4eb2）。</p>
+<p>技能与会话（3 条 feat）：</p>
+<p>skills.auto_load 常驻技能</p>
+<p>hash: 1976869c01</p>
+<p>问题：想让某些技能出现在每个新会话里，只能每次敲 -s，或依赖 Curator 自动加载（不可控）。</p>
+<p>修复：config.yaml 加 skills.auto_load: [name, ...]，列出的技能以完整 skill block 渲染进每个新 agent 的系统提示——CLI、TUI、gateway、cron、API 全生效，是 -s 的持久版；缺失或被禁用的名字警告并跳过，配置打错字不会卡会话启动（复用 _load_skill_blocks 的禁用门和 Curator 用量提升，与 -s 一致）。</p>
+<p>效果：常用技能一次配置、长期生效，覆盖所有会话入口。</p>
+<p>会话搜索时间边界 + 排除列表</p>
+<p>hash: 5655920f9a、e819846b10、2a2c3aa588</p>
+<p>问题：/session_search 只能全库搜或带起始点，想搜&quot;最近 24 小时&quot;这类相对窗口没有语法。</p>
+<p>修复：新增 after/before 时间边界和 exclude_session_ids 排除列表（5655920f9a）；相对时间（7d/24h/2w）通过包装器转发到 after/before（e819846b10）；OR 宽松重试让改述式提问也能命中（2a2c3aa588）。</p>
+<p>效果：会话搜索拿到时间窗与排除能力，记忆回找更精准。</p>
+<p>其他亮点：</p>
+<p>gateway 陌生私信 decline 行为</p>
+<p>hash: a6e934e0fd</p>
+<p>问题：unauthorized_dm_behavior 只有两个选项——回配对码（pair）或保持沉默（ignore），对主动找上门的陌生私信没有礼貌拒绝选项（移植自 qwibitai/nanoclaw#3260）。</p>
+<p>修复：新增第三个选项 &#x27;decline&#x27;：对未知发送者回一条简短礼貌拒绝，然后 24 小时对这个发送者保持沉默；群组消息仍永远静默忽略；decline 戳记先写后发，发送失败不会变成拒绝风暴；文案可自定义（unauthorized_dm_decline_message）。</p>
+<p>效果：陌生人私信有了一次性礼貌回应，且不会被重复骚扰。</p>
+<p>/context 列出加载状态与 token 消耗</p>
+<p>hash: 5349aa609d</p>
+<p>/context 命令现在逐条列出每个上下文文件的加载状态和 token 消耗（灵感来自 Copilot CLI），排查&quot;上下文到底占了多少&quot;不用再猜。</p>
+<p>profile clone 可保持与源同步</p>
+<p>hash: 7bb52c0b74、6fcd011c01</p>
+<p>hermes import-agent 支持 --sync 使导入的 agent 设置与源保持同步（6fcd011c01）；profile clone 可 opt in 保持与源同步（--sync-imports，7bb52c0b74）。</p>
+<p>安全加固</p>
+<p>hash: faf71eb4c1、26f5643dc9</p>
+<p>文件工具拒绝 Windows NT 命名空间路径（\\.\C: \??\C: 类），防 NTLM 凭据泄漏（faf71eb4c1，灵感来自 Claude Code）；MCP 的写能力工具在会话中途过期后不再自动重试（26f5643dc9，移植自 cloudflare/cloudflare-os#168），避免重复写入副作用。</p>
+<p>其他零碎</p>
+<p>hash: 23bdb546cc、1657a1ce2d、398279fd6a、251ab05000、f25f655559、87ce653d1d</p>
+<p>config.yaml 顶层新增已知键 allow_all_users（23bdb546cc）；CLI 新增 --format stream-json 结构化 JSONL 输出（1657a1ce2d）；两个新可选技能 ip-as-logo（可爱 IP 吉祥物标识，398279fd6a）和 auteur（电影感网页设计 + 可执行的 anti-slop 门槛，251ab05000）；会话导出附带时序证据（f25f655559）；旧 HERMES_NEMO_RELAY_ATIF_*/ATOF_* 环境变量迁移进校验过的 relay-plugins.toml（87ce653d1d）。</p>
+<p>性能（1 条）：</p>
+<p>hash: 416a8177c2</p>
+<p>插件源文件的&quot;已移除 import&quot;扫描每进程只跑一次，不再每 profile 一次（perf(plugins)）。</p>]]></description>
+    </item>
+    <item>
+      <title>Hermes 日报 2026-09-15：视频生成三连：可灵 3.0 与 Wan 3.0 上线，桌面端新增字体选择器与独立推理强度</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-15</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-15</guid>
+      <pubDate>Tue, 15 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 14 日 ~ 9 月 15 日合入 main 的提交，共 294 个 commit（不含 merge），另有 4 个 merge。新增 23 个功能、165 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端设置里新增聊天/UI 字体选择器，每个辅助模型还能独立设置推理强度。</p>
+<p>视频生成三连：可灵 Kling 3.0、阿里 Wan 3.0 上架 FAL，Gemini Omni Flash 1.1 补上文生视频。</p>
+<p>可灵图像 v3 上线，附赠 AI 主持人口播视频和滚动落地页两个新技能。</p>
+<p>CLI 的 /queue 队列可以查看、编辑、重排了，所有模型选择器都支持带推理强度切换。</p>
+<p>MCP 的 OAuth 刷新令牌绑定颁发者，回调页面堵掉反射型 XSS。</p>
+<p>桌面端（3 条 feat + 15 条以上 fix）：</p>
+<p>聊天/UI 字体选择器</p>
+<p>hash: 40f2702b22</p>
+<p>问题：桌面端聊天区和界面字体一直跟着主题走，想换可读性更好的字体（比如阅读障碍友好的 OpenDyslexic）只能改主题预设，导入的 VS Code 主题又根本不带字体设置，聊天区没有任何用户可调入口（#72485、#37566）。</p>
+<p>修复：设置 → 外观新增 Chat Font 行，紧挨着 Terminal Font。选中的字体写入 config.yaml 的 desktop.font_family，叠加在主题 fontSans 前面——留空就是主题原样，选了字体就替换，同时保留主题自带的中文和 emoji 回退。</p>
+<p>效果：聊天区和界面排版终于有独立的字体开关，不需要动主题就能换可读性字体。</p>
+<p>每个辅助模型独立的推理强度控制</p>
+<p>hash: cc7ee8d1f5、1d33a4fee6</p>
+<p>问题：辅助任务（总结、标题、审核等子模型）的推理强度只能整体跟着主模型走，设置里没有逐任务控制的入口；即便用户在 CLI 里手工写了 auxiliary.&lt;task&gt;.reasoning_effort，桌面端也看不到、改不了，只能靠&quot;重置全部到主模型&quot;这种一刀切。</p>
+<p>修复：设置 → 模型 → 辅助任务里，每个任务旁边新增推理强度选择器（继承 / 关闭 / 具体档位），前端 cc7ee8d1f5 加上后端 1d33a4fee6 打通：POST /api/model/set 区分&quot;没传该字段（保留原覆盖）&quot;与&quot;显式 null（清除、回到继承）&quot;，档位经过 parse_reasoning_effort 规范化，未知档位直接 400；&quot;重置所有到主模型&quot;也会清掉全部覆盖。继承行文案是独立的&quot;inherit · main model effort&quot;，不跟供应商的&quot;auto&quot;混用。</p>
+<p>效果：桌面端和 CLI 现在编辑同一个值，每个辅助任务都能单独定推理档位，覆盖/继承语义精确可逆。</p>
+<p>桌面端更多细节</p>
+<p>hash: ff1e0f0d52、14efb46089、85b93771d2、09b74dea64</p>
+<p>设置 → 模型 → 辅助任务补上了三个缺失的槽位（triage_specifier、kanban_decomposer、profile_describer），之前这三个任务只有&quot;重置全部&quot;能改，现在有独立行和本地化标签（ff1e0f0d52）。</p>
+<p>HERMES_SKIP_INTRO=1 之前会连首次引导一起关掉（引导挂在影片完成事件上），现在只跳过开场影片、引导流程照常弹出（14efb46089）。</p>
+<p>停止一个澄清请求后，下一轮的新问题不再被挂到旧行上、也不会出现一个问题的两张卡（85b93771d2）。</p>
+<p>IME（中文等输入法）回车守卫扩展到桌面端 21 个输入点：组合输入期间的 Enter 不再误提交对话框/输入框，Kanban 任务名、Telegram 白名单输入、clarify 卡片等全部纳入（5cbd994575、19729c6ea7、09b74dea64）。</p>
+<p>视频生成（3 条 feat，国内平台优先）：</p>
+<p>可灵 Kling 3.0 标准/Pro 上架 FAL</p>
+<p>hash: 3304d205be</p>
+<p>内容：FAL 视频目录新增两个家族：kling-v3（标准版）和 kling-v3-pro。图生视频端点、时长 3-15 秒、支持生成音频和负向提示词，payload 形状按 FAL 公布的 llms.txt schema 钉死在测试里。</p>
+<p>效果：可灵 3.0 用户可以直接在 Hermes 的视频生成里调用，带音频出片。</p>
+<p>阿里 Wan 3.0 + Wan 3.0 Prime 上架 FAL</p>
+<p>hash: 80e8de8c34</p>
+<p>内容：阿里 Wan 3.0 在 FAL 正式上线（Wan 2.7 时代起就挂着 Coming Soon）。新增 wan-3.0（$0.05-$0.20/秒）和 wan-3.0-prime 尊享档（$0.068-$0.28/秒）：文生/图生视频、时长 2-30 秒、480p/720p/1080p、原生音频、自适应比例。schema 细节按 FAL OpenAPI 逐个映射（i2v 用 start_image_url、时长是整数、音频开关键是 audio 不是 generate_audio，新抽象 audio_param_key 顺带回归验证了 veo3.1 不受影响）。</p>
+<p>效果：Hermes 视频生成又多了两个阿里系模型，长短视频都能做。</p>
+<p>Gemini Omni Flash 1.1 补上文生视频</p>
+<p>hash: aecee6f66a</p>
+<p>内容：google/gemini-omni-flash 升级到 v1.1（FAL 2026 年 8 月上线）：家族新增文生视频端点，加上原有图生视频，分辨率枚举 360p/720p/1080p/4K，时长 3-10 秒整数，原生音频始终开启。定价 $0.03/s（360p）到 $0.30/s（4K）。测试把&quot;每个家族必须双端点&quot;设为目录不变量，i2v-only 的旧守卫靠合成家族保留。</p>
+<p>效果：之前只能图生视频的 Gemini Omni Flash 现在可以直接文字描述出片，4K 档也开放了。</p>
+<p>图像生成与技能（2 条 feat）：</p>
+<p>可灵图像 v3 上架 FAL</p>
+<p>hash: ae596d805b</p>
+<p>内容：新增 fal-ai/kling-image/v3/text-to-image（$0.028/张、原生 2K 默认、8 种宽高比）以及配套图生图编辑端点。i2i schema 用的是单个 image_url 字符串而不是常见的 image_urls 列表，目录为此新增 edit_image_param 旋钮让 _build_fal_edit_payload 只取第一张源图。</p>
+<p>效果：可灵图像 v3 的文生图和编辑都能用了，2K 出图为默认档。</p>
+<p>新技能 ×2：AI 主持人视频 + 滚动落地页</p>
+<p>hash: a79ff58d65、56cc2bd814</p>
+<p>内容：ai-presenter-video（移植 cclank/lanshu-create-ai-presenter-video，MIT，7 天 955 星）：AI 主持人口播视频流水线——旁白作为主时钟锁定、头像生成带预算控制、口型/一致性 QA、字幕、ffmpeg 确定性成片（响度归一 + 联系表验证）。能力映射到 Hermes 原生：text_to_speech / FAL 视频家族 / vision_analyze / hyperframes。</p>
+<p>scrollcraft（移植 nateherkai/scroll-craft，MIT，1.2k 星）：滚动驱动的高端落地页技能——采访 → 页面语法 → 标志性动效工作流，确定性 CSS/JS 引擎 + 截图式滚动验证，素材生成锚定在 image_generate。</p>
+<p>效果：做口播视频和滚动落地页都有开箱即用的技能包。</p>
+<p>CLI 与事件驱动（2 条 feat + 2 条移植）：</p>
+<p>/queue 队列可查看、编辑、重排</p>
+<p>hash: ce318290bd</p>
+<p>内容：借鉴 Factory Droid：/queue 之前只能盲追加，现在支持 /queue list 查看、/queue edit N &lt;p&gt; 替换第 N 条（保留 voice sentinel）、/queue rm N 删除、/queue move A B 重排、/queue clear 清空、/queue add &lt;p&gt; 强制入队（开头像管理词的内容不再被误判成命令）。队列变更全程持互斥锁并重建 unfinished_tasks，join/task_done 记账保持一致；粘贴引用照常展开。</p>
+<p>效果：排队中的提醒消息可以拉回来改、删、换顺序，不再只能排着等。</p>
+<p>模型选择器统一带推理强度</p>
+<p>hash: 2c0bec33f9、85e32fcd69</p>
+<p>内容：桌面端输入框有了推理强度 pill 之后，其余所有选模型的地方这次补齐：/model X --reasoning high 一条命令同时换模型和档位（档位经 parse_reasoning_effort 校验，未知档位返回明确的 MODEL_SWITCH_ERR_BAD_REASONING）；经典 CLI 的 /model 在模型切换后再落档位，避免被交换逻辑覆盖；辅助模型菜单也有对应步骤。CLI 的 hermes model 里，委托任务的档位空值文案改为&quot;Inherit parent&quot;——明确表示子任务继承父代理的档位，而不是用供应商默认值（85e32fcd69）。</p>
+<p>效果：任何界面上换模型都能把推理档位一起带上，不用再单独敲 /reasoning。</p>
+<p>事件驱动 cron：</p>
+<p>webhook 路由可以触发 cron 任务</p>
+<p>hash: 45ab5e3b5d</p>
+<p>内容：借鉴 ChatGPT Work 的&quot;应用事件触发定时任务&quot;模式（新邮件、Slack 动静、GitHub PR 反馈等），用现有两个子系统拼出来：webhook 路由新增 cron_job 模式——与 agent 路由同等的 HMAC 鉴权、限流、过滤器、脚本和幂等，进来一个事件就把已有 cron 任务触发一次（execute_job_for_event 走共享的认领逻辑，202 Accepted 立即返回），事件触发复用 at-most-once 认领、在途去重和投递。启动校验拒绝 cron_job 与 deliver_only 同配。</p>
+<p>效果：定时任务可以变成事件驱动，并且复用调度器的防重投递保障。</p>
+<p>安全与可靠性（4 条）：</p>
+<p>MCP OAuth 刷新令牌绑定颁发者</p>
+<p>hash: d9e88e19e2</p>
+<p>内容：移植 openai/codex#39615。MCP 服务器公告的授权服务器可能变化（受保护资源元数据被改、服务器迁移、DNS 接管），之前会把存储的刷新令牌发给服务器当前公告的任意颁发者——等于把长期凭据交到另一个授权服务器手里。现在 HermesTokenStorage 在缓存令牌旁记录 hermes_issuer（剥离后才做 model_validate，绝不上线）；两条 provider 路径（legacy mcp_oauth 与 managed manager）在每次保存时盖戳、在 _initialize 强制核对。不匹配时：刷新令牌从内存和磁盘剥掉，未过期的访问令牌继续用，到期再全量重认证。</p>
+<p>效果：DNS 接管/服务器迁移场景下，长期凭据不会泄露给冒牌授权服务器。</p>
+<p>OAuth 回调 XSS 转义</p>
+<p>hash: d3fc0cca0f</p>
+<p>内容：OAuth 回调 HTML 中的 error 参数未转义就直接渲染，恶意 error 值可注入脚本（反射型 XSS）。修复：回调页对 error 参数做 HTML 转义后再输出。</p>
+<p>效果：构造恶意 OAuth 回调链接无法再在回调页执行脚本。</p>
+<p>cron 成功运行闭环解决事故</p>
+<p>hash: 498abb677e</p>
+<p>内容：事故账本之前只增不减——一次性的失败（全局模型切换后的漂移跳过、供应商故障）恢复后仍永久显示 detected/alerted，32 个任务全跑 OK 还挂着 32 条 open。现在一次成功运行会把该任务的 detected/alerted 事故标记为 resolved（新状态）；resolved 与 operator 手动的 closed 区分开：同一错误签名再次复发会经 upsert_incident 重新打开并再次提醒，closed 则保持关闭。</p>
+<p>效果：hermes cron incidents 终于反映当前健康状况，不再累积僵尸事故。</p>
+<p>平台与效率（5 条）：</p>
+<p>Slack 粘贴表格不再静默消失</p>
+<p>hash: a74e0155b6</p>
+<p>内容：移植 qwibitai/nanoclaw#3666。Slack 里的粘贴表格是 &#x27;table&#x27; block（常嵌在 attachments[].blocks[] 里，偶尔在顶层），既不在消息文本也不在文件列表，agent 只能收到表格前后的话。现在 _render_slack_table_block 把表格渲染成&quot;cell | cell&quot;行，文本叶子从 raw_text/rich_text 子树收集，上限 2 万字符、截断处标 [table truncated]；三条吸收路径（线程历史、附件内嵌块、实时消息顶层块）全部接通，serialize 时跳过 table 块避免重复。</p>
+<p>效果：Slack 里发给 agent 的表格数据能完整到达，不再只剩前后文。</p>
+<p>computer-use 不再重发未变化的截图</p>
+<p>hash: 682b973b32</p>
+<p>内容：移植 openclaw/openclaw#129924。同一会话同一目标连续两次截图像素逐字节相同，就不发图块，改发完整文本元数据（含元素索引）+ &quot;屏幕未变化&quot;标注。适配：以连续跳过次数上限 2 兜底，保证压缩淘汰引用图前全像素会重投；去重状态按会话隔离、只追加不改写历史（prompt 缓存前缀不动），无 session_id 时完全跳过。</p>
+<p>效果：页面不动时视觉循环不再反复烧多模态 token，省流量省费用。</p>
+<p>工具搜索：不存在的工具不再返回&quot;看似相关&quot;的结果</p>
+<p>hash: c63de5a231</p>
+<p>内容：移植 nearai/ironclaw#7965。旧 BM25 只要共享一个词就得分，长描述搜一个不存在的工具会返回看着很像的列表，模型把&quot;有结果&quot;读成&quot;就在里面&quot;然后反复改写重搜（上游生产 trace：652 次调用里 216 次是 tool_search 空转）。修复：文档必须命中查询一半以上的可回答词才被提供；覆盖过滤只在可回答词 &gt;=4 时才启用，短查询召回不受影响。</p>
+<p>效果：搜不到就是搜不到——模型会停下来而不是空转烧 token。</p>
+<p>Perplexity 请求带上 Hermes 身份头</p>
+<p>hash: 1ad89ac018</p>
+<p>内容：Perplexity 的 /search 与 /sdk/content/snippets 请求新增 HTTP-Referer、X-Title、User-Agent（HermesAgent/&lt;版本&gt;）和 X-Pplx-Integration: hermes-agent，与 Kimi、OpenCode 一致。纯静态头，不含用户数据，不增加请求数。</p>
+<p>效果：Perplexity 侧能看到 Hermes Agent 的流量来源，便于集成方识别与计费。</p>
+<p>背景审查的推理强度配置生效</p>
+<p>hash: 47714f9402、6da540d3ec</p>
+<p>内容：路由型背景审查分支之前完全不读 auxiliary.background_review.reasoning_effort，显式配置被静默忽略、按供应商默认跑（#94825）；同模型分支则是&quot;继承父级配置以保证 prompt 缓存一致性&quot;、该键配置了也没用但没人告知。修复：路由分支用共享的 parse_reasoning_effort 解析任务键；同模型分支在该键确实被设置时弹一次性警告（按父级作用域，一个会话只警告一次），配置参考文档同步说明 no-op。</p>
+<p>效果：背景审查的推理档位要么真生效、要么明说无效，不再静默。</p>
+<p>其他值得关注的修复：</p>
+<p>桌面端 SSH 池生命周期修复集群（134c5226af、be69a8d043、e785128934、e24b344b6c 等）：停止池时完整拆除 SSH 生命周期，keepalive WebSocket 在 SSH 隔离下持有，空闲退出不会误杀同属的兄弟连接，拆除失败记日志不再直接抛异常。</p>
+<p>Windows 冷启动认证修复集群（060c0cd0f8、ccc335cdba、674e3f3cd1、8c3a35b69d、faf6e6889b 等）：启动证明绑定到进程真实创建时间而非账本声明，PID 复用/超时窗口不再产生误授权，attestation 只接受正整数的 PID 列表。</p>
+<p>state.db 双重 writer 句柄修复（939a2f64b4）：长生命周期进程不再重复铸造 state.db 写句柄；WAL 锁守卫跟随句柄生命周期（274fd56dca）、重构计数守卫共享（3e43cee505）等州存储加固集群。</p>
+<p>Python 映射 repr 脱敏（47668280e7、92d4c0233e、5280dec0ee）：dict/映射的 repr 输出里 apikey/token/secret/password 大小写混合后缀也脱敏，已带掩码的值不再被二次折叠。</p>
+<p>Codex 图像生成走原生端点（3275ca88ec）：OpenAI 撤回 gpt-5.5 导致所有图像调用 404 的问题根治，改为直连 chatgpt.com/backend-api/codex/images 端点，无宿主模型、无 SSE、无半帧处理。</p>
+<p>Gemini 工具 schema 全量透传（743140cd82）：parametersJsonSchema 直接接受完整 JSON Schema，anyOf 联合、裸数组、$ref 间接引用不再被降级翻译，坏 schema 400 整请求的问题消除。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-14：桌面端推理强度独立按钮、iPhone 照片终于能分析、Meta 图像模型入目录</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-14</link>
