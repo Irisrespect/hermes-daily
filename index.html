@@ -22,9 +22,94 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 52 期 · 16517 个提交 · 每日自动更新 ·
+<p class="meta">共 53 期 · 17378 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-19" class="day">
+      <h2>Hermes 日报 2026-09-19：桌面端语音回复流式播放、隐藏浏览器页面保活；备份完整性保护、cron 投递秘密脱敏；WhatsApp 原生提及与群策略修复</h2>
+      <p><strong>本期覆盖 9 月 18 日 06:30 ~ 9 月 19 日 06:30 合入 main 的提交，共 861 个 commit（不含 merge），另有 2 个 merge。新增 23 个功能、594 个修复、1 个性能优化（口径为合入 main 的时间；原始数据含部分作者时间 09-17 的 commit，晚合入 main，属正常）。主体改动集中在桌面端体验、数据安全与备份、平台集成（WhatsApp/微信/飞书）和 Windows 运维。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端语音回复改为流式播放，边生成边出声；隐藏的浏览器页面不再被销毁，恢复后原样回来</li>
+<li>备份完整性保护：不完整归档不再清理最后完整备份，失败退出码非零可被定时任务发现</li>
+<li>cron 投递内容统一脱敏，LLM 任务回显的 API key 等凭据不再原样发到聊天</li>
+<li>WhatsApp 新增原生 @提及；群聊入站策略修复，群消息不再被误拦或丢弃；微信「prepare failed」误判限流修复</li>
+<li>换了家的 memory provider 自动从插件目录装回；Windows 计划任务漂移可报告、可自愈</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端：语音回复流式播放（2 个 fix）</p>
+<ul>
+<li>93dc760d8a：语音回复不再等整条消息生成完才出声，而是从 live message deltas 增量流式播放，回复内容边生成边念，等待感大幅缩短。</li>
+<li>e98090e09e：语音循环在回复稳定边缘（stable reply edge）被唤醒，配合上一条让流式播放的启动时机更准，避免漏播或重复。</li>
+</ul>
+<p>桌面端：隐藏的浏览器页面保持存活（3 个 fix）</p>
+<ul>
+<li>73d4a4e9cb：嵌入式浏览器的「隐藏/恢复」与「关闭」彻底分离。此前隐藏面板会直接卸载 &lt;webview&gt;，页面状态和正在跑的自动化全部丢失；现在隐藏只是 visibility:hidden + inert 保持挂载（PaneBody 保留最后可见视口），恢复后原样回来。隐藏窗格的命令预览焦点不再偷走宿主输入框焦点，drive_preview 的 focus() 也不会在面板隐藏时抢占。</li>
+<li>26a7a95ceb：Browser 瓦片的 keep-alive 通过 PaneMirror 固定住，Terminal 的 Hide 行为同步补了文档——所有窗格类型的隐藏语义现在一致。</li>
+<li>a0c61500bc：保持挂载的隐藏 body 用 lifecycleKeepAlive 门控，只有声明了保活的页面才走隐藏保活路径，避免所有窗格都背上隐藏成本。</li>
+</ul>
+<p>桌面端：工具活动图片正常显示（3 个 fix）</p>
+<ul>
+<li>46cd0458c1：本地 vision 图片现在能在工具活动流里显示，此前本地图片走不通渲染路径。</li>
+<li>9e4b10da41：工具活动图片统一改走 MarkdownImage 媒体管线——本地走 readFileDataUrl、远程 gateway 走 profile 作用域的 /api/fs/read-data-url，加载中、「Couldn&#x27;t load」失败态、共享灯箱全部复用，不再维护第二套 resolver。</li>
+<li>93e7c4f402：删掉重复的 ToolActivityImage 解析器（复制品失败态什么都不渲染），统一用 MarkdownImage 渲染活动图片，补了失败状态断言。</li>
+</ul>
+<p>数据安全：备份完整性保护（2 个 fix）</p>
+<ul>
+<li>1250a3e4eb：`hermes backup --keep` 的轮换清理在归档不完整时仍会执行——定时任务每次撞上同一个不可读文件就 exit 1，但 N 轮后所有完整 zip 仍被轮换清掉，最后只剩不完整归档。现在只有完整备份成功后才执行修剪，测试固定了「不完整运行时既有好档必须存活（--keep 1）」的场景。</li>
+<li>ccb3d968ce：`hermes backup` 逐文件失败时打印了 `Backup incomplete` 却仍返回 shell 状态 0，cron 或 systemd 定时器会把缺 state.db 的坏档当成「成功」。run_backup() 现在返回归档是否完整，cmd_backup() 映射到退出码 1；zip 保留以便能恢复其余部分，--quick 不变。</li>
+</ul>
+<p>安全：cron 投递内容先脱敏再发送（1 个 fix）</p>
+<ul>
+<li>c0362da9a6：LLM cron 任务的响应文本投递前没经过扫描——任务若把凭据带出来（回显带 API key 的失败 curl、摘要了配置文件），会原样发进聊天。现在所有外发通道统一走 _redact_cron_payload()：投递内容（媒体提取后的单一咽喉点）、会话镜像负载、任务名都过这道 fail-closed 脱敏；脱敏器抛错时直接替换负载而不是放行。security.redact_secrets 只管用户自己的日志，关不掉外发脱敏这条安全边界。</li>
+</ul>
+<p>平台集成：WhatsApp 原生提及 + 群聊策略 + LID 修复（1 个 feat + 5 个 fix）</p>
+<ul>
+<li>b34ebc084a（feat）：发送通道新增 WhatsApp 原生 @提及支持。</li>
+<li>35b38f1f4e / 477afd2420：桥接层此前把私聊发送者白名单套到群参与者头上，群里陌生号码可能被误拦；现在桥接拿到适配器解析出的群入站策略和 WHATSAPP_GROUP_ALLOWED_USERS 群白名单，allowlist 读取收敛为单一 reader。</li>
+<li>81fd9dc773：Node 桥接摄入端真正执行群入站策略——按群策略和群 JID 白名单过滤，不再错用私聊名单。</li>
+<li>3926c4209c：LID 发送者没有 lid-mapping 时群消息被直接丢弃（#72529），现在这类发送者不再导致丢消息。</li>
+<li>8a55373dbf：首次接触的 LID 发送者也纳入授权判断，不再一律拒绝。</li>
+</ul>
+<p>平台集成：微信会话错误不再误判限流（2 个 fix）</p>
+<ul>
+<li>bd39167c56：iLink 对 bot 主动发送返回 ret=-2「prepare failed」表示对端会话未就绪（还没收到过入站消息，或上下文 token 没了），这是确定性错误，却被当成频率限制——重试预算烧在永远不消失的错误上，还触发全账号 30 秒限流熔断，堵死之后所有发送（#80125、#112709）。现在先尝试无 token 重发，仍失败或无 token 可丢时直接快速失败并报「session not ready」，且措辞避开 rate limit 关键词，不再进限流路径。</li>
+<li>5db9f02372：媒体发送腿上也补了同样的 session-not-ready 报错；冷却消息保留原始字段，测试与文档同步。</li>
+</ul>
+<p>平台集成：飞书附件保留（3 个 fix）</p>
+<ul>
+<li>51fa2d51a2：飞书批量文本消息里的附件不再丢失。</li>
+<li>2e58dbc9c5：批量消息的附件行内标记（inline flags）一并保留。</li>
+<li>29490a0e66：帖子（post）的文件附件在收发转换中保持完整。</li>
+</ul>
+<p>配置省心：memory provider 自动装回（1 个 feat）</p>
+<ul>
+<li>e21ccdd7dc：内置 memory provider 正在向维护者自己的仓库和插件目录迁移（如 honcho 的插件现在发布在 plastic-labs/honcho#hermes-plugin-honcho 子目录），配置名、memory.&lt;name&gt; 配置段、数据目录、工具名都不变，用户丢的只是代码路径。两个钩子自动兜底：`hermes update` 时所有共享该 venv 的 profile 若 memory.provider 解析不到，就按审定的 pin 从目录安装（含 kill list、依赖约束、enable）；`agent init` 时每次进程尝试一次（桌面端用户不手跑 update），遵守 security.allow_lazy_installs。离线或目录里没有时给出带确切一行命令的警告，不再只有 DEBUG 日志。插件安装也接受 owner/repo#subdir 拼写。</li>
+</ul>
+<p>Windows 运维：计划任务漂移可报告、可自愈（2 个 feat + 1 个 fix）</p>
+<ul>
+<li>2097cc6b88：硬模板之前注册的 Windows 计划任务会永远带着旧 XML——`_install_scheduled_task` 只有一个提示式调用方，更新流程只重写 launcher。`hermes gateway status` 现在读取已注册任务的 XML，与模板白名单叶子（Task version、RestartOnFailure、LogonTrigger Delay、Exec Arguments）比对，漂移时打印 `⚠ Scheduled Task registration predates the current template (missing: ...) Repair: hermes gateway install`。只报告不自动改；schtasks 查不到时静默；白名单刻意排除 UserId（导出是 SID、写入是 DOMAIN\user），健康任务不会被误报（Fixes #113670）。</li>
+<li>084befaea7：上一条只报告没人重写，RestartOnFailure/登录 Delay 永远只到得了新安装（#113670）。现在镜像 gateway.py::refresh_systemd_unit_if_needed 的 `reconcile_scheduled_task`：同样做白名单比对，漂移时按当前模板 delete+create 重注册。挂在 Windows `start()` 路径和 `hermes update` 的 launcher 刷新里；拒绝重注册（Access Denied）时打印详情并指向提权的 `hermes gateway install`。</li>
+<li>60b6435526：读取已注册计划任务时用 namespace-agnostic XML 解析，不再假设命名空间前缀，不同系统生成的 XML 都能读。</li>
+</ul>
+<p>状态层自愈：Telegram 话题表 v2→v3（3 个 fix）</p>
+<ul>
+<li>558cc3bd63：telegram 话题表读取把所有 OperationalError 都吞成空结果——升级开了 DM 话题模式后残留的 v2 表（缺 profile_name 列）会静默失效，话题模式在所有路径上看起来像没开，而 v2→v3 迁移只在 /topic 显式开启或绑定时写路径才跑，永远轮不到它，形成自我强化的静默故障。现在 _topic_read_one 和 list_telegram_topic_bindings_for_chat 读取时发现 pre-v3 表就自动迁移一次再重读；表不存在仍读作空、绝不建表，保留「仅显式 opt-in 才迁移」的约定。</li>
+<li>7ef48e2e51：v2→v3 话题修复做成原子操作，失败不再沉默——要么完整迁移要么明确报错。</li>
+<li>83b50f6bea：v2→v3 重建能扛住孤儿绑定和残留的 scratch 表，中途不再中断。</li>
+</ul>
+<p>提供商变动：opencode-free 免费档移除（1 个 feat）</p>
+<ul>
+<li>998f614c7f：OpenCode 免费档对匿名流量已返回 HTTP 403，内置免密钥的 opencode-free 提供商成为死代码：删除 provider 行、别名（free/opencode_free）、模型目录、keyless 运行阶梯、header 接线和缓存 slugs，并删除 model-providers/opencode-free 插件。auth.py 保留迁移提示——配置过它的人会看到点名的清晰报错，可迁移到 opencode-zen（按量付费）或 opencode-go（包月订阅）。</li>
+</ul>
+<p>社区插件目录上新（24 个新条目 + 1 个校验增强）</p>
+<ul>
+<li>目录新增 24 个条目：6a627e6eb3 live-time、369d3b49ca Toolsmith 桌面插件、24fd6ca65a Session Diff 桌面插件、b09f7a8f1a Hermes Outpost、3090f9c625 ClinePass 模型提供商、6e8209df73 billing 社区插件、244ee11d2f by2kb 视频转知识、b9cf6bf794 kiro-acp、328503b562 Replaid、13d5b65168 hermes-opper（Opper 模型提供商）、a23482a1f4 zerosignal v0.1.0、c0bdb65e8e debug-desk、c5fba43c53 web-serply、4594092006 junie-acp（JetBrains Junie 作为 ACP 提供商）、6b219b56fe hermes-town、0d4339145d Jev decision sidekick、2ac562f155 hermes-subscription-meter（用量计费监控）、9478d543da my-github（桌面端 + dashboard）、85b00c145a anysearch（社区网页搜索/抓取）、b25ce15746 memobase（memory provider）、8862ea2ab7 hud-teach（屏幕教学）、2775bf7367 epistemic-harness（认知外挂框架）、afbc17a716 session-styler（桌面端会话样式）、4e19fd1d92 mnemosyne-memory（memory provider）。</li>
+<li>d02a840fb4：catalog 声明 hermes 最低版本门槛并标注 zerosignal 的占位 key。</li>
+<li>f253f25b78：`plugins validate --install-deps` 现在先安装依赖声明再探测能力，校验结果更可靠。</li>
+</ul>
+    </section>
+    
     <section id="2026-09-18" class="day">
       <h2>Hermes 日报 2026-09-18：桌面端群聊管理大升级：置顶、分区、群内改成员；插件依赖自动安装，文件树可显示 gitignore 文件</h2>
       <p><strong>本期覆盖 9 月 17 日 06:30 ~ 9 月 18 日 06:30 合入 main 的提交，共 728 个 commit（不含 merge），另有 2 个 merge。新增 20 个功能、480 个修复、4 个性能优化（口径为合入 main 的时间；原始数据含部分作者时间 09-15/09-16 的 commit，晚合入 main，属正常）。主体改动集中在桌面端 Bot 群聊体系、插件依赖管理、更新链路与数据安全。</strong></p>
