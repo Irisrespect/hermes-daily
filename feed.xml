@@ -5,8 +5,104 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 17 Sep 2026 07:33:22 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 18 Sep 2026 10:10:16 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-18：桌面端群聊管理大升级：置顶、分区、群内改成员；插件依赖自动安装，文件树可显示 gitignore 文件</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-18</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-18</guid>
+      <pubDate>Fri, 18 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 17 日 06:30 ~ 9 月 18 日 06:30 合入 main 的提交，共 728 个 commit（不含 merge），另有 2 个 merge。新增 20 个功能、480 个修复、4 个性能优化（口径为合入 main 的时间；原始数据含部分作者时间 09-15/09-16 的 commit，晚合入 main，属正常）。主体改动集中在桌面端 Bot 群聊体系、插件依赖管理、更新链路与数据安全。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端 Bot 群聊管理大升级：置顶、拖入用户分区、群内直接编辑成员、@提及内联渲染</li>
+<li>文件树新增按项目开关的 gitignore 显示切换</li>
+<li>插件体系支持声明式依赖自动安装，hermes update 重建 venv 后自动重装</li>
+<li>更新检查 GitHub API 带认证，共享出口 IP 不再撞匿名配额</li>
+<li>通知可选择性关闭用户频道警告；Windows 启动 I/O 优化</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端 Bot 群聊组织（3 个 feat）</p>
+<ul>
+<li>609998718c：群聊现在可以像 bot 一样归入用户自建分区。把群聊行拖到某个分区、从右键菜单选择分区、或直接在建分区时归入，三种方式都支持；取消归档（拖回 Unassigned、移除分区、删除分区）会回到群聊默认桶。</li>
+<li>2679f47727：群聊支持置顶。以前 bot 行有 Pin to top，群聊行没有，常用群经常被新的单聊挤下去（#89813）；现在群聊行右键也有置顶/取消置顶，置顶状态存在本地群聊持久化里，不混入网关镜像。</li>
+<li>13f18198bd：bot 行右键新增「打开最近会话」。左键仍是进入规范 Bot Chat，但多任务用户的活跃工作常在普通会话（cron 运行、委托任务、+ 侧线程），现在可以直接从名单行打开最近的普通会话，不用在混合侧边栏里翻。</li>
+</ul>
+<p>桌面端群聊成员与输入（4 个 feat + 修复）</p>
+<ul>
+<li>df2d8c6bb5：群房间头部新增「管理成员」选择器。列出所有本地 bot 和连接 bot，预勾选当前成员，一步保存；保存同时写本地 bot 的 groups[] 元数据和房间的持久成员描述，加人（包括远端 bot）踢人都不用解散重建房间。</li>
+<li>6b22e10826：群设置里也能打开同一个成员选择器，选择在往返中保持稳定。</li>
+<li>e04ce9d122：群聊里的 @提及渲染成应用内联引用样式：路由给 bot 的 @bot 显示为 agent、等人的 @user 显示为 human、@everyone/@all 显示为 broadcast；只有路由会真正识别的 token 才高亮，未知句柄、邮箱、代码片段保持纯文本。同批还加了「回复 @bot」入口。</li>
+<li>755781341e：群聊输入框（含新线程和线程内回复）按内容自动长高（field-sizing: content，上限 min(50vh, 24rem)，超过后内部滚动），长指令不用再在小框里滚着写。</li>
+<li>9f077100cc：修复「一个本地 bot + 远程连接 bot」无法新建群聊的问题——门的条件之前数的是本地行（&lt;2 就锁门），而对话框实际可以坐满整个多源名单，导致用户为了点开建群按钮还得先加一个凑数的本地 bot。</li>
+<li>589abfe94d：群聊头像按所属连接和 profile 归属到正确的主人，同名 bot 不再串头像。</li>
+<li>08debd715f：支持中文 bot 名；2b267f9467 保证改名后的主 bot 在群轮提示里用自己的 @tag 引入。</li>
+</ul>
+<p>桌面端文件树与窗口（feat + 修复集群）</p>
+<ul>
+<li>27dfbe397f：文件树头部新增眼睛开关，按项目根级持久化，打开后显示被 .gitignore 过滤的文件。对用 .gitignore 做白名单（deny-by-default）、嵌套 checkout、按环境分目录的项目来说，被过滤的目录以前直接消失得像数据丢失；开关按 CONNECTION + root 作用域，同一路径在不同后端不共享答案。</li>
+<li>8ffc2f0369：WSLg 下 frameless 窗口由 renderer 自绘窗口控制按钮（此前标题栏没有最小化/关闭按钮）；原生 Wayland 启动可用。窗口控制判断逻辑抽取成独立 helper 并补了单测。</li>
+<li>1aa296fbcd / 5aa1e353ef：标签页被挤压到控件下方时，空白标题栏带仍可拖拽窗口；保留标题栏拖拽区域，避免小窗口下拖不动。</li>
+<li>6fac69ced3：Windows 驱动器路径按 basename 显示标签；b94143c92b / 5b5ec01091 / e805e57ee7：Artifacts 索引 MEDIA 路径走聊天解析器、流式 MEDIA 标签按原始源重渲染、未加引号的 MEDIA: 路径允许内部空格（#96657）。</li>
+</ul>
+<p>插件体系：声明式依赖自动安装（3 个 feat）</p>
+<ul>
+<li>96e8a23222：目录插件的 pyproject.toml [project].dependencies（或 manifest python_dependencies）现在会在安装/启用/更新时装进 Hermes venv。约束文件由 Hermes 自身锁定依赖 + 所有启用插件的声明合并而成；解析不了的候选插件在移动目录前就被拒装，不碰其他插件；--no-deps 可跳过单个安装。</li>
+<li>hermes update 用锁文件重建 venv 会清掉其他一切，所以 git/zip/修复三条更新路径都会重装所有 profile 启用插件的依赖并集；联合解析失败时逐个独立解析，只丢真正有问题的插件。</li>
+<li>6ac3ff8867：plugins validate 现在会让「没有任何可加载内容」的树直接失败，并检查依赖声明本身。</li>
+<li>e3507ef2ce：install_specs 支持 constraints 和 dry_run，为上述安装链路提供底层能力。</li>
+</ul>
+<p>通知与性能</p>
+<ul>
+<li>cd3de040ab：新增 display.suppress_warning_notifications（全局 + 分平台，默认 false）：opt-in 关闭 user-channel 的 warning 类通知。实现带 notification_category 分类、贯穿唤醒/队列/持久化，CLI/TUI 渲染边界同步处理（54 个 commit 压缩合入，保留原贡献者署名）。</li>
+<li>db63214c7b：Windows 启动 I/O 与阻塞检查减少：源 hash 缓存带元数据校验；启动已打包 app 跳过 Node/npm 检查；打包控制台输出改异步轮转日志；gateway 任务状态走 COM 查询不再加载 ScheduledTasks；renderer 资产用 Vite manifest 校验。98 Python + 19 renderer 测试通过。</li>
+</ul>
+<p>更新链路修复集群</p>
+<ul>
+<li>44af268513：被动更新检查读 api.github.com 的匿名 REST 预算只有 60 次/小时且按 IP 计，共享出口（办公室 NAT、VPN、代理节点）经常全员 403，误报「Hermes 无法连接更新服务器」。现在按 GITHUB_TOKEN / GH_TOKEN → gh CLI keyring → 匿名 的顺序解析凭据；gh 那一级对 GUI 启动的应用尤为重要（GUI 继承最小环境，光靠 env 两级救不了受影响的用户）。</li>
+<li>c61a11474b / 7b085a734b / e79ba2d7f2：更新检查在 env token 被拒时回退匿名重试；登出的 gh 下次检查会重新询问。</li>
+<li>d49fda1d15：CLI `hermes update` 经 --build-only 构建成功后，把重建的桌面端安装到系统位置（macOS ditto 暂存 + 原子交换）。94ced1a2b2：update 全程在新拉取代码的解释器里完成，不再用旧解释器收尾。</li>
+<li>290bdc3c76 / 5a49d1de3d：Windows 运行时 repoint 可以运行，且不再重命名活动 venv。bbdb279a68：桌面端提权阶段扛住 release/win-unpacked 的瞬时文件锁。2d88b9b4df：非 ASCII Windows 路径下 node-pty 暂存不再依赖 fs.cpSync/fs.rmSync。8ca920b52a / f501ebcf1e：rcedit 提交失败按观察到的锁窗口重试。</li>
+</ul>
+<p>数据不丢与安全（桌面端 + 工具层）</p>
+<ul>
+<li>2f273962db：桌面端发送时立即写入首条消息（此前要等 agent 构建完才写，冻结的 app 会留下空会话）；profile 重命名后会话标签页存活（#111868 两条数据丢失路径）。</li>
+<li>956abb9d25：流式输出时 reasoning 块不再吃掉已读正文——模型把思维链内联在回答通道时，闭合标签到达前渲染不再把整段闪没（#62774 长回复中途「截断」）。</li>
+<li>be79102ed8：工具层拒绝向数据库文件写文本、拒绝覆盖二进制；a3967ddbc0 / d219e5755a：SQLite 伴生文件按二进制识别（即使文件还不存在也拒绝）；a48debd368：browser exec 输出脱敏 vault 值。</li>
+<li>2f273962db 与 c44b423e52（终端快照不再持久化委托标记）同批覆盖桌面端 + 工具两条链路。</li>
+</ul>
+<p>平台与模型</p>
+<ul>
+<li>294421fdfb：image_gen.provider: nous 按存储的 model id 路由到 FAL / Krea / Portal 三网关（FAL 目录 id→FAL、Krea 插件 id→Krea、其他→Nous Portal）。此前 Portal 模型 id 会落进 FAL，警告未知模型并按 FLUX 默认计费；选单目录由同一模块构建，每个模型只列一次，选单与运行时口径一致。</li>
+<li>3063d0f2bb：Matrix 适配器实现 create_handoff_thread（Slack 风格）：cron attach_to_session 和 gateway handoff watcher 在 Matrix 上不再静默失效——之前告警只能平铺投递，线程 ID 为空导致「Mirror: no session found」，人工回复无法续上下文；现在用 m.relates_to / m.thread 引用根事件实现线程，回复可续会话。</li>
+<li>d27a43f1b6：Gemini 400 API_KEY_INVALID 时提示 Standard key 指引。</li>
+<li>a51c659944：aux 自定义 provider 的 callable key_cmd 凭据修复为在全部解析分支里存活（#88667）。</li>
+<li>f37336522b：原生视觉嵌入预算从硬编码 256KB 改为 vision.embed_target_bytes 可配置。</li>
+<li>1792e8bf5f：恢复的 llamacpp 会话在所有界面上跟随活动的托管端口（#114336）。</li>
+</ul>
+<p>网关 / cron / 稳定性（候选补充）</p>
+<ul>
+<li>e27244adc6：无活动快照时 watchdog 上界，空 agent 持有者不再空转。</li>
+<li>38c77f4c21 / f6978426a2：一个失败的 flush 文件不再中断待发消息恢复；无法解析的 profile 存储保留 flush 文件而不是写进根存储。</li>
+<li>4c0ad43dfe / 132a181d80：投递后 fire-claim 采样落空时，已投递的失败通知保留真实错误、已投递的 run 保持 ok 状态（#105861）。</li>
+<li>6924cc66fb：enabled_toolsets 的 MCP 服务器只是重连中时 cron 任务照常运行，不再卡住。</li>
+<li>baeebe4a60 / ecefbfa6e1 / b397349065：TUI 网关隔离轮次不再抢占父会话租约，压缩轮换期间借用保持惰性。</li>
+<li>c748a4b4b4 / 679d08511f：跨连接 DM 交给同进程的 Bot Chat；兄弟进程 Bot Chat 的回复如实报「已排队」而非「已投递」。</li>
+<li>f708640561 / 5d220ed693 / b675e6dee7：Discord 只响应硬 @提及、bot 标签续写批处理、bot 交接窗口按块重新武装。</li>
+<li>745e3264ff / ea09e2e401 / 3c56591788：本地运行时拒绝不完整下载、修复损坏缓存、隔离下载暂存文件。</li>
+</ul>
+<p>桌面端其他（候选补充）</p>
+<ul>
+<li>81de5afa44：侧边栏分组循环可重绑快捷键。</li>
+<li>1b2da20783：把最前面的窗口附加到活动草稿（窗口引用）。</li>
+<li>76a4d3b62a：macOS 检测双 Command 手势。</li>
+<li>5eb062735e：catalog 新增 hermes-t3-control v1.5.0（社区工具插件，提供本地 T3 编码线程的列出/读取/创建/控制工具，平台 Linux/WSL2）。</li>
+<li>4d91731aa8 / 4c203de493：首次使用时解释功能；自定义颜色在现有选择器里可用。</li>
+<li>8a492617e1：恢复卡死在「stranded-resume」死路时提供「开始新会话」出口。</li>
+<li>534c93f9e7：项目行下最多预览 3 个会话，并给「显示全部 N 个会话」入口。</li>
+<li>08debd715f 之外：1b722403b9 支持带重音拉丁字母、NFC token 与 CJK profile id 截断。</li>
+</ul>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-17：桌面端技能/插件目录当天回滚又回归，多 profile 复用默认开启，审批流支持批量堆叠</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-17</link>
