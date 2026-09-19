@@ -5,8 +5,285 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 19 Sep 2026 06:46:22 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 20 Sep 2026 06:39:49 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-20：桌面端 429 限额卡可预约自动重试，API 回复流输出推理过程，openai-codex 支持浏览器 PKCE 登录</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-20</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-20</guid>
+      <pubDate>Sun, 20 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 19 日 ~ 9 月 20 日合入 main 的提交，共 827 个 commit（不含 merge），另有 50 个 merge。新增 87 个功能、454 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端：429 限额卡显示重置时间，还能预约「限额重置后自动重试」，不用守着键盘掐点按</p>
+<p>桌面端：错误卡「切换模型」直达会话模型菜单，WAF 拦截会直接写明原因和解决办法</p>
+<p>API 服务：/v1/chat/completions 和 /v1/responses 的流式与非流式回复都输出推理过程（reasoning），OpenAI 兼容客户端不再丢思考内容</p>
+<p>登录：openai-codex 新增浏览器授权码 + PKCE 登录，禁用设备码的组织也能登录；借用手头外部登录可一键关掉</p>
+<p>稳定性：重试和回退链都用尽后自动走恢复阶梯等待服务恢复；Hermes 自己的 scratch 目录取代系统临时目录</p>
+<p>重点条目：</p>
+<p>桌面端（13 条修复 + 1 个功能，已合并同类）：</p>
+<p>429 限额卡可以预约自动重试</p>
+<p>6e1f5c9713 feat(desktop): 429 usage-limit card can schedule one retry for when the limit resets</p>
+<ul>
+<li>问题：HTTP 429 限额卡只显示「限额已到」，用户知道什么时候重置（#115924 已加「Limit resets at HH:mm」）但想重试还得守在键盘前掐点按 Retry（#98852）。</li>
+<li>修复：卡片新增一个「限额重置时自动重试」按钮，由后端在失败回合上盖的 resets_at 驱动，点击后客户端定时器等重置时刻自动重发。</li>
+<li>效果：限额到达后不用盯屏，预约一次，重置时刻自动重试。</li>
+</ul>
+<p>645e9298b6 feat(error-surface): 429 error card shows when the usage limit resets</p>
+<ul>
+<li>问题：429 报错卡只有 Retry，从不说明什么时候重试会成功，用户只能猜或守着应用（#98852）。</li>
+<li>修复：provider 返回的 Retry-After / resets_at / retry_after 之前只被退避逻辑用掉，没有显示出来；现在卡片直接展示「限额在 HH:mm 重置（约 1 小时 5 分钟后）」。</li>
+<li>效果：错误卡从「猜」变成「知道」，配合上面的自动重试按钮，429 处理完整闭环。</li>
+</ul>
+<p>错误卡「切换模型」直达会话模型菜单</p>
+<p>74c2439af2 fix(desktop): error card &#x27;Switch provider&#x27; opens the live session model menu</p>
+<ul>
+<li>问题：报错卡上的「切换模型」入口是死的，用户还得退出卡片去设置里找模型菜单。</li>
+<li>修复：按钮现在直接打开当前正在用的会话模型菜单。</li>
+<li>效果：遇到 provider 报错，点一下就能换模型继续，不用先退出去找设置。</li>
+</ul>
+<p>错误卡点名 WAF 拦截</p>
+<p>1fc8887c6e fix(desktop): the error card names a WAF block and the User-Agent fix instead of &#x27;retry in a moment&#x27;</p>
+<ul>
+<li>问题：某些报错其实是网站防火墙（WAF）拦截，之前卡片只给一句含糊的「稍后再试」，用户不知道到底是什么问题。</li>
+<li>修复：错误卡识别 WAF 拦截场景并直接写明是 WAF 拦截、以及改 User-Agent 的解决办法。</li>
+<li>效果：报错不再含糊，用户知道是防火墙挡的、以及怎么绕过。</li>
+</ul>
+<p>会话没了也能找回没发出去的草稿</p>
+<p>acccd54c67 fix(desktop): restore the unsent composer draft when a session is gone</p>
+<ul>
+<li>问题：桌面端标签页引用的会话在别的设备被删、profile 改名或后端被清掉时，会话窗口会降级成新草稿（此前的 commit 已避免热循环），但用户已输入的文字仍藏在旧 key 下的 hermes:composer-drafts:v3 里，随会话一起消失。</li>
+<li>修复：检测到会话已消失时，把存着的未发送草稿恢复到新窗口。</li>
+<li>效果：会话没了，打了一半的字不白费。</li>
+</ul>
+<p>模型设置页标注主模型上下文窗口、暴露压缩模型超时</p>
+<p>f30fe581a8 fix(desktop): Model settings label the main-model context window and expose the compression model timeout</p>
+<ul>
+<li>问题：模型设置页的「Context Window」字段读起来像 MoA/辅助设置，用户改了以为主模型能保持 1,048,576 token 上下文，实际不知道它管的是哪个模型。</li>
+<li>修复：改文案和描述，明确这是主模型的上下文窗口；同时把压缩模型的超时暴露出来可配置。</li>
+<li>效果：设置项不误导，主模型与压缩模型的参数各管各的。</li>
+</ul>
+<p>语音选择器新增 ElevenLabs v3 和 gpt-transcribe</p>
+<p>71df3e5aee fix(desktop): expose ElevenLabs v3 and gpt-transcribe in Voice pickers</p>
+<ul>
+<li>问题：ElevenLabs 模型字段是个封闭的 3 项下拉，居然没有 eleven_v3；TTS/STT 未设置时也不会回落成后端默认值。</li>
+<li>修复：改成和其他语音/模型 ID 一样的建议式组合框，缺失的模型补上；未设置的 TTS/STT 回落后端默认。</li>
+<li>效果：语音选择器可选 ElevenLabs v3、gpt-transcribe，语音配置更灵活。</li>
+</ul>
+<p>一步从文件夹创建项目</p>
+<p>e1866bf7a6 fix(desktop): create a project from a folder in one step</p>
+<ul>
+<li>问题：从文件夹创建项目需要多步操作。</li>
+<li>修复：一步完成从文件夹创建项目。</li>
+<li>效果：新建项目更顺。</li>
+</ul>
+<p>其它桌面端修复（合并说明）</p>
+<ul>
+<li>听写请求超时按 stt.openai.timeout 走，不再挂死（471ef5f4c3）；客户端直连 STT 上传限制 60 秒（0830b7f741）。</li>
+<li>模型菜单/开机向导相关：onboarding 模型选择固定到所选 provider（fbcc605956、c25892c8b8、be81cf7d4d 测试固定）。</li>
+<li>构建健壮性：Electron 镜像只在发行版缺失时才重试（d3c012ffd2），get-windows 半装目录会点名并修复（7ee8f5528d、f97f8d5fd5、048e7b974f、2a9ba25994），PE 盖章先于 ASAR 完整性（168e0f78ad）。</li>
+<li>自定义端点测试真正探测传输路由，不再只打 /v1/models；端点固定 API 模式并保留别名元数据（ab241af386、363b8a6fcb）。</li>
+<li>唤醒探测把前台回合算作进行中的工作（e796a29866、4f766f8fa5），强制唤醒不再反复重连抖动（69c51bb008、a915f0b3b2、ad6c7a5a4c）。</li>
+<li>群聊镜像截断的头条会标记出来（c91d955ff7、d32dacf855、d99226015d）；会话消失时恢复未发送草稿（acccd54c67）；/reasoning 隐藏修复（0c3ebefb5e）。</li>
+</ul>
+<p>⚠️ 注意：桌面端目录浏览恢复的一批改动被整体回退</p>
+<p>3eb9712180|2026-09-19|teknium1|Revert &quot;feat(catalog): restore website install links to Desktop&quot;</p>
+<p>007e80ee0f|2026-09-19|teknium1|Revert &quot;docs(catalog): restore native browsing and install guidance&quot;</p>
+<p>086628ad8a|2026-09-19|teknium1|Revert &quot;feat(ui): support icon-only segmented controls&quot;</p>
+<p>8bd0da2b8c|2026-09-19|teknium1|Revert &quot;feat(desktop): restore native skill and plugin catalogs&quot;</p>
+<p>f923398fee|2026-09-19|teknium1|Revert &quot;feat(desktop): browse catalogs as cards with a saved list option&quot;</p>
+<ul>
+<li>5 条 Revert 全部撤销 09-16 合入的「桌面端技能/插件目录浏览恢复」系列（网站安装链接、原生目录浏览、目录卡片视图、图标式分段控件），界面退回旧版。Revert 的 commit body 未说明回退原因。</li>
+</ul>
+<p>API 服务与推理输出：</p>
+<p>回复流输出推理过程（reasoning）</p>
+<p>70cee9e092 feat(api-server): stream model reasoning on /v1/chat/completions and /v1/responses</p>
+<p>b957782917 feat(api-server): stream model reasoning on /v1/chat/completions and /v1/responses</p>
+<ul>
+<li>问题：OpenAI 兼容客户端（Open WebUI、opencode、LibreChat、Vercel AI SDK）只能看到答案文本，agent 的 reasoning_callback 在流式 writer 里根本没接上，思考增量在本机界面都能渲染，却在传输层被丢掉（#99552）。</li>
+<li>修复：_spawn_stream_agent 把 status/reasoning 回调接进 agent，两个流式 writer（/v1/chat/completions 和 /v1/responses）都输出 reasoning 增量。</li>
+<li>效果：所有 OpenAI 兼容客户端能看到模型的思考过程，不再只有答案。</li>
+</ul>
+<p>0a846a2e2d feat(api-server): reasoning on non-streaming replies; echoed reasoning input items are ignored</p>
+<ul>
+<li>问题：非流式回复没有 reasoning 字段；且如果请求里回显了 reasoning 输入项，会被当成普通消息重复处理。</li>
+<li>修复：非流式回复也带上 reasoning；回显的 reasoning 输入项被识别并忽略，不重复计费。</li>
+<li>效果：流式/非流式体验一致，回显推理内容不会污染对话。</li>
+</ul>
+<p>text_verbosity 控制回答长度</p>
+<p>3910489f78 feat(openai): agent.text_verbosity controls Responses answer length</p>
+<ul>
+<li>问题：GPT-5 系列模型的回答长度只能靠 reasoning effort 间接控制，没有独立参数（#20203）。</li>
+<li>修复：新增配置键 agent.text_verbosity（空 / low / medium / high，默认空 = 不发送），设置后 Responses 传输层发出顶层 text: {verbosity: ...} 字段，配置在 agent 配置解析时只解析一次。</li>
+<li>效果：要简答还是详答，和思考深度脱钩，独立调节。</li>
+</ul>
+<p>/v1/responses 历史工具输出上限</p>
+<p>064756ca45 feat(api-server): opt-in cap on tool outputs in the stored /v1/responses history</p>
+<ul>
+<li>问题：持久化的对话历史快照把每次工具输出原样嵌入，几个大输出就让单次 response_store.db 写入涨到约 677 KB（配置的 2.7 倍）。</li>
+<li>修复：新增 opt-in 上限，控制存入历史的工具输出大小。</li>
+<li>效果：响应历史不再被大工具输出撑爆，数据库写入体积可控。</li>
+</ul>
+<p>hermes.status SSE 事件</p>
+<p>b9f29e2180 feat(api_server): stream agent status lines as hermes.status SSE events</p>
+<ul>
+<li>问题：OpenAI 兼容的 SSE writer 只有工具进度和推理内容，没有生命周期状态；API 客户端在 provider 故障（现在有自动恢复阶梯）等待时面对一条静默的 socket，分不清「在等 provider」还是「挂死了」。</li>
+<li>修复：_spawn_stream_agent 把 status_callback 接进 agent，两个 writer（/v1/chat/completions 和 /v1/responses）都输出 hermes.status SSE 事件。</li>
+<li>效果：客户端能看到 agent 状态行，等待期间不是黑盒。</li>
+</ul>
+<p>Codex 服务端 web_search 支持 openai-native 后端</p>
+<p>82c77ff9b9 feat(web): add openai-native backend for Codex server-side web_search</p>
+<ul>
+<li>问题：Codex 服务端 web_search 只能走客户端侧函数实现。</li>
+<li>修复：声明 OpenAI 的 provider 执行式 Responses web_search 内建工具，镜像已有的 xAI 原生搜索路径；通过 web.search_backend: openai-native 选择，仅搜索，web_extract 仍走自己的后端。</li>
+<li>效果：Codex 服务端网页搜索多一个 provider 原生后端可选。</li>
+</ul>
+<p>登录与认证：</p>
+<p>openai-codex 浏览器授权码 + PKCE 登录</p>
+<p>de66512ab7 feat(auth): opt-in browser authorization-code + PKCE login for openai-codex</p>
+<ul>
+<li>问题：openai-codex 升级前只能走设备码登录，禁用设备码授权的组织完全无法登录（#95743）。</li>
+<li>修复：hermes auth add openai-codex --browser（或 auth.codex_login_flow: browser）走 OpenAI authorize 端点 + PKCE，回调在固定重定向 URI http://localhost:1455/auth/callback 接收。设备码仍是默认，浏览器流程只在用户明确要求时启用，不会被自动替换。</li>
+<li>效果：被设备码卡住的组织也能登录 Codex。</li>
+</ul>
+<p>借用手头外部登录可一键关掉</p>
+<p>6c7f693473 feat(auth): opt out of borrowing Codex CLI / Claude Code logins (auth.adopt_external_logins)</p>
+<ul>
+<li>问题：Hermes 自己的登录缺失或刷新被拒时，会自动借用并刷新 Codex CLI（~/.codex/auth.json）和 Claude Code（~/.claude/.credentials.json）的登录。但两家都发单次轮换的 refresh token，借用后两个程序共用一个 token 家族，谁先刷新谁把另一个踢下线（#113023）。#113816 让死登录可见了，但用户没有关掉借用的开关。</li>
+<li>修复：新增 auth.adopt_external_logins（config.yaml，默认 true），设 false 就不再借用外部登录。</li>
+<li>效果：不想被 token 互踢的用户可以关掉自动借用。</li>
+</ul>
+<p>新 Codex 登录与池化凭据同账户时警告</p>
+<p>65f6e31ffe fix: warn when a new Codex login is the same OpenAI account as a pooled credential</p>
+<ul>
+<li>问题：两个 openai-codex 登录携带同一个 principal（chatgpt_account_id + sub）时会互相顶号，用户不知道新登录重复了哪个。</li>
+<li>修复：hermes auth add openai-codex 成功后会打印新登录与哪些现有池化凭据重复，并给出处理建议。</li>
+<li>效果：重复登录当时就能发现，不用等被顶号。</li>
+</ul>
+<p>稳定性与性能：</p>
+<p>重试和回退都用尽后自动恢复</p>
+<p>0752127c5e feat(agent): bounded auto-recovery ladder after retries and fallback are spent (#85426, #107307)</p>
+<ul>
+<li>问题：api_max_retries 和 fallback 链在临时故障（5xx、过载 529、连接/读取超时）下都用尽、且还没送出任何答案时，回合直接以「API failed after N retries」结束，其实 provider 一分钟后就恢复了，用户得自己发现并重发。</li>
+<li>修复：settle_unrecovered_error 现在走有界的自动恢复阶梯，等待一段时间再试。</li>
+<li>效果：临时故障不用手动盯，agent 自己等恢复继续。</li>
+</ul>
+<p>Hermes 自己的 scratch 目录取代系统临时目录</p>
+<p>2dcebe6471 feat: Hermes-owned scratch dir replaces the system temp dir for every process and child</p>
+<ul>
+<li>问题：Hermes 和它启动的一切（浏览器 profile、PTY 探测、技能脚本、委托代码里的 tempfile 默认值）都写系统临时目录，Linux 上多数是 RAM 盘 tmpfs，agent 负载一高就填满。</li>
+<li>修复：新增 hermes_constants.get_scratch_dir() → HERMES_HOME/cache/scratch（0700 权限），超过 72 小时的条目按计划清理。</li>
+<li>效果：临时文件进 Hermes 自己的目录，不再撑爆系统 tmpfs。</li>
+</ul>
+<p>hermes usage --json 不看会话也能查额度</p>
+<p>85b2a3df6c feat(cli): `hermes usage [--json]` prints the /usage account limits without a session</p>
+<ul>
+<li>问题：Codex 5 小时/周窗口（以及 Anthropic/OpenRouter 限额）只有交互式 /usage 斜杠命令能看，cron 任务和 shell 脚本没有途径读配额（#33094、#57476）。</li>
+<li>修复：hermes usage 通过 agent.account_usage.fetch_account_usage 取同一份快照，凭据解析按无活动会话的路径处理，--json 输出机器可读。</li>
+<li>效果：脚本和定时任务也能读账户配额。</li>
+</ul>
+<p>启动预热提前解析 provider 上下文元数据</p>
+<p>614f11d3f6 perf(gateway): prime provider context metadata during startup warm-up</p>
+<ul>
+<li>问题：网关启动预热只预载了 run_agent 导入图和工具 schema，配置路由的上下文窗口元数据要等第一轮入站消息才解析，AI Agent 构造时在「提交 ACK」和「推理请求」之间多付了一次 catalog HTTP 探测（codex OAuth /backend-api/codex/models、OpenRouter metadata）。</li>
+<li>修复：在现有 executor 线程预热里用 _resolve_gateway_model_context() 提前解析，与应用回合相同的路由/凭据/profile 规则。</li>
+<li>效果：首轮推理不再卡这个探针，启动到首答更快。</li>
+</ul>
+<p>工具与集成：</p>
+<p>官方 n8n 服务器接入 MCP 目录</p>
+<p>17b5df02f2 feat(mcp): connect to the official n8n server from the catalog (#116063)</p>
+<ul>
+<li>新增：MCP 目录可连官方 n8n server，HTTP + 浏览器 OAuth 连自己的实例。保留独立 n8n-official 标识，已退役的 n8n bridge 不会被改名或覆盖，凭据和工具过滤原样保留。普通目录配置值存入 server config，密钥引用保留在 secret 引用中。</li>
+</ul>
+<p>read_file 直接看 SQLite 结构、标记冲突文件</p>
+<p>11d68e4652 feat(tools): read_file renders SQLite schemas and flags merge conflicts; web_extract refuses binary payloads</p>
+<ul>
+<li>问题：OMP 对比发现三个小缺口（#77367）：read_file 打开 .db/.sqlite/.sqlite3 被当二进制拒掉；合并冲突文件没有标记；web_extract 可能接收二进制负载。</li>
+<li>修复：SQLite 文件走文档抽取路径（与 .docx/.xlsx 相同），输出 schema 概览（每表 CREATE、行数、前 5 行、索引/视图），以只读 immut 方式打开不影响在线数据库；合并冲突文件给出冲突标记提示；web_extract 拒绝二进制负载。</li>
+<li>效果：agent 读 SQLite 数据库结构和冲突文件不再瞎猜。</li>
+</ul>
+<p>自定义语言服务器与更聪明的路由</p>
+<p>8420737a82 feat(lsp): declare custom language servers in config (lsp.servers.&lt;id&gt; with extensions)</p>
+<ul>
+<li>新增：可在配置里声明自定义语言服务器（lsp.servers.&lt;id&gt; + 扩展名映射），不限于内置列表。</li>
+</ul>
+<p>d4d9b76d8c feat(lsp): route .blade.php to laravel-lsp; plain .php stays on intelephense</p>
+<ul>
+<li>修复：.blade.php 正确路由到 laravel-lsp，普通 .php 仍走 intelephense，不再混用。</li>
+</ul>
+<p>c484be0123 feat(lsp): lsp.package_manager picks npm, pnpm or yarn for language-server installs</p>
+<ul>
+<li>新增：lsp.package_manager 可选 npm、pnpm 或 yarn 安装语言服务器。</li>
+</ul>
+<p>OpenAI 图像 provider 配置化</p>
+<p>fc08fdb171 feat(image_gen): OpenAI image provider sends custom model ids verbatim and can reuse a named custom endpoint</p>
+<ul>
+<li>新增：OpenAI 图像 provider 原样发送自定义模型 ID，可复用命名的自定义端点。</li>
+</ul>
+<p>3fa2c45bd8 feat(image_gen): OpenAI image provider takes base_url/key_env from config, blanks OpenAI-Project, bypasses macOS system proxy</p>
+<ul>
+<li>修复：base_url/key_env 从配置读取，不再写死 OpenAI-Project 头，绕过 macOS 系统代理。</li>
+</ul>
+<p>Codex 内联 SVG 栅格化</p>
+<p>3dad039a74 feat(codex): inline SVG images are rasterized to PNG before the Responses send</p>
+<ul>
+<li>问题：发送层守卫把内联 data:image/svg+xml 全部降级成文本占位符，模型永远看不到 agent 或用户附件想让它看的图。</li>
+<li>修复：复用 vision_analyze 栅格化链（cairosvg / svglib+reportlab / rsvg），能转 PNG 就转，再发送。</li>
+<li>效果：SVG 图片不再被降级成占位符，模型能看图。</li>
+</ul>
+<p>流式 TTS 首句阈值可配置</p>
+<p>9823ce4ff1 feat: make the streaming TTS first-sentence threshold configurable (tts.streaming.min_len)</p>
+<ul>
+<li>问题：SentenceChunker 硬编码 min_len=20，三个构造点（gateway StreamingTTSConsumer、CLI/TUI 流式播放、dashboard /api/audio/speak-stream）都不传参，短中文开场白（如「记得，叫团团。」7 字）永远被缓冲到第二句之后，第一声延迟约一句。</li>
+<li>修复：新增 tts.streaming.min_len 配置，阈值可调。</li>
+<li>效果：短句开场也能及时出声。</li>
+</ul>
+<p>Telegram 冷启动保留离线队列</p>
+<p>a4a0447b04 feat(telegram): drop_pending_on_cold_boot knob to preserve offline queue</p>
+<ul>
+<li>新增：Telegram 平台新增 drop_pending_on_cold_boot 开关，冷启动时是否丢弃离线待处理消息可配置，默认保留离线队列。</li>
+</ul>
+<p>网关：按发送者 user_id 路由入站消息</p>
+<p>d6f3285b81 feat(gateway): route inbound messages to profiles by sender user_id</p>
+<ul>
+<li>问题：gateway.profile_routes 只能按消息来源（guild/channel/thread）区分，共享聊天里两人各要隔离的 profile 就得跑两个 bot（#33548）。</li>
+<li>修复：user_id 加入路由判别条件。</li>
+<li>效果：一个 bot 内按发送者分流到不同 profile。</li>
+</ul>
+<p>ad651b8250 feat(gateway): RoutingIdentity — one frozen identity per inbound event</p>
+<ul>
+<li>配套：每个入站事件冻结一份 RoutingIdentity，路由判定期间身份不漂移。</li>
+</ul>
+<p>插件目录继续上新（本期 25+ 个新条目与 pinned 更新）</p>
+<p>重点新增条目（不代表全部）：</p>
+<ul>
+<li>compartment（01291fdab1）：加密的离线 memory provider。</li>
+<li>hermes-project-stewardship（5db3298a5e）：项目管理。</li>
+<li>browserclaw（4383f1cdba）：浏览器自动化。</li>
+<li>mermail（0a6699754e）：邮件社区插件。</li>
+<li>Hermes-Jev（81ba264838）、jev-typesafe（2b2512d0cf）。</li>
+<li>VK Messenger 平台插件（da1d38dde6）。</li>
+<li>Pixel Worlds 桌面 realms（b8390ee2e5）。</li>
+<li>iteration-budget-meter（e4733ccad5，迭代次数预算计）：迭代预算计量。</li>
+<li>reasoning-switch（8bac975043）、compact-reasoning-label（89cdfb8140 pinned）：推理开关、紧凑标签。</li>
+<li>opaque-composer（bf9f57e2a4）：输入框。</li>
+<li>ha-sidebar-navigator（efc9a4458f）、hermes-loadout（fc32ca7974）、toolaria（65fcc53c36）、quota（bb431a7a2e）、memlock（83664cb5a3）等。</li>
+<li>ReMe（e834ee8971）：列表支持 + manifest 安装对齐。</li>
+<li>网关 opt-in served_model 字段（bafb778edc）：回复底部标注实际应答的模型。</li>
+</ul>
+<p>（社区插件目录持续滚动更新，上期 24 个、本期又 25+；条目由社区各维护者提交，多为新增 catalog 卡片。）</p>
+<p>安全与数据：</p>
+<ul>
+<li>插件目录拒绝越出 SDK 表面的桌面插件（72f55062d2）。</li>
+<li>新 Codex 登录与池化凭据同账户警告（65f6e31ffe，见上）。</li>
+<li>会话路由按 user_id 隔离（d6f3285b81，见上）。</li>
+</ul>
+<p>维护命令：</p>
+<ul>
+<li>hermes codex-runtime migrate [--dry-run] [--json]（d09183d8d3）：Codex 运行时迁移命令。</li>
+<li>hermes sessions repair-profiles（67757285f6）：修复跨 profile 交叉的持久状态。</li>
+</ul>
+<p>说明：本期 5 条 Revert 均撤销 09-16 合入的桌面端目录浏览恢复系列，界面退回旧版；原因未在 commit body 说明。其余统计差异：修复数量大（454）与上期（594）相比回落，仍以修复季为主。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-19：桌面端语音回复流式播放、隐藏浏览器页面保活；备份完整性保护、cron 投递秘密脱敏；WhatsApp 原生提及与群策略修复</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-19</link>
