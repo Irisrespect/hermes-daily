@@ -5,8 +5,74 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 20 Sep 2026 06:39:49 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 21 Sep 2026 07:14:00 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-21：cron 任务跟随主模型、桌面端设置页重组，插件目录新增约 20 个条目</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-21</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-21</guid>
+      <pubDate>Mon, 21 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 20 日 06:30 ~ 9 月 21 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 916 个 commit（不含 merge），另有 2 个 merge。新增 60 个功能、522 个修复、14 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>cron 任务不再快照模型，触发时跟随主 agent 配置，需要锁定时用 pinned 显式固定</p>
+<p>桌面端设置页改成有序子页面，线程时间线、代码 diff 都能隐藏，输入框去掉背景模糊</p>
+<p>插件安装打通：hermes://plugin/install 深链与官网卡片直达桌面端安装对话框，目录新增约 20 个条目</p>
+<p>模型 provider 插件体系补齐：声明式 OAuth 登录引擎、外部进程 provider、插件自管登录命令</p>
+<p>性能批量优化：update 跳过重复 npm ci、技能更新跳过重复下载、/model 列表只读缓存</p>
+<p>重点条目：</p>
+<p>桌面端（约 89 条 fix + 5 条 feat）</p>
+<p>设置页重组成有序子页面（5a0fb0f38d）</p>
+<p>设置页之前是一整屏长列表，项多的时候要找某个设置只能一屏一屏翻。现在设置按子页面的形式组织，每个子页面有固定顺序，找设置和改配置都更直接。</p>
+<p>线程时间线条可以隐藏（ee56d38d97）</p>
+<p>线程会话的消息之间会渲染一条时间线条，占版面。新增开关可以把时间线条隐藏，界面更紧凑，想回看时间再打开。</p>
+<p>外观设置新增「隐藏代码 diff」（4d14aaf477 + 0f2c27152d）</p>
+<p>不关心代码改动细节的用户，之前必须看完整 diff 区域，界面被大段代码占掉。现在外观设置里可以隐藏代码 diff，隐藏后仍保留编辑次数的统计，不会丢信息。</p>
+<p>输入框背景模糊移除（7b81848ce5 + 7da7259e07）</p>
+<p>输入框之前的背景是半透明模糊，对话一长、下面文字多的时候输入内容不好读。现在改成不透明底色，文字清晰度明显提升。</p>
+<p>Bot Mode 聊天可拖进分屏（25dc2d3440 + c6a59c20f5）</p>
+<p>Bot Mode 的长驻聊天之前拖不进分屏窗格，拖了没反应。现在支持拖成独立分屏；同时修复了主窗口标签拖进分屏时「复制而非移动」的问题——之前同一个会话会出现在两个窗格里，现在拖拽是移动，主窗口自动释放该标签。</p>
+<p>macOS 原生文本替换生效（410c281756 + d7c7af771a）</p>
+<p>macOS 系统级的文本替换（缩写自动展开）之前只在系统输入框里生效，消息输入框里不认。现在桌面端输入框遵循 macOS replacements，设置里也能直接打开替换控制。</p>
+<p>手动 /compress 显示压缩进度（a59d15a0c8）</p>
+<p>手动执行 /compress 压缩会话上下文时，之前没有进度反馈，大会话要等很久。现在桌面端显示压缩进度，能看到压缩进行到哪一步。</p>
+<p>Bot 聊天用 Bot 自己的语音（f3d98d4fda + ae7bf98971）</p>
+<p>Bot Mode 的聊天之前读消息用的是主账号的 TTS 语音和身份。现在 Bot 聊天在窗格和主面板里都用自己的（connection, profile）身份说话，读消息也是 Bot 自己的 profile 语音，多 Bot 场景下谁在说话一目了然。</p>
+<p>cron 与模型（cron 18 条 fix、gateway 44 条 fix）</p>
+<p>cron 任务跟随主模型，pinned 显式锁定（0469740ab3）</p>
+<p>这是本期对自动化用户最重要的一条。之前未 pin 的 cron 任务在创建时会快照当时的全局 provider/model，之后 hermes model 或 /model 换了模型，任务仍然跑创建时的老模型——整个任务舰队不会跟随主配置变化，只能靠 hermes cron resnap 手动追赶。新规则：任务触发时按「单任务 pin &gt; cron.model / cron.model_provider（舰队默认）&gt; model.default」解析，未 pin 的任务直接用触发时刻的主模型。想锁死的任务在创建/更新时传 pinned=true，把当前主模型写进任务作为显式 pin；pinned=false 释放。cronjob 工具只允许锁定主模型（不能把花费指到别的模型），CLI 新增 --pin / --unpin。旧快照机制连带的 hermes cron resnap 命令、工具的 resnap 动作和 all 参数、以及桌面端的 cron 模型影响卡片一并移除。</p>
+<p>/branch 默认开兄弟线程（dbcbd9d9db）</p>
+<p>Discord、Telegram、Slack、Matrix 上，/branch 之前会把当前聊天/线程的会话键重新绑定到克隆分支上，原会话直接结束——想对比两条路径都不行。现在默认先通过适配器的 create_handoff_thread 开一个兄弟线程，克隆分支绑定到新线程，原会话保持可用；线程创建失败不会留下孤儿分支行。/branch --here 保留就地切换；平台不支持线程、DM、未知的 Discord 父级等情况自动回退到就地切换并提示。</p>
+<p>nous 免费账户解锁订阅计费模型（a76e491660）</p>
+<p>Nous 网关可以把目录条目记到账户订阅上（billing_mode: subscription），但免费档账户的模型选择器只放行标价 $0 的模型，订阅计费的一律锁住。现在把订阅标记带进定价条目，免费档账户也能选订阅计费的模型；静默默认仍然优先真正免费（$0）的模型，不会误导消耗。</p>
+<p>插件生态：目录、深链与 provider 插件</p>
+<p>桌面端插件目录深链安装（aae3c737ad + d9fdaeb434）</p>
+<p>hermes://plugin/install?catalog=&lt;name&gt; 深链会把名字解析到实时插件目录 feed（就是插件页用的同一份 /docs/api/plugins.json），直接打开桌面端「安装插件」对话框，走和插件页手动挑选完全相同的 reviewed/pinned 模式。名字无效会给出明确的错误提示；catalog 参数独占了这条链接的语义，永远不会把目录名重新解释成 git 地址（就算链接里夹带 repo= 也会被忽略），未审核的仓库没法借目录名混进安装流程。官网插件目录的卡片也支持点击拉起桌面端安装对话框。</p>
+<p>插件目录新增约 20 个条目（05e580ff62、629107a84c、b85c552e26、e437be2f50、97f731020b、e2978d0a81、20d7521fab、b95c822f5a、97d925dfae、58bc617c8b、8c9b674622、e6b32ee271、6bdfc0b099、f2a85c16f7、38bae549c6、4666ce6d83、358cb07280、22b72e2561 等）</p>
+<p>覆盖几类实用场景：rss-reader（RSS 阅读）、memory-review（记忆回顾）、intelligent-tool-break（工具调用断点）、bot-forge（bot 生成）、provider-status（provider 状态监控）、image-utils（图片工具）、prompt-enhancer 与 prompt-snippets（提示词增强与片段库）、openrouter-voice（语音）、sticky-notes（便签）、sketch-pad（草图板）、source-tray（源码托盘）、debug-desk（调试台）、Tempo MPP、Corpus、Adspirer、hermes-herald，以及 reMarkable 云和笔记本工具包（22b72e2561，读写 reMarkable 电子纸设备的云笔记）。排行逻辑也改了：目录按星数排名，去掉 review-claim 徽章（76fe8f7f5f）。</p>
+<p>model-provider 插件：声明式 OAuth 登录引擎（97fd8c8f2a）</p>
+<p>外部模型 provider 插件要实现登录，之前得自己写浏览器授权流程、本地回环回调、token 持久化和刷新，全部接进 ProviderProfile 的 auth_handler / refresh_credential 钩子。现在核心提供 hermes_cli/auth_oauth_pkce_plugin.py：插件作者定义一个 OAuthPKCEConfig 数据类、挂两行回调即可。安全边界全部由核心统一管：只允许 https 端点（明文 http 仅限本地回环且是字面量主机，即本地开发 IdP）、token 主机在登录和刷新前都会先对照授权主机白名单校验、S256 PKCE、常量时间比较的 CSRF state、RFC 8252 监听在字面量 127.0.0.1（显式端口，0 表示由系统分配）、凭据以 pooled oauth credential 存储（source manual:loopback_pkce，load_pool 不会误删）、单次使用的 refresh token 在 auth 锁下重新读取，同级旋转被采纳而不是被花两次。token、state、verifier 一律不写日志。</p>
+<p>model-provider 插件：外部进程 provider 支持独立分发（13fe9c7171）</p>
+<p>CLI 驱动的订阅类 provider 之前只能作为内置插件随 Hermes 发布。现在 ProviderProfile 增加 native_reasoning_details_type、model_aliases、get_model_context_length、get_usage_cost、setup_status、discover_models 等钩子，这类 provider 可以做成独立的 kind: model-provider 插件。hermes model 的通用插件流程：外部进程行按 CLI 自己的登录状态门控（TTY 上内联 login_command）、discover_models 行带按行说明、可执行文件缺失时不写配置。/model 和选择器把进程 provider 的实时目录与已 pin 的合并显示，别名在 provider 内部解析。桌面端配套渲染：&quot;[1m]&quot; 显示成 &quot;1M&quot; 标签、连字符的 Anthropic 版本号读作「Haiku 4.5」。</p>
+<p>插件自管登录命令（749443e292 + dce233e809）</p>
+<p>hermes auth add/status/logout/refresh 之前只能管理内置 provider 的凭据。现在模型 provider 插件可以在自己的 profile 里注册、登录、刷新，OAuth 形态的插件走同一套命令，插件账号的生命周期和内置 provider 一致。</p>
+<p>插件自己分类 API 错误（bce20d0b1f + f7240ca980）</p>
+<p>ProviderProfile 新增 classify_api_error，model-provider 插件可以自行把上游错误归类（配额、过载、鉴权等）。插件 provider 在全部界面（模型选择、状态显示）都可选择且状态准确。</p>
+<p>进程与性能（perf 14 条）</p>
+<p>TUI 进程面板（1d30aa5571 + caa2e2dd99 + 2c78b9b39e）</p>
+<p>TUI 的 live-work dock 和 /agents 覆盖层之前只合并 subagent 事件。现在按同样节奏轮询 process.list，在 agents 下方新增 Processes 块：⚙ 命令、运行时长、最后输出，进程退出后 60 秒内显示退出判定；dock 预算拆分，进程和 agent 块互不遮挡。后台进程状态统一打上 exited_at 时间戳并在 process.list 暴露。CLI 的后台进程也显示在 live-work dock 和 monitor。配套修复：空闲时的 bot 投递轮询做了节流，TUI 空闲不烧 CPU（bfc28a2cc3）。</p>
+<p>hermes update 跳过重复 npm ci（96149253c9）</p>
+<p>update 第一阶段装完依赖并记录 manifests digest 后，web 构建步骤之前无条件再跑一遍 npm ci，把 node_modules 清掉重装。现在复用第一阶段的摘要门（同时校验 node_modules 和 tsc/vite 垫片），锁文件没变就直接构建，更新明显更快。</p>
+<p>技能更新跳过重复下载（075ed55493）</p>
+<p>check_for_skill_updates 之前为了验证版本，要把每个已安装 hub 技能的完整 bundle（SKILL.md 加所有附件）下载下来重新算哈希。GitHubSource 现在提供 current_revision()（每仓库一次缓存的 tree 查询，不拉 blob），锁定条目里记录的 source_revision 没变就直接报告 up_to_date；没有记录版本或仓库不支持探测的条目仍走全量下载路径。</p>
+<p>桌面端渲染与 /model 提速（3c60e7db67 + cb24121a8e + 4243abd633）</p>
+<p>桌面端关键帧静态化、输入框测量用 rAF 合并、加载暂停改时钟驱动，渲染开销下降。/model 列模型时只读缓存目录，不再对每个端点和 OpenRouter 目录发实时探测（GET /v1/models 全部跳过），列表秒开。另有 gateway 的 api-server 启动成本削减（501d8ba4e0）和发布大 tool 结果后裁剪进程内存（f32f651788）。</p>
+<p>Kanban（14 条 fix）</p>
+<p>kanban 工具链补强（daf5e0d7a7 + d8b64d4a6d + 88d2d90fe1 + 71c614b6e3 + 64c7da592d + bdd7192bcf）</p>
+<p>kanban create 新增 --body-file 参数从文件读任务正文（UTF-8 读取并走真实解析器），shell 特殊字符不再被命令行吃掉；触屏设备点卡片是打开而不是误触发拖动；完成列按完成时间排序；kanban_complete 的结果里报告注册过的附件集合；profile_routes 固定到无本平台适配器的 profile 时，投递自动走主机器人而不是丢消息。凭据受限的订阅之前会静默回退，现在会警告一次而不是无声重绕（2b86e0b223）。</p>
+<p>新模型（其他）</p>
+<p>z-ai/glm-5.3-flashx 上目录（8d153b26aa）</p>
+<p>OpenRouter 和 Nous Portal 目录同步新增 z-ai/glm-5.3-flashx：工具调用支持、1,048,576 上下文、0.37/1.25 美元每 M token。Nous 列表从 OPENROUTER_MODELS 派生，一个元组改动两端生效；默认上下文长度表单独加了键，避免子串匹配落到 glm-5.3-flash（1,310,720）上把窗口高估 25%。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-20：桌面端 429 限额卡可预约自动重试，API 回复流输出推理过程，openai-codex 支持浏览器 PKCE 登录</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-20</link>
