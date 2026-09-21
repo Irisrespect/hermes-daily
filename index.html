@@ -22,9 +22,75 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 55 期 · 19121 个提交 · 每日自动更新 ·
+<p class="meta">共 56 期 · 19689 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-22" class="day">
+      <h2>Hermes 日报 2026-09-22：桌面端托盘与 HUD 唤出、插件可直接卸载，插件目录新增约 20 个条目</h2>
+      <p><strong>本期覆盖 9 月 21 日 06:30 ~ 9 月 22 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 568 个 commit（不含 merge），另有 1 个 merge。新增 44 个功能、299 个修复、5 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端新增「轻按唤出 HUD」和「最小化到托盘」，并修掉一批长会话内存占用问题（#77311 系列）</p>
+<p>插件中心可以直接卸载用户插件；官网插件目录给每个插件生成独立页面、README 从锁定 commit 渲染</p>
+<p>插件目录新增约 20 个条目：Parallel Search、prompt-enhance、file-tray、done-bell、kiwi、cognee 等</p>
+<p>prompt 缓存 cache_ttl 支持 auto 按会话类型分档；终端后台任务支持心跳通知；子 agent 加预算预警</p>
+<p>Windows 一批修复：只读 Git 目录删除、WSL bash 存根跳过、退出清屏不再弹窗；记忆替换不再静默覆盖整条</p>
+<p>重点条目：</p>
+<p>桌面端（70 条 fix + 8 条 feat）</p>
+<p>轻按唤出 HUD（8e806ae1b2 + 9ff6e071fa + fca3221df4）</p>
+<p>HUD 之前只能从 Hermes 内部快捷键进出，人在别的应用里时够不着。现在新增「轻按唤出 HUD」开关：在 Windows / Linux 上按下并松开 Ctrl+Alt，macOS 上按下并松开 Command+Option，就能从任意应用把 HUD 调到前台。手势由原生被动监听识别「干净的修饰键轻按」（不掺杂其他按键），不记录按键内容也不截屏；Windows 用一个小型原生辅助程序实现（本期内还修了它的免 SDK 构建与失败提示）。默认关闭、仅作用于本设备；Linux 需要 X11 会话，不支持 Wayland。HUD 手势设置也独立成了一个快捷键页。</p>
+<p>最小化到托盘（92be0f8ed1 + 5100e9c328 + b7fdf2d504 + 7ff69689d0）</p>
+<p>外观设置新增「最小化到托盘」：开启后，最小化窗口或者关闭主窗口是把窗口隐藏到系统托盘（macOS 为菜单栏），Hermes 继续在后台运行；退出走托盘菜单里的「退出 Hermes」或 Cmd+Q。默认关闭、仅本设备。配套修复：托盘模式下点关闭变成隐藏主窗口（而不是退出）；HUD 辅助程序起不来时会区分「缺少辅助程序」「会话不支持」「启动失败」并说明托盘关闭的含义，不再只给一句笼统的失败。</p>
+<p>插件可直接卸载（dd482928ee + dec236b214 + 180975a3cb）</p>
+<p>插件中心之前只有安装和开关，卸载只能去 CLI 或 dashboard。现在每个用户插件行都有垃圾桶按钮 + 破坏性确认对话框：后端新增 plugins.manage remove（复用 hermes plugins remove 的同一套核心，原子删除插件目录和安装元数据，拒绝捆绑插件和目录外路径），卸载后行消失并重新扫描。单独安装的桌面插件（没有 agent 部分的）走 Electron IPC 删除，渲染进程只报文件夹名不碰路径，拒绝越界段和统一包的另一半。捆绑插件与 pip 安装的入口插件不提供按钮（后端删不掉）。</p>
+<p>长会话内存与渲染（#77311 系列，14b4327445 + af2a3be5fe + ca8874350c + f4e085e956 + 56af2bdf7e + 7d2d634708）</p>
+<p>负责 #77311 下半场：会话存储以前会把渲染过的每一条消息都留在内存里（尾部水合、每次「显示更早」翻过的页、流过的每一轮流），渲染端内存只涨不降。现在保留当前窗口加一页余量、更早的释放；停靠（park）的会话面板会从 warm cache 里剪掉转录缓存（此前因为引用关系被钉死在窗口生命周期）；头像缓存加了上限，长会话不再钉住图片字节；空闲渲染器的 DecodeText 占位动画跑完一次就停（实测同一工作区从 ~9.6 commits/s 空闲降到 ~0.7）；渲染进程堆上限和 desktop.electron_flags 现在对打包版生效——此前打包版读不到启动参数，有 Windows 用户在 15GB 空闲内存下仍遭遇 OOM 崩溃循环。</p>
+<p>一台主机一个后端（25d88ad0c4 + 9eb90b0a03）</p>
+<p>此前桌面端每次启动、每个 profile 都会再拉一个 hermes serve；现在启动先做发现，校验候选的会话令牌、HTTP 就绪和 WS 鉴权后附着到已在运行的后端，只有本机没有后端时才自己起一个（并持有主机级启动闸，两个应用同时启动只会产生一个后端）。gateway 侧新增主机级单例锁 + 会合记录（pid、创建时间、端口、protocolVersion、token 指纹、服务的 profile 集合）：第二个 hermes serve 会打印现成的 pid 和端口并正常退出 0；PID 复用（创建时间不符）或已死的记录一律视为过期、绝不附着。多个 profile 不再各自起一套后端。</p>
+<p>配置写入作用域修复（8961499ff6 + f0eed37de4 + 8403fd1166 + 744634fd94 + 389e89bd47 + 44d492b98d + 74ecb8301b + f63c7c803d）</p>
+<p>从网关 A 读到的配置记录必须写回网关 A，之前却会写到当时的默认目标——多连接 / 多 profile 场景下设置可能写错地方。现在把配置 GET 的（connectionId, profile）存进 WeakMap，保存时绑定到读取路由；写回时保留 origin 上的 foreground 优先级；writeScope 默认值从 null 改为 undefined（修复首屏 GET 完成前保存会写进 PRIMARY profile 的问题）；缓存刷新后保留配置路由；语音提供商、字体的自动保存依赖补齐 writeScope。一批改动文件集中在 hermes-config 记录本身，配套两条性能优化（结构共享恢复、writeScope 改 getter）。</p>
+<p>其他桌面端修复</p>
+<p>状态抽屉内容折叠前先淡出（5ee87bf9ee）；每个聊天可以隐藏输入框上方的状态堆栈（accb82032c）；时间线导航跳转后的消息计数和编辑框可用性修复（73f3f64eb9 + f532b8adf5）；历史分页的计数与偏移按后端单位对齐（6668ac14a0 + 3f985c84cd + 7c799c26ce）；大段文本粘贴从 HERMES_HOME/composer-pastes 附着（60dd9778c6）；群聊里带引号或粘贴的停止词不再卡住成员（c5b27c4c8c + 4f0ced3e5f）；Linux 原生通知不再冻结 / 优雅释放（326ce363a3 + ab4455d965 + c93b157249 + 8f7b3b48fc）；隐藏链接标题渲染器不再加载登录墙（1c81ad3485 + 3d0bdce9f9）；远程桌面更新不再重启本地网关（04845f5f3e）。</p>
+<p>cron 与 gateway</p>
+<p>一台主机一个 ticker（cb647a018f）：单一主机进程按 profile 接管所有 profile 的定时任务（此前每 profile 各自的 claim 键混用）。配套修复：in-flight claim 按注册键释放（9ecd22e5da）、停滞代码在 cron status 里显示为中断、hermes update 重启已证实滞后的网关（8863b36fd6）。</p>
+<p>续跑上下文注入上一轮的回答而不是它的提示词（387e8e1e16）；自定义 provider 的模型选择在 cron 编辑里保留（46e1e49d30）。</p>
+<p>gateway 错误返回时保留已产出的部分回答（1a90fad0f5）；/help 和 /commands 对非管理员只显示能执行的命令（2978c23acc + 2c286d9d17）；多 profile 网关收敛为仅 multiplex 形态——真实迁移、无退出开关、无回滚、主机锁拒绝（ed703493da）；更新重启义务收敛到主机级（061195fac1 + 953b6f6f08）。</p>
+<p>macOS：launchd 启动的 gateway 可以通过本地网络（5d63d3e5c5，走 osascript 包装拿到平台身份，修 #71206 / #57812）；housekeeping 独立线程池不再饿死对话正文（9815b44568）。</p>
+<p>插件生态与目录</p>
+<p>官网插件页（845fee6cf4 + 2463550c97 + 4c2c20f6e7 + 10c273813d + a782e2ee77）</p>
+<p>/docs/plugins/&lt;名字&gt; 和 /docs/plugins/by/&lt;作者&gt; 在构建时从同一份 plugins.json 生成：插件页含完整描述、披露声明、锁定 commit / 版本 / 平台、工具、钩子与环境变量、桌面端安装按钮、仓库与审核源码链接、截图画廊。README 默认从审核时锁定的 commit 渲染（此前开关没条目开启，222 个插件页全没有 README；现在 222/222 渲染，readme: false 可关）。目录卡片新增「Added / Updated」时间（取自 git 历史，浅克隆时为 null 而不是错值），并能按最多星标 / 最新 / 最近更新排序。卡片不再点击展开/收起，点任意位置直接进插件页。</p>
+<p>插件目录新增约 20 个条目</p>
+<p>含 Parallel Search（696da692e8）、prompt-enhance（4c76f85017）、file-tray（579cccce08）、jev-curator（66db0a01bb）、done-bell（ddde715b8e）、prompt-tray（c0b7951643）、kiwi（e652d6ea82）、cognee（f6e1c21a52）、Cron Bulletin（5034e5ec0a）、protean-model-sync / protean-subagent-viewer（743ee72596）、vaultknox、hermes-pubky、iroh-interconnect、vector-platform、Orbit Desktop、kanban-task-threads、sabi、gbrain、kame-api-rotation、subscription-meter 等；另有 cdp-manager、rss-reader、hermes-auto-titler、prompt-snippets、lancedb-suite 等一批版本更新。</p>
+<p>能力与工具</p>
+<p>缓存 TTL 自动分档（23301d705c）</p>
+<p>prompt_caching.cache_ttl 新增 auto：1 小时缓存档写入价是 5 分钟档的 2 倍 / 1.25 倍，只有在回合间隔超过五分钟时才划算——正好符合「人离开一会再回来」的交互会话，而完全不符合子 agent、cron、一次性任务。单个全局值伺候不了两种场景，运维只能留 5 分钟档、每次回来付全额上下文重写。auto 在每次会话开始时按会话来源解析一次：人工交互的用 1 小时档，机器节奏的用 5 分钟档。实测某安装：63% 的交互式缓存写入是 5-60 分钟空闲后的冷重写，auto 能把交互写入成本降约 42%，代价是子 agent +49%、cron +23%。</p>
+<p>终端长任务心跳（65b0ff38ea + 9acd0d33b6）</p>
+<p>terminal(background=true, heartbeat=N) 每 N 秒（下限 60）发一次 heartbeat 事件，只带上次之后的增量输出，加上原有的完成通知。长跑任务（合并列车、全量测试、部署）不再全程静默；失败能在 N 秒内被上级发现而不是等到退出。heartbeat 属于后台专用修饰符，execute_code 沙箱里被拦（沙箱不接受 background/notify 类修饰符）。</p>
+<p>子 agent 预算预警与恢复信息（97beaeeeb3 + a2b6f53245）</p>
+<p>子 agent 被 child_timeout_seconds 判为停滞时之前只会静默消失、丢掉全部上下文；现在空闲窗口用完 80% 时会通过 steer 通道收到一行「预算警告」（在它的下一个迭代边界送达），慢但可救的子 agent 有机会自己收尾并返回摘要；警告每个空闲窗口只发一次，有进展就重新计时。后台子 agent 的恢复事件带上每个在跑转录的最后几行和 owner cwd 的 git 状态一行快照。</p>
+<p>MCP discovery 并发上限（9a1f06293d）</p>
+<p>mcp.discovery_concurrency 可配（默认 4，0 = 不限）；非整数 / 负数会告警并回落默认值；发现 pass 的超时随有效上限缩放（配套 #117373 的并发限制）。</p>
+<p>新命令</p>
+<p>hermes sessions set-journal-mode delete|wal：离线转换已存在的 WAL 存储（配置里的 journal_mode: delete 无法自应用到 WAL 库）。有任何外部进程持有数据库或 sidecar 时拒绝执行并点名 PID；busy_timeout=0 防止中途插进来的打开者被竞态；校验头部字节并提醒配置不一致。--db 可覆盖 kanban.db / cron 存储（96da5d97fc）。</p>
+<p>hermes update --list-venv-holders：以 JSON 打印占用 venv 的进程（pid/exe/argv/kind），venv 空闲 exit 0、有占用 exit 3，供自动化精确停进程后重试；只读，发生在任何变更之前（eaef5ec717）。</p>
+<p>连接器统一（afc3b7c6f3）</p>
+<p>桌面端连接外部应用改为单一后端操作（#111008）：连接状态六态（pending 覆盖厂商的 INITIALIZING/INITIATED）、连接与账号元数据严格按契约校验、mint 结果在 initiated 上带 connectionId、CONNECTION_REQUIRED 带 connectUrl + connectionId；桌面端、TUI、CLI 走同一套设置卡片流程。这是给连接器生态补齐契约的一步，普通用户感知为连接流程更一致、错误更明确。</p>
+<p>修复与平台</p>
+<p>Windows（b79b530eec + 0abc3b044b + 8e4c943477 + 1a24b851e5）</p>
+<p>删除只读 Git 目录不再失败：Git 在 Windows 上留下只读的松散对象文件，checkpoint 清理、MCP 目录卸载重装、git 安装的插件卸载以前都会中断在半路留下残局；新增 utils.rmtree_readonly 清写位后重试单次操作，其余失败保持原语义。bash 自动发现跳过 WSL / WindowsApps 的 bash.exe 存根（#116818）；退出清屏的回退不再起 shell、不再闪控制台窗（#116904）；技能内联 shell 优先解析原生 Git Bash。</p>
+<p>记忆替换（67208caac3 + c2bc93588f + c6ed01e774 + 05b9bacbf8）</p>
+<p>部分匹配的 old_text 之前会静默覆盖整条记忆（匹配之外的条款全丢、还报成功），经 /memory 审批重放路径危害更大；现在明确整条替换契约：精确整条匹配优先于子串匹配，替换结果会说明，审批界面也会显示被覆盖的条目，replaced_entries 按操作序号记录。</p>
+<p>认证（2632229bcf）</p>
+<p>撤回了「具名 profile 不再继承根 auth.json」：桌面端更新后，依赖根 OpenAI Codex 登录的 bot profile 全部报「No Codex credentials stored」，用户得给每个 bot 重走一遍设备码。共享一份授权是本来设计——OAuth refresh token 单次使用，授权放根、profile 只读解析、刷新把轮换链写回根。</p>
+<p>语音 / 图片生成 / macOS（29414875c0 + 884b8d980f + 5d63d3e5c5）</p>
+<p>语音唤醒的暂停 / 停止不再卡在卡死的麦克风流上（#117096）；图片生成遇到网关 429 会按限流上报并重试一次，不再误报「模型可能未启用」（某安装一周触发 260 次，占图片调用 17%）；macOS launchd 网关的本地网络权限修复见 gateway 节。</p>
+<p>模型目录（a1b1817adf + 9ec9075540 + 0f9fc3434e + e77c516e73）</p>
+<p>grok 4.7 置顶模型选择器（Nous 源列表同步 pin 到首位）；新增小米 mimo v2.6；DeepSeek 选择器只保留 deepseek-flash / deepseek-v4-pro（清理 models.dev 带回的下线 id），桌面端 deepseek-flash 显示为「DeepSeek V4.1 Flash」。</p>
+<p>性能（a2ac754a56 + 14bdc01b8f + 0111d93178 + 55a8f42329 + 8889060bbf）</p>
+<p>桌面端 hermes-config 记录恢复结构共享、writeScope 改 getter 不再展开查询；gateway 花名册的 ui_meta 走同一份 memo（按 profile.yaml 键控）、轮询复用未变化的 session 字段；profiles 列表只在 YAML 文件变化时重读。</p>
+<p>其他修复</p>
+<p>compaction 检查点前的用量锚点失效（1ae6f650f9）；doctor / cron status / gateway status 报告真实的主机拓扑（a1398a6f67）；doctor 不再给出会被更新回退的修复建议（d76c77beed）；LSP 一个卡住的请求不再让整个工作区失声（c545272568）；浏览器孤儿回收只认完整 socket 目录路径（f2f70bed7a）；备份排除 Browser Use CLI 的 browser_profiles（b52bd5c857）；dashboard 的 REST 路由遵循传入的 profile（6a3dcc39ab）；kanban 拒绝空完成任务证据（6504b665ba）并暴露任务运行时限（1a4c68ce97）；审批守卫对空回答给出警告（262825db74）。</p>
+    </section>
+    
     <section id="2026-09-21" class="day">
       <h2>Hermes 日报 2026-09-21：cron 任务跟随主模型、桌面端设置页重组，插件目录新增约 20 个条目</h2>
       <p><strong>本期覆盖 9 月 20 日 06:30 ~ 9 月 21 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 916 个 commit（不含 merge），另有 2 个 merge。新增 60 个功能、522 个修复、14 个性能优化。</strong></p>
