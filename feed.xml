@@ -5,8 +5,70 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 22 Sep 2026 07:06:55 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 23 Sep 2026 06:54:12 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-23：桌面端新增简单 / 高级界面模式与连接器页，GPT-6 三档模型进目录</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-23</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-23</guid>
+      <pubDate>Wed, 23 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 22 日 06:30 ~ 9 月 23 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 389 个 commit（不含 merge），另有 1 个 merge。新增 18 个功能、175 个修复、14 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端布局编辑器新增「界面模式」：简单模式只留侧边栏和聊天，高级模式保留全量工具面板，两套布局互不覆盖</p>
+<p>桌面端 Connectors 连接器页替换 MCP 标签页，插件装完 MCP 没连上时可直接「Connect now」，不再为 MCP 连接重启网关（原生插件除外）</p>
+<p>模型目录上新 GPT-6 Sol / Terra / Luna 三档与 Claude Opus 5.5；Codex 选择器不显示 GPT-6 的问题修复</p>
+<p>插件系统加固：单插件 10 秒加载超时、策略钩子 fail closed、挂死守卫不再阻塞工具调用；插件设置表单进桌面端</p>
+<p>集成目录新增官方 Blender Lab 与 NVIDIA App / Broadcast（仅 Windows）；性能一批（证书缓存、扫描削减、记忆去重）</p>
+<p>重点条目：</p>
+<p>桌面端（35 条 fix + 7 条 feat）</p>
+<p>界面模式：简单 / 高级（ddeed59afd + 107c67cad2 + 41d4124fff + 68f75db5e5 + c21df8e7eb + ff7642c268 + a53b42ddea）</p>
+<p>桌面端从「给开发者的工具台」细分出两种形态。布局编辑器模板上方新增 Interface mode 分区：简单模式只留侧边栏和聊天——终端、文件、diff 面板全部收起，侧边栏只能在左 / 右停靠；高级模式保持终端、文件、diff、状态栏和自定义布局。设置 → 外观 → 窗口与布局里是同一个控制；Ctrl+K 命令面板搜「Simple mode」（或重绑定 view.toggleSimpleMode 动作）保证随时能切回。收起不只是视觉：隐藏的面板整个不挂载，不跑 xterm、不轮询状态栏（CDP 实测验证）。简单 / 高级各有独立布局、切换互不覆盖；onboarding 的临时布局不写进模式记忆；应用布局会同步打开 / 收起对应面板，面板状态与快捷键指示保持一致。首次启动选 Basic 布局预设应用简单模式、Elite（终端布局）应用高级模式。</p>
+<p>连接器页与 MCP（dc50403a81 + 70f5dc5f46 + 834580309d + d826001ae5 + d1ce67c67a）</p>
+<p>Connectors 页替代原 MCP 标签页：一个应用一张卡，打开可看它带的全部工具。后端为工具列表新加了客户端与缓存（按 portal origin + connector 存 JSON，24 小时新鲜期；过期用 ETag 重验证：304 保留、404 删条目、上游故障供旧列表并标 stale、401 绝不供缓存）；catalog / accounts / policy 全套 RPC 就位——成员级工具开关能说清是谁关掉了哪个工具，写入带修订冲突检测（过期写入返回 POLICY_CONFLICT）；连接和断开一个 app 账号不再需要聊天会话。插件安装 toast 分流：MCP 服务器未连接时给「Connect now」按钮（调 reload.mcp 现场注册，实测 nvidia-app 0.5 秒注册 12 个工具）；已被网关接住时显示「已生效」；原重启提示只在原生插件没被网关接住时保留。另修：插件安装结果的 python_dependencies 字段缺失导致每次桌面端安装都在 errors.log 记一条契约校验失败；连接器对话框的动词与开关归位到 header。</p>
+<p>MCP 启用开关统一（3e00a356a4 + aaf0fd9273 + ade4814466）</p>
+<p>mcp_servers.&lt;name&gt;.enabled 之前有四个独立读取器，行为互相矛盾：MCP 客户端把 enabled: 0 读成「开」、工具集解析器读成「关」；服务器列表把 enabled: &quot;false&quot; 显示成「开」而 agent 实际跳过；目录只认 true/1/yes，enabled: on 显示为「关」但服务器在跑。现在统一为单一读取器 mcp_server_enabled（ACP、hermes tools 选择器、桌面连接器卡、MCP 健康扫描全部接入），桌面端由同一份 case 表驱动 Python 与 vitest 两侧测试，UI 与运行时不会再漂移。profile 编辑器里的开关也修了：之前编辑器写 disabled 键而运行时读 enabled 键，关了不生效、配置里 enabled: false 的显示为开；现在 describe 报告 enabled（默认 true、兼容旧 disabled），保存写入 enabled 并清掉旧键，旧配置在下次保存时迁移。</p>
+<p>其他桌面端修复（c785dd8001 + 2d46d124c7 + 84f41249aa + 8027c370a1 + 7449d50953）</p>
+<p>转录在空刷新页时不再闪空白：sessions.changed 刷新可能在后端重启 / state.db 读竞争时返回零行，之前整页被当成完整转录接受、视图被清空（还触发输入框闪动和光标重置）；现在同会话已有消息时忽略空页、不污染已接受签名表，空页也不再降级 possiblyTruncated 尾巴（「显示更早」保持可用）。Kanban 与所有连接作用域查询跟随网关切换：缓存失效时机修在连接 id 变化时、query key 内嵌连接作用域、持久化 board slug 按连接存储、事件 socket 在连接变化时重开——一个网关的看板不会再画到另一个连接下。对等窗口保持远程 profile 路由；头像图片生成超时从 socket 的 30 秒放宽到 90 秒（#86161）。</p>
+<p>模型目录（79ec1f2a34 + 1d10cef836 + 463980c0e4 + 4ae78e3979 + 95f20517c2）</p>
+<p>GPT-6 Sol / Terra / Luna 替代 gpt-5.6 档位进 OpenRouter 与 Nous Portal 目录（含 -pro 变体），openai-api 兜底列表也排在 5.6 之前。Codex OAuth 侧镜像 5.6 + Astra 契约：272K 上下文回退、可选的 -900k 变体（实测 900K 提升、仍受目录 max_context_window 上限约束）、日期快照资格、effort 阶梯；/model gpt 会解析到旗舰 gpt-6-astra。</p>
+<p>修复 Codex 选择器不显示 GPT-6：Codex 的 models 端点按请求的 client_version 过滤，Hermes 之前发「0.0.0」哨兵，自 GPT-6 铺开起该请求只返回旧的冻结列表（astra + 5.6 三件套）——vendor 自家客户端对同一账号能看到 gpt-6-sol / luna，Hermes 却看不到。两个请求点现在都走 fetch_codex_catalog_entries()：先按最新客户端版本请求，非 200 / 空才回退哨兵；也不再读本地可能过期的 ~/.codex/models_cache.json。</p>
+<p>另外：token 轮换（OAuth 刷新换 account id）后 Codex 目录缓存不再丢失，缓存键带上 token 状态；Claude Opus 5.5 进 OpenRouter 与 Nous Portal 目录（两条路由都做过实付验证）。</p>
+<p>插件系统与集成目录（25 条 fix + 4 条 feat）</p>
+<p>加载可靠性（9863e315f1 + 3755520916 + 89de608317 + 02ad41df3a + e1a6679399 + f95fc0fe77）</p>
+<p>每个插件的 import + register() 现在跑在独立工作线程上，默认 10 秒超时（plugins.load_timeout_seconds，0 关、上限 600）：一个死循环或阻塞网络调用的插件不再让启动、hermes chat、ACP 会话无限挂起——超时记录为失败并继续下一个插件，挂起前已注册的内容被清理，被放弃加载器之后的 ctx.register_* / subscribe 调用被拒绝（上下文标记 abandoned），不让迟到的注册落进已清扫的注册表。</p>
+<p>pre_tool_call 策略钩子抛异常之前 fail open（工具照跑、控制静默消失），现在与超时一致 fail closed：异常追加阻断指令 + 警告；一个插件的阻断优先于更早插件的批准；一个挂死的 pre_tool_call 守卫不再阻塞之后所有工具调用直到重启（过抑制窗口后允许新调用，每回调最多 3 个存活挂起 worker 封顶，防止线程泄漏）。</p>
+<p>桌面端运行时插件加载器的四个隔离漏洞修复：模块求值挂起（顶层 await 等死宿主）现在 10 秒赛跑、失败只影响自己一行；插件用裸全局开的定时器和监听器随卸载清理；两个文件夹导出同一 id 时确定性归属（文件夹名排序第一个胜出）；坏保存（语法错误 / 超时 / 重复）会卸载旧版本而不是让它伪装成 loaded。register() 抛异常时回滚、拒绝 URL 引入、已知路径重载。</p>
+<p>设置表单、安装位置与晚加载即连（5c0e73eff1 + b54c9568e7 + 21d0b12958 + a8b3fe60ac + 47c202479a）</p>
+<p>桌面端插件标签页现在直接渲染插件声明的设置表单（config_schema）：string / number / boolean / enum / json / secret 六类控件表驱动；插件、CLI、桌面端共用同一个配置写入路径（save_plugin_setting）与同一把锁，托管安装 / 托管键拒绝逻辑一致；secret 行只带 .env 变量名和存在标志，值走凭据路由写入，绝不落进 config.yaml。</p>
+<p>插件安装弹窗新增 profile 选择：默认或具名 profile，安装到对应 home 的 plugins/。</p>
+<p>晚加载的插件立即接通平台处理器（斜杠命令、按钮回调、入站转换）——发现监听在 discover_and_load 内部对新增插件触发、平台适配器幂等重接线，不用再重启网关；工具和提示词仍延迟到下个会话（prompt 缓存不变量），MCP 服务器走 reload.mcp。插件开关在 dashboard / TUI / Desktop 所有界面都明确提示「需要重启」。</p>
+<p>集成目录新增（2f6170bfa6 + abfa59ab5d + adefd99671）</p>
+<p>官方 Blender Lab 集成进目录：stdio MCP 服务器（锁定上游 v1.0.3）+ Blender 工作流技能，需要 Blender 5.1+ 与单独安装的 MCP 插件，Windows / macOS / Linux 可用；披露声明注明工具以用户权限在 Blender 里执行任意 Python。</p>
+<p>NVIDIA App 与 NVIDIA Broadcast 两个官方插件（仅 Windows）：每个 MCP 服务器声明它需要的应用，安装时校验应用存在且版本满足（不满足直接拒绝安装）、工具只在应用运行时出现——在 ARM64 笔记本与 x64 桌面两台实机验证，注册 12 个 NVIDIA App 工具、10 个 Broadcast 工具。</p>
+<p>便携插件现在可以声明每个 MCP 服务器需要的应用，宿主不支持时安装直接拒绝（NS-942）。</p>
+<p>性能（14 条）</p>
+<p>网络与网关（966f746b58 + 3e88c8032d + 4c41d9804c）</p>
+<p>CA 证书包不再每个凭证请求都解析一遍：之前 _resolved_https_context() 为每个 urllib 请求新建 SSLContext、每次解析整个证书包（certifi 231KB、119 张证书），私信、模型目录探测、Azure 探测、模型 provider 插件全都在付这个钱；现在按（路径, mtime, size）记忆化，证书轮换 / 编辑后下次请求仍能重新加载——单个上下文构建实测 4.24ms → 0.57ms，十个请求的证书包解析次数从 10 次变成 0 次。</p>
+<p>网关心跳恢复扫描：restore_heartbeat_watches 之前对每个路由会话都进一次 profile 作用域，每次重建 secret scope 和终端策略、重解析 profile 配置（N 个会话 = 每轮 2N 次 YAML 解析）；现在按 profile home 分组、每 profile 只进一次，配置读取走文件签名缓存——3 profile 主机上单次作用域进出 1.80ms → 0.11ms。投递账本的修剪并入记录事务（不再单独一轮）。</p>
+<p>流式与配置（74183e1793 + 559f7d170f + 25d240da11 + aeafa28342）</p>
+<p>推理流式输出开关之前每个 reasoning token 都要读一次配置（拿全局锁 + 深拷贝），多个并发流全部串行在锁上；现在每个流解析一次、下个请求重新读，查配置本身走只读路径。配置读取热路径全面去锁 / 只读：账本 append 与 capture 路径、ledger_enabled、缓存命中的 read_raw_config 都不再拿 _CONFIG_LOCK。</p>
+<p>记忆与技能（cbe23de61a + 2866bc6dff + a85b6f9cdd + 6f928eb3ae）</p>
+<p>记忆注入块去重：每个用户回合注入的 &lt;memory-context&gt; 块之前没有任何去重，provider 合并多存储、prefetch 合并多 provider，同一事实经常出现两三次；而且这个块会写进 api_content 随之后每个请求重放（为了 prompt 缓存字节稳定），重复的列表项要按回合重复付费。现在同一块内逐字重复的列表项只保留一份（标题、正文、空行、分割线不动），在真实 state.db 上实测省 16.8% 字节（约 5.5 万 token）。</p>
+<p>技能账本无变化时跳过重写（之前每次维护扫描都重写一遍整个文件）；computer_use 的无障碍树遍历有界（超限时 capture hint 会说明）；技能安装的 HTTP 客户端跨 resolve + fetch 连接池复用。</p>
+<p>记忆与技能健壮性（83a1a9a2bb + 28bd8cc08c + af0305c95a + e1ea7e74f0 + 83cf0ef801 + dd309d046f + 71932b150b + ed6b55d1d8 + c86607124f）</p>
+<p>记忆回想块去重修正（承接上一期的去重特性）：只有自包含的列表项会被去重——带续行的条目永不吞并（此前会拼接出两个来源都没有的记录、还把伪造条目烙进 api_content 每回合重放）、缩进行永不去重、任何第 0 列非列表行开启新节、加粗标题（**X**）与编号列表保持原样。实测 166 个真实块上省量不变（16.8%），正确性零成本。</p>
+<p>技能账本（skill ledger）损坏不再崩溃：解不开的账本按空处理并给警告（list_entries、压缩、blob GC 各路径），blob GC 保留一小时内未引用的 blob（避免刚写的 blob 被扫）；锁跨越 append + sweep 与 CLI compact / GC 全程；账本大小有界（去重重写 + 最旧条目裁到低水位），行拆分只在物理换行处。</p>
+<p>其他修复与改进（b01b1c8b5a + bf8b2d8026 + 524041b9d0 + aef4d7a70b + 92e6cc189b + 79ee6bcf72 + 3c6c132366 + 333898b353 + 48ed4e5364 + 4094ab610d + 9a7b54accf + 0e5809566f + 33a1d46dfc + e1c71bd4fc + 8eeec5423b + 71a2fe399b）</p>
+<p>hermes kanban gc 保留期边界：--event-retention-days / --log-retention-days 负数之前会构建「未来截止时间」、匹配所有终态事件行和 worker 日志 → 批量误删；0 则会删掉比「现在」更老的一切。现在负数报错（rc 2）、0 视为禁用该清理（与 done_sub_retention_days 的惯例一致），库层面同样拒绝负数。</p>
+<p>SQLite WAL 守卫：部分 fcntl 失败时只关守卫，不再杀死所有导入者。</p>
+<p>更新流程：系统 unit 在 exit 78 停不下来的修复；autostash 条目按 sha / 裸索引寻址（不再 stash@{N}，rebase 后索引会失效）。</p>
+<p>TUI：profiles.configure 的 toolset pin 写入运行时真正读取的键。</p>
+<p>setup profile 改由后端铸造、按角色（role: setup）查找——引导流程的 toolset 授予标记只有后端能写；setup 会话的 toolset 按角色授予，其他途径无法获得。</p>
+<p>平台识别：hermes_platform.host 机器信息 / 运行时谓词 / SoC 识别器与 resolver（locate / inspect / probe）落地，硬件识别读宿主事实而不是环境变量。</p>
+<p>技能体量 lint：SKILL.md 超过 24k 字符给出超宽提示（建议拆分 references/），在跨过阈值的那个补丁上提示一次。</p>
+<p>插件辅助调用事件：每次辅助 LLM 调用都触发 pre/post_auxiliary_call。</p>
+<p>上下文总结覆盖度遥测（33a1d46dfc）；压缩启动横幅用 _effective_threshold_cap（71a2fe399b）；gateway 的 legacy checkpoints: true 签名带默认上限（e1c71bd4fc）、threshold_tokens: null 重建缓存 agent 不等重启（8eeec5423b）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-22：桌面端托盘与 HUD 唤出、插件可直接卸载，插件目录新增约 20 个条目</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-22</link>
