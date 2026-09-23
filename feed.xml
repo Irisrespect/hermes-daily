@@ -5,8 +5,47 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 23 Sep 2026 06:54:12 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 24 Sep 2026 07:30:59 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-24：机器人桌面 Bot Screen 上线：实时观看并接管 bot 的桌面，插件安装即用</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-24</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-24</guid>
+      <pubDate>Thu, 24 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 23 日 06:30 ~ 9 月 24 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 737 个 commit（不含 merge），另有 14 个 merge。新增 52 个功能、337 个修复、21 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>机器人桌面 Bot Screen 上线：网关上的 bot 获得自己的 Xfce 桌面，实时串流进 Hermes 桌面端；看它工作，遇到登录 / 两步验证 / 验证码随时接管，交还后它接着干</p>
+<p>桌面端一批改进：Files 面板 HTML 预览带「渲染 / 源码」切换、14 条界面本地化补齐、消息可靠性修复</p>
+<p>插件安装即用：装完即在该 profile 所有已打开的会话生效（下一轮），不需要 Connect now / 重新加载 / 重启；插件目录新上架二十多个条目</p>
+<p>网关与配置加固：多 profile 主机可单独停 / 起 / 重启某个 profile；崩溃恢复不再把最近活跃的会话全部重答；瞬时读错误不再清空或误判 config.yaml</p>
+<p>TUI 的 /goal 与排队消息常驻活动坞；看板 Jira 风格标签页改版；21 条性能优化</p>
+<p>重点条目：</p>
+<p>机器人桌面（Bot Screen）——100+ 条提交的功能分支</p>
+<p>跑在无头 Linux 网关上的 bot，现在每个都有自己的桌面：TigerVNC 的 Xvnc + 一套精简 Xfce（每个 profile 一套），Hermes 桌面端把这块桌面实时串流出来（b41c8ddfc4）。你看得到 bot 在里面操作应用；它卡在登录、两步验证或者验证码上时，点「接管」直接接手键鼠输入，输完点「交还」，bot 就用你刚建立好的会话（含 cookie）继续干活。谁在控制由一份租约统管：人类持有时，bot 的全部 computer_use 动作（含截图）被拒绝；接管会踢掉其他观看者的输入通道——不是靠前端限制，桥接层直接丢弃非租约方的键盘 / 鼠标 / 剪贴板事件（含 noVNC 会切换到的 QEMU 扩展键事件）。</p>
+<p>入口与界面：桌面端机器人列表右键 → Open Screen（接管 / 交还）；计划任务面板顶部的实时预览——每 4 秒刷新一张真实缩略图，点开进实时画面（d357efea7b）；计划任务与 Sessions 侧栏的 Screen 入口、桌面端一键装依赖（d9f817dd7b）；CLI 的 hermes computer-use screen status|start|stop|install-deps；以及 computer_use 工具的接管请求动作（request_handoff / wait_for_human）。桌面端还可勾选「bot 开始用桌面时自动打开它的 Screen 标签页」（437e7456f5）：opt-in、只提 pane 不抢键盘焦点、重放历史不触发、每个 bot 30 秒限流、手动关闭后冷却期内不再弹。</p>
+<p>其他细节：默认外观做了 Hermes 化——壁纸、深色主题、只保留真实存在的启动器，接管的人打开浏览器落在 bot 自己的浏览器 profile（83244c55c9）。资源守护（71971e9205）：主机（或其更紧的 cgroup）可用内存低于 1.5GB（默认 1536MB）拒绝启动屏幕；闲置 30 分钟自动停、下次使用自动回来（「使用」含 computer_use 调用 / 浏览器 / 有人观看，人类持租约时永不超时）；两个阈值都可配置（0 关闭）。「交还（强制）」按钮处理窗口已不持有租约的情况（0f513fc5cb）。官方 Docker 镜像提供可选的 HERMES_BOT_DESKTOP 构建参数，把约 550MB 的 TigerVNC / Xfce / Chromium 依赖烤进镜像，默认关闭（a5174ed0a1）。整条分支合入的相关提交超过 100 条（按 git log --oneline --grep=bot.screen 计 110 条），配套修复覆盖租约交接与「交还（强制）」（0f513fc5cb）、no-op 租约过渡不再累加 epoch（4ffa767127）、断线重连保留 viewer id（36e2d92c2d）、4000 驱逐后自动重挂（9fb34f2da2）、安装卡片归属应用级（bd2ae0a8eb）等。</p>
+<p>桌面端（fix(desktop) 68 条 + feat(desktop) 2 条；以下为节选）</p>
+<p>Files 面板 HTML 预览（c755d047c4）：打开本地 HTML 文件默认走沙箱预览直接渲染，文件名行一个开关切换到源码显示；重开标签、文件有未保存修改时都保持选择（1adad98d10）；源码开关收进文件头一行（b5c4dbc0c3）；agent 交付的 HTML 也直接渲染打开（2e1afdf0ec）。</p>
+<p>界面本地化补齐 14 条：机器人创建与外观对话框（eca8babe07）、排期与高级设置（d9d970ba0f）、账单界面（36d2229e38）、卸载确认（4fd3f02a3f）、辅助模型警告（520fead094）、自定义接入点编辑（053acdb02b）、MoA 预设控件（11dcf8f97a）、提供商错误与网络回退（0a810b049b）、实时斜杠命令描述（2d585eb0b2）、更新分组与回退文案（c312d39931）、内置介绍正文（stock intro bodies，92d13e83d7）、侧边栏过滤器（1766f65df8，切换语言不改动已选）、当前 profile 与连接的语言重载（51ff85255a）、看板标签随语言刷新（4faa44267e）。Unicode 设置描述（4f9f3c3072）与头像首字母（2b18ca7867）不再被弄坏；插件范围说明文案与选择器收敛（4f9f1f96f6）；搜索选择器统一换成共享菜单组件（0087827510、1def81aa18）。</p>
+<p>消息可靠性：对话中途插入的消息（steer）被拒绝或发送失败时文本不再丢失（8228bc0a1e）；只有推理内容的流不再被补全的正式回复覆盖（3b5c5cc7fb）；已经由持久化记录覆盖的流式气泡正确退役，部分回执 / 回执缺失场景一并处理（1e740989eb，issue #118670 / #119540 / #118671）；保留的错误轮按持久化 rowId 匹配而不是渲染层 id（4e950948e4）；心跳乱序的完成事件归位到自己的气泡（d9a6f25a55）、被取代回合的 delta 残片在 message.start 时清理（7c0b206cc9）。</p>
+<p>插件与目录</p>
+<p>安装即用（9039b690fc）：从任意入口装完插件，它的 MCP 服务器和技能在该 profile 所有已打开的会话里下一轮直接可用（按插件所在 profile home 过滤）——没有 Connect now 按钮、不用 /reload-mcp、不用重启应用；MCP 工具走 tool_search / tool_call 延迟加载，模型侧工具数组和缓存提示词前缀不变。桌面端六种语言里的 Connect now 文案全部删除，安装提示直接说「3 个工具已连接 · 技能 X 就绪」，没连上的服务器逐个说明。配套修复：两个插件同时安装都激活（c07501ec41）、间隔一秒安装的插件都保留安装记录（d275e422dc）、连接一个新 MCP 服务器不再把其他服务器的工具踢掉（dbe2f6964d）。</p>
+<p>设置向导：setup agent 新增 manage_catalog 工具，可以搜索目录插件和技能、并通过审批卡片安装（31e59b9441）——模型只能发目录 id 和动作，安装走宿主流程（目录 pin、安全扫描、即时激活），逐行批准后才安装，装到 default 或高级模式指定的 profile；onboarding 的连接器卡片里直接列出该平台能跑的目录插件，应用不存在的置灰并说明原因（6ec517c475、5c215ffa21）；新增两个推荐任务「帮我用 Blender 做点东西」（全平台）和 Windows + NVIDIA 显卡的「配置我的游戏与直播」（NVIDIA App + Broadcast，d41f079e4e）。</p>
+<p>目录新上架（二十多个条目）：microsoft365 独立插件（9002482f99 + alpha→a4 共 5 条：bcb7356d33 / b38553540e / a09ae21319 / 2d468c389f）、Telnyx 提供商（9e228a8bed）、MrScraper（3122392cda）、hermes-discord-rpc（47ec7fb66a）、记忆后端三连——hindsight（344c522731）、honcho 与 supermemory（81a095cb1d）、indigokarasu 四件套 chronicle / custodian / identity / pocket-watch（c5de7b3966）、Prompt Pocket（df35983847）、plan-mode（afccefa9c6）、hermes-monitor（bc35bf2900）、hermes-zh 中文社区插件（c4081ffc0c）、command-tray（17df70d59d）、lib-docs（6f33360580）、needs-you（f679c92b86）、boardstate（7f23a66890）、hermes-impossibl 模型提供商（e2e81e0ef0）、Titanos MCP（543096e92e）、hermes-session-warmer（3c85ffe23c）、AgentPlaybooks（1f70810011）、coder 0.1.0（11ae116a04）、pricewin（f9488af8a0）、secure-env-ingress（4d6646e497）、glasser（1831269755）、mybot-farm v0.2.0（a47752af0e）。另有约 20 条版本更新 / 重 pin（Nerve v0.2.2、mybot-farm 重定向 v0.3.0（3341187f9c）、rss-reader 1.0.9、prompt-enhance 1.1.0、hindsight 1.0.1、antigravity 多次 bump 等）。</p>
+<p>网关（38 条；以下为节选）</p>
+<p>单 profile 停启（4c342c05de）：多 profile 主机下 hermes -p X gateway stop 会把该 profile「停泊」——先写 profiles/X/gateway.parked（防 30 秒 reconcile 把它加回来），再发 unserve-profile 控制动词，拆掉它自己的适配器 / 重连 / cron；start 移除标记走标准上线路径；restart 拆掉再拉起但不写 parked、不会被当成停泊。默认 profile 保留整机语义；被停泊的 profile 在 gateway status 里显示 parked。gateway.standalone（0238c9d740）让指定 profile 完全脱离宿主复用器单独跑。</p>
+<p>崩溃恢复重做（360b9697ac）：非正常启动时，之前会把最近 120 秒内活跃过的会话全部标记「重启中断」并自动重答一遍——交付测试里一次 kill 重答了 52 个聊天。现在删掉按时间扫描的逻辑，只按持久化的在飞回合标记精确恢复：有完整回复的进投递账本补发（标记为可能重复），没回复的恢复一次；同时修了一个真实窗口——回合标记在投递义务记录之前被清除，中间崩溃会导致回复永远发不出。补充修复（1136f135dd）：[SILENT] / NO_REPLY 之类被抑制的回复在恢复时不会被当成「恢复的回复」发出来；在飞标记改用时区安全写法（跨 DST / 容器时区不再误判新旧）。平台重连后的消息重放不再被回答两次（43b8951beb，重建的适配器继承旧适配器的去重缓存）。multiplex_profiles 现在只有一个合法值，旧的 false 会一次性改写为 true 并提示（b936546561）。</p>
+<p>配置与更新</p>
+<p>配置 8 条：瞬时读错误（EMFILE / EIO）不再把 config.yaml 清空——之前一次 TUI / 面板保存会把读失败的兜底对象当配置写回，整个文件被替换成兜底 + 一个新键；现在读失败会拒绝保存，文件保持字节不变（db2f07c5cf）。读错误不再被记成「文件损坏」（061da070d2）：之前一次瞬时读错误会让提供商解析在每次对话里持续报 corrupt_config、还会把好文件写成 .corrupt 备份，现在重试成功即清除记录。读不到配置时不再每次加载都重建兜底（714f646eb9）；稀疏保存不再写出空的 agent 段（0698be87bc）；保存被拒的提示区分原因——坏 YAML 让你去改文件、权限问题提示修权限、只有其他读错误才说「重试」（b0369c49a1）；显式 null 设置不再被保存丢掉（93c5856bd5）；长引号标量保留（7f59505685）、xai 迁移输出宽度对齐（2f0cab5141）。</p>
+<p>更新相关 11 条（fix(update) 8 条 + 跨 scope 3 条）：更新锁认领写着「自己 pid」的陈旧锁（7995d8391b）——容器里 pid 复用会让重试误报「另一个 Hermes 更新正在运行（进程 2）」直到 20 分钟上限；认领后刷新不临期保留（7a61f1d247）；去掉 --reinstall 管道（7cf0afdf98）、先刷新陈旧 editable finder（60a088795d）。HEAD 带着本地补丁（cherry-pick 的热修复）不再让 fleet 重启义务永远挂着（30056d612b，#119367）；在网关内部跑的 cron 更新不再对自己所在的网关误报 STALE（8895b0f119，#119597）；editable 安装的 import-health 探测看对 venv 的 finder（8680a8d1ed）；换装后子进程在 checkout 里启动（949a8bb0ab）；另有跨 scope 3 条：每条更新只重启自己 home 的网关（c500dc6d99，#93349）；桌面端 Windows 更新后重启网关（d10f1735bc）；网关重启失败按「手动步骤」提示，而不是把整个更新判定为失败（0f1544f903）。</p>
+<p>TUI 与看板</p>
+<p>TUI（1753653450）：/goal 目标在活动坞上方有一行常驻——「⊙ goal · 3/20 轮 · 标题」、「⏳ parked · 至 14:32 · 原因」或「⏸ paused · 原因」，完成或清除后消失；状态来自既有 session.control 契约，只在会话变化时读一次、跟随已有事件，不轮询数据库。经典 CLI（43455f5670）：坞顶显示目标状态行、坞底显示排队消息（数量 + 前 3 条预览 + N more），F7 摘要行同步显示「goal active|parked|paused」和「N queued」；/queue 在任务运行时直接生效（之前会被当成普通命令排到回合结束后），查看 / 删除 / 编辑都能边跑边用。多 profile 隔离修复（d9e10e0eb1）：次 profile 的密钥保存 / 断开与会话默认模型（含会话创建返回的模型）不再落到启动 profile（此前 alpha 保存的 key 会出现在 default 的 .env 里）。</p>
+<p>看板改版：评论 / 活动 / 运行 / worker 日志合并为一个 Jira 风格标签页（默认评论、无内容 tab 省略、只有评论时控件隐藏），依赖关系（Blocked by / Blocks）从主栏移到右侧属性栏（5104cb228e）；任务详情从抽屉改为居中双栏弹窗（主栏：诊断 / 描述 / 结果 / 评论 / 活动 / 运行 / worker 日志；右栏：行内编辑器（负责人 / 模型覆盖）+ 优先级 / 租户 / 工作区 / 创建时间 / 估时 / 附件），chip 直接显示任务标题、老后端回退短 id，Esc 或点背景关闭（2476c82837）；任务文本按 Markdown 渲染、去掉重复的 feed 标签（63f5bc0999）。</p>
+<p>性能（21 条）</p>
+<p>以下为 21 条中的节选。模型选择器不再被过期目录阻塞、复用选择器配置快照（fc1c260d25、ccf9c3542a）；工具注册表解析不再整体复制所有工具（30cd1e97d0、c191c34566）；网关：no-override 扫描懒执行（5a035357f5）、配对名单按文件 mtime 缓存（d644764c9d）、缓存 macOS 系统代理探测、不再按 chunk fork（16b18ce602）、能力探测不再深复制配置（99e8251e5b）；config 与 manifest 加载统一 fast_safe_load（16db511ed5）；readiness 与 bundled manifest 改走 C 加载器并复用解析（1572836184）；codex 格式控制扫描：纯 ASCII 直接跳过、非 ASCII 字符只分类一次（a1944881cf、61202bf2fb）；工具历史配对去掉二次方复杂度（bca2f0f3da）；MoA 参考裁剪每条消息只算一次（c40655ebb6）；prompt 缓存只复制可变行（774df367ee）；状态扫描只扫携带行（8fc679b4e8）；provider 目录 stamp 缓存（f63c388e1a、6604b0479e）。</p>
+<p>其他</p>
+<p>cron 跨夏令时：到期时刻比较改用 UTC 归一化（e3618cdec2，影响 DST 时区主机的定时任务）。微信接入优化（73dc249cca）：长轮询游标之前每个周期都同步写盘、值没变也重写（fsync 阻塞网关事件循环）；现在只在变化时写、写盘走线程池。agent 上游封号在 200 流里直接失败一次、而不是当成故障反复重试（2c948e6aa2）；Telegram token 正则锚定修复 ReDoS（70f79c8cde）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-23：桌面端新增简单 / 高级界面模式与连接器页，GPT-6 三档模型进目录</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-23</link>
