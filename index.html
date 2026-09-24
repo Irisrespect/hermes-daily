@@ -22,9 +22,62 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 58 期 · 20815 个提交 · 每日自动更新 ·
+<p class="meta">共 59 期 · 21670 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-09-25" class="day">
+      <h2>Hermes 日报 2026-09-25：桌面端插件接口大扩容，新增法语德语西班牙语，托管搜索换 Perplexity</h2>
+      <p><strong>本期覆盖 9 月 24 日 06:30 ~ 9 月 25 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 855 个 commit（不含 merge），另有 11 个 merge。新增 49 个功能、413 个修复、1 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端插件系统扩容：沙箱嵌入、外观槽位、侧边栏与会话管理、输入框 API、模型标签、公开事件总线，十几项新接口</p>
+<p>桌面端新增法语、德语、西班牙语三套完整界面翻译与文字方向设置；自定义模型、语音快捷键、命令面板、外链设置等一批体验改进</p>
+<p>托管网络搜索改由 Perplexity 提供；Firecrawl 保留网页提取与单次兜底，自配 key 的路径不变</p>
+<p>插件目录集中上架一批中文场景插件：微信社交助手（macOS）、微信读书伴读、错题诊断、外卖营养教练；官方镜像新增 -desktop 变体，托管实例上的 Bot Screen 可开箱使用</p>
+<p>修复：更新中断不再弄坏安装、分支分叉丢提交先备份、朗读不再念出链接、上下文指示器不冻结；另有 1 条性能优化</p>
+<p>重点条目：</p>
+<p>桌面端 · 插件系统扩容（十几项新接口）</p>
+<p>桌面端给插件系统一口气开放了十几项新接口，来自插件需求清单（#116305）的一批 wishlist 项，直接为 rss-reader、sidebar-manager、better-session-appearance 等插件解锁了此前只能靠 React 内部手段（fiber 遍历、CSS display:none、直接写持久化 key）才能做到的事。</p>
+<p>沙箱嵌入（d81db86d61）：插件嵌入外部内容不再自己挂 Electron webview（那会和应用共享 cookie 与存储），改用应用提供的 SandboxedFrame——一个沙箱 iframe：不透明来源、默认只允许脚本、不带 referrer、懒加载；allow-same-origin、顶层导航、弹窗、modal、storage-access 等逃逸令牌即使被请求也会被强制剥掉（没有 sandbox 属性的 frame 是完全特权的，所以净空结果会回落到默认姿态）。</p>
+<p>外观槽位（8d71403ffa）：插件可以往「设置 → 外观」页尾部注入控件（每个自带错误边界与 chip 兜底）；配色组件 ColorSwatches（个人资料栏和项目对话框用的同一套色板网格）加入公开 SDK，可直接配 host.sessions.setColor 做会话颜色。</p>
+<p>侧边栏管理（632a5cd1c8、7fba0e6e73）：host.sidebar.hide(navId, hidden?) 与 host.sidebar.setOrder(ids) 写入持久化的导航偏好 store，侧边栏通过一个纯函数（orderSidebarNav）应用：隐藏的去掉、点名的按给定顺序排前、没点名的保持默认相对顺序跟在后面、未知 id 无效；偏好从不改动默认列表——卸载插件后所有行恢复原样。</p>
+<p>会话列表 API（585e296db5、9d8ae38850）：host.sessions.pin / reorder / setColor 写的是应用自己控件写的那套 store（行的 shift 点击、拖拽持久化、颜色选择器），插件操作和手动操作永远不会互相矛盾；会话 id 经 lineage 匹配器解析到持久根 id，因此压缩导致的会话 id 轮换之后，置顶与颜色仍然存活。另外 SESSION_ROW_AREAS.leading / .trailing 提供侧边栏行的前后装饰槽。</p>
+<p>输入框 API（a874cee625、dcea97b27f）：向插件公开 composer 草稿读写（host.composer）与 host.composer.focus(sessionId)；配套修复（ef70b3661c）：host.composer 的 new 失败即闭合、草稿回复单属主。</p>
+<p>模型标签（2b4a5a0924、eecabbe70b）：插件可以给模型选择器里的条目提供标签（宿主缓存、非字符串结果回退）；配套修复（6b2c23ae42）：标签提供者必须返回字符串。</p>
+<p>设置网关（748f0398e3）：插件可暴露类型化的设置读写网关；配套修复（ab2c1cb0f2）：host.settings 对继承键直接拒绝，而不是抛 TypeError。</p>
+<p>类型化桥（bd55633248、488cd566ba）：技能 / 工具集 / profiles 的类型化桥对插件公开；capabilities 桥移入公开 SDK（sdk/bridge.ts），pluginDecisions 改为只读（配套修复 4cec3f85e7：对外发冻结副本）。</p>
+<p>事件总线（8034d493dc、5fa1402819）：插件后端有了公开、正式的事件发送接口——plugin_events.broadcast_plugin_event(plugin_id, event, payload) 在应用全局事件流（host.onEvent 订阅的那条）上发出 plugin.&lt;plugin_id&gt;.&lt;event&gt;；事件名支持点号层级（每段非空，&#x27;../x&#x27;、&#x27;.x&#x27;、&#x27;a..b&#x27; 会被拒绝），插件 id 强制进入命名空间，防止名字拼错后桌面端半拉子永远等一个没人发出的名字。fire-and-forget、任何请求处理器里都能安全调用。</p>
+<p>SDK 导出（7d63f57c7d）：ListRow / ToggleRow 等组件导出，插件面板与核心设置的版式观感一致。既有的侧边栏偏好保护（2553b8660b）：sidebarNav.prefs 不能隐藏插件行。其余配套修复：外观扩展只渲染在顶层页（55c52f2902）、sessions.reorder 改为写入活动 id 并新增 reorderPinned（4f3426e7ca）、SandboxedFrame 改用显式属性白名单（c2645ef14c）。</p>
+<p>桌面端 · 多语言与体验改进</p>
+<p>三套新语言：法语、德语、西班牙语（d44bd702cf）进入语言选择器，配上三套完整目录（4b6b3ae7f7 法语 / c133597a98 德语 / 7612a15ad9 西班牙语）；display.language 与区域别名（fr-CA、de-AT、es-419 等）都映射到对应语言。外观新增「文字方向」设置：自动 / 从右到左 / 从左到右（32eeacdf7c），该设置本身也一并翻译（537466e645）。</p>
+<p>自定义模型（7fe3318ed5、d24d5556ed、8a67351872）：在模型菜单里输入一个没有任何提供商列出的模型 id，会出现每个已配置提供商一行（当前提供商优先），回车即切换并记住；菜单里还有明确的「添加自定义模型…」底行，把搜索框变成 slug 输入；设置里的模型选择器也能增删自定义模型。配套修复（a88121ac8c、e1295e33d9）：自定义模型动作不蹭模型 id 命名空间、只在查询无匹配时才出现。</p>
+<p>语音快捷键（352b89d466、30565b2db2、3cc24b0130）：非 macOS（Windows / Linux）语音对话开关默认 Ctrl+Alt+V（macOS 仍为 Ctrl+B——非 mac 上 ctrl 会折叠成 mod，原来的 Ctrl+B 会撞侧边栏开关）；听写（开始 / 停止）可在设置 → 键盘快捷键里自定义绑定，默认不占键位；F12 现在可以被绑定为语音（或任何）快捷键——一旦有绑定用到 F12，它就不再打开开发者工具，而是转发给渲染层。语音设置提示也改为指向「语音对话」动作而不是听写。</p>
+<p>命令面板（11b0bccf84、3fd49606fa）：设置里约 20 项手工构建的行此前完全搜不到（保持唤醒、禁用 F12、池上限、快速输入、附件上限、聊天 / 终端字体、每一个通知开关、完成音、自动归档、网关模式 / keychain / 诊断、自动更新等），现在全部进入 Ctrl+K 命令面板——一份 settings-manifest.ts 统一持有 id、子页、文案、关键词与平台可用性，行元素 id、深链路由（?setting=&lt;view&gt;.&lt;key&gt;）与面板目录都由它派生。置顶会话在面板结果里单独分组排最前。</p>
+<p>外链设置（08944e1681）：设置 → 高级 → 桌面新增设备本地开关：开关打开后，点击链接一律用系统浏览器打开（此前走应用内浏览器）。显式的「在应用内浏览器打开」菜单动作和 agent 驱动的预览不受影响；偏好在打开的窗口间经 storage 事件同步。</p>
+<p>搜索 · 托管搜索改由 Perplexity 提供</p>
+<p>（749220ef00）Nous 托管搜索的供应商换成 Perplexity；网页提取保留 Firecrawl，同时 Firecrawl 继续作为单次搜索的兜底。自己配 key / 显式覆盖的搜索走各自的计费路径不变；兜底结果永不进缓存。托管通道被选中但 Tool Gateway 不可用（未授权或没有 Nous token）时，直接报告该选择错误，而不是让用户去填一个从没选过的直接 key。注意：面向用户的产品文案仍统一称「托管网络搜索」（不点名供应商），状态、门户与文档皆然；兜底标注为 managed_primary。</p>
+<p>插件目录 · 中文场景社区插件集中上架</p>
+<p>微信社交助手 wechat-social-assistant（711d5b0a6d，macOS 专用）：本地优先的微信关系记忆助手——通过系统 OCR / Accessibility 只读取微信窗口里可见的内容，数据全部存本地 SQLite（0600/0700 权限，无云），32 个 MCP 工具提供联系人简报、跟进计划、话术草稿与每周关系报告；引擎固定到 PyPI 不可变版本 1.5.1（uvx stdio）。从不读微信数据库、不注入微信、不发消息——话术草稿仅供人工审阅。</p>
+<p>微信读书伴读 reading-buddy（deeb319e8b）：本地优先的微信读书阅读伴侣——把书架、阅读统计与笔记同步到本机，8 个工具生成私有阅读卡片与每周 / 每月回顾；数据留在插件目录，从不回帖到微信读书，卡片与回顾只在用户确认后落地。</p>
+<p>错题诊断 good-student（246853f26b）：面向家长与学生的错题诊断与学习动作闭环——确定性本地核心（SQLite，无云），识别走宿主模型、由家长确认；数据不出设备、无需凭据。</p>
+<p>外卖营养教练 eatwise（d601c0b0a3）：本地优先的中文饮食教练——确定性的餐食营养点评、个人每日能量 / 营养目标，9 个工具跑在内置开放食物数据库（TFND + USDA FNDDS）上；无网络、无账号、无支付，画像 schema 设计上拒绝姓名 / 电话 / 证件号 / 医疗字段。</p>
+<p>hermes-workbench（547fe69870）：把 Hermes 桌面端界面通过 dashboard 搬进浏览器（`hermes workbench`），面向无头服务器、VPS 和平板；用你本地的 Hermes checkout 以 npm + Vite 构建界面并在需要时在 loopback 起 dashboard。</p>
+<p>grok-acp（1de8634962，并 pin v0.1.1 / v0.1.2：509d7dd0b2 / d6c6f31d06）：把 xAI Grok 订阅作为 Hermes 模型提供方，走 ACP stdio。</p>
+<p>其他目录批次：AgentPlaybooks 便携代理（45875d530f，命令行审计 / 跨客户端配置同步 / Agent Plugin 打包 / playbook 恢复 / Bot Mode profile 导出）、DeskRPG 网关插件（e28e180ff2）与 0.16.0 更新（f4e0f331b1，英文默认、opt-in worker 传播）、bot-forge v0.5.0（a5b90bcdb2）、provider-status 1.5.8 / 1.5.9（a6a7dd8784 / d59970c35e，17 家提供商的配额状态栏，含 DeepSeek / GLM 峰谷时段仪表与倒计时）。</p>
+<p>平台 · Bot Screen 官方镜像与 Webhook 会话镜像</p>
+<p>Bot Screen 官方镜像补上 -desktop 变体（686c34d3f6）：官方发布的镜像此前没有 Xvnc / Xfce（Dockerfile 的 HERMES_BOT_DESKTOP 参数没人设置），而托管实例无 sudo、/opt/hermes 封死，运行时装不了。现在构建出 -desktop 后缀变体（:latest-desktop / :main-desktop / :v*-desktop），自带 Xvnc + Xfce 与 Playwright 的 headed Chromium；slim 与 desktop 各自独立的镜像清单，desktop 发布失败不会带崩 slim 的 :latest。昨天上线的 Bot Screen 由此在托管实例上开箱即用。</p>
+<p>Webhook 会话镜像（11fb429f49）：webhook 路由投递到 telegram / discord 等平台时跑在临时会话（webhook:&lt;route&gt;:&lt;delivery_id&gt;）里，投递的文本从来不会进入目标聊天的会话——用户在那边回复「所以他出局了？」，agent 完全不知道刚给对方发过什么。现在跨平台发送成功后，把投递内容作为带标签的用户消息（[Webhook delivery: &lt;route&gt;]）镜像进目标聊天的会话（与 cron 简报同一条路径与角色约定）；best-effort、绝不弄失败投递，聊天还没有会话时跳过；路由可用 mirror_to_session: false 关闭。</p>
+<p>修复与加固</p>
+<p>更新中断保护一组（e30f8c6344、9f835060d5、7eda5a69cc、f035bf872e、c56c0a61c4、c9f14820b6、e50b3a3933）：hermes update 在「Pulling updates」阶段被 Ctrl-C、关掉的终端、断电或 OOM 杀掉时，git 是逐文件搬运、HEAD 最后移动——此前会留下「HEAD 还在旧提交、文件已经换了一半」的混合树，每个入口点（包括 update 自己）都直接 ImportError，只有手动 git reset --hard 才能救回来。现在更新器用 .git/hermes-update-pull 标记文件包住 fast-forward 与分歧调和，记录 pid、拉取前提交与目标提交；下次启动的前置恢复流程按标记把工作树修回。配套：被撕坏的文件（缺失 / 空 / 写到一半）按 git 的写回处理、不再误判成用户编辑（9f835060d5）；自定义分支上的 merge 场景（104/500 次随机 kill 会坏）也能恢复（7eda5a69cc）；恢复流程永不动用户自己的改动、标记在每条退出路径上清理（Ctrl-C 中断场景除外，f035bf872e）；多个启动竞争恢复时用 OS 锁互斥轮流跑、输家不会导入半恢复状态（c56c0a61c4）；无锁文件系统（NFS / SMB）也能恢复（c9f14820b6）；无 .git 的镜像改读 build stamp，重启义务的「已覆盖 / 未覆盖」不再自相矛盾（e50b3a3933）。</p>
+<p>分支分叉保护（21cc8bfef3、db1ff59937）：update 在目标分支遇到分叉用 reset --hard origin/&lt;branch&gt; 解决，但分叉有两种成因——上游 force-push / rebase（本地无损失）与本地提交（全部被丢）——此前只有孤立情况（无共同祖先）会写 rescue ref，常见情况只能靠 90 天过期的 reflog 找回。现在 reset 前把会被丢弃的本地提交锚定为 rescue ref，并打印被丢的提交数量与一条 git log origin/&lt;branch&gt;..&lt;ref&gt; 找回命令。另（db114c2504）：更新时 SSH publickey / host-key 获取失败给出明确诊断。</p>
+<p>朗读修复（25f7bac318、80e30634a5）：不再朗读 MEDIA:/path 文件链接（会渲染成「Open xxx.xlsx」，语音读不出、ElevenLabs 类模型还会在连字符 slug 上循环「eeeeee」）与「代码块省略」/「链接」占位符（不可念的 token 就该静默，而不是念成英文词）；行尾冒号在换行前先收敛成句号，避免语音挂在开放冒号上。本地语音在最后一个租约释放后按 tts.keep_warm_seconds（默认 60 秒，0 = 立即）保温——此前唤醒式语音会话在约 2 秒的 Piper 预热刚结束时就被逐出，每次唤醒都要重新加载。桌面端流式朗读同步修了一组（e39900cc91、feb503d68f、299fc88f6e、d5785bb525）：按句流式合成、edge-TTS 兜底冲掉封存的中段、句缓冲改为纯 cutSentences 累加器、卸载与会话断开时停掉句级回退轮询。</p>
+<p>上下文指示器（c4bb76a132）：回复生成过程中状态栏的上下文占用表此前被回合开始时的旧 breakdown 值覆盖（后端其实每秒在流式发 session.usage 快照），整个回合冻结、结束才跳变；现在忙碌期间流式用量优先，空闲时才由 breakdown 覆盖。</p>
+<p>终端重绘一组（68b0f85d46 等 11 条 fix、另有 1 条重构与 2 条测试，#95375）：tmux 里调整窗口大小不再重复或丢转写行——重绘不再擦掉视口再重放（prompt_toolkit 的擦除瞄准的是重新换行后的 chrome 顶部，转写留在原地）；未知终端（ssh 下的 xterm-256color 等）按非回流终端安全重放、擦除不会拿走的比放回的多；0.3 秒防抖（tmux 立即重排但最多每 250ms 发信号）；非回流的 TERM 名单为 linux / st / mosh / vt / cons（GNU screen 经实测移入回流名单——4.09 会像 tmux 一样重排）。</p>
+<p>流式总开关（ad5271b217、c89265299a）：全局 streaming.enabled: false 此前不是硬开关——网关的流式解析器有两处直接使用按平台配置（display.platforms.&lt;平台&gt;.streaming）而不检查总开关，关掉全局开关后 Telegram 等平台仍会流式输出；现在解析器把总开关与平台覆盖 AND 起来，关闭即对所有平台生效。企业微信（WeCom）原生流式同步文档更新为跟随该总开关（#53697）。</p>
+<p>Kanban 附件（efafed5baf、d9a44a0ed4）：看板附件下载改走认证网关的统一下载通道。</p>
+<p>性能优化（1 条）</p>
+<p>（3aecc75ea3）hermes_state 被导入时不再预先构建 Windows Restart Manager 的 ctypes 结构（从不使用 Restart Manager 的进程也白白付这笔账），改为首次扫描时才懒构建；argtypes 按函数名绑定，而不是把字典顺序和位置元组 zip 起来。</p>
+    </section>
+    
     <section id="2026-09-24" class="day">
       <h2>Hermes 日报 2026-09-24：机器人桌面 Bot Screen 上线：实时观看并接管 bot 的桌面，插件安装即用</h2>
       <p><strong>本期覆盖 9 月 23 日 06:30 ~ 9 月 24 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 737 个 commit（不含 merge），另有 14 个 merge。新增 52 个功能、337 个修复、21 个性能优化。</strong></p>
