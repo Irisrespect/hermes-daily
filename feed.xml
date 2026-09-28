@@ -5,8 +5,76 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 27 Sep 2026 07:02:50 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 28 Sep 2026 10:57:47 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-28：桌面端启动与聊天修复、Windows 更新链加固、cron 脚本解释器</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-28</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-28</guid>
+      <pubDate>Mon, 28 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 27 日 06:30 ~ 9 月 28 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 792 个 commit（不含 merge），无合并提交。新增 23 个功能、356 个修复，没有标记为性能优化的提交。</strong></p>
+<p>说明：本期为修复为主的「大修日」，新增功能里 22 条含 catalog（20 条为社区插件目录收录/更新，另含网站卡片排版与技能目录各 1 条）；用户可见的改动集中在桌面端与更新链路。</p>
+<p>📌 今日要点：</p>
+<p>桌面端启动与聊天体验一批修复：后端就绪等待 45 秒放宽到 180 秒；回复收尾不再重复渲染；粘贴附件对账不再重复或挂错；过期审批条清理；Bot Screen 支持剪贴板粘贴</p>
+<p>Windows 更新链加固：更新收尾不再杀掉自身导致循环失败；用户未跟踪文件与游离提交受到保护；无 git 的机器补齐全链路；失败提示不再误建议「修复 / 杀毒」</p>
+<p>会话与数据可靠性：删除保护活跃回合与子代理会话；转录行回滚更安全；网关忙时退避与启动期防误杀；压缩历史无损</p>
+<p>cron：Python 脚本可指定外部解释器；解释器只接受 Python 程序；任务库损坏时保存 fail closed</p>
+<p>安全与保护：邮件 From 伪装解析与域名对齐检查；SimpleX 白名单只认 contactId；备份不再被不完整包覆盖；摘要先脱敏再截断</p>
+<p>重点条目：</p>
+<p>桌面端 · 启动与聊天体验</p>
+<p>后端就绪超时放宽（895ef9b83）：冷启动的后端初始化（插件发现 + 路由挂载在 web_server 导入期完成）在慢一点的硬件上要 45~60 秒，而就绪等待只有 45 秒，首次启动成了掷硬币；每次输掉都会把健康但慢的后端推倒、重新驱动启动，连锁成几分钟的「未连接」和孤儿 python 进程（#63454）。现在主进程的就绪轮询与渲染端镜像等待同步放宽到 180 秒，后端一响应就立刻返回，快机器没有感知。</p>
+<p>回复渲染修复（f9a57d5f9、9b17e8097）：回复收尾存在两条各自的「落定」路径，都可能为同一行存储数据再画一个气泡——最终帧（response_previewed / response_transformed）与流式中段没有公共前缀时，前缀启发式失效、易变的边界标志又无法代表它；现在按持久化回执（最终回合命名的存储行）落定到显示用的 interim 上，而不是追加副本。另修复：助手回复里的单行换行现在会保留。</p>
+<p>粘贴附件对账（4c1f111de、820bb0b1a、056a96087、0f4a98f87、fc91608d8）：粘贴的附件行在注册（hydration）前没有行 id，对账只能保守追加、导致同一回合重复出现（#120978）；修复后按附件身份（规范化引用 + 文本）容错匹配。随后连续收紧三处：带行 id 的行不再被容错吞掉（同一张带标题的截图连发两次不再丢第二条）、无标题的附件回合不再互相对错（空标题不匹配任何行）、重复标题的粘贴按粘贴次序逐对配对（#122079）。另修复：已确认的提示词在压缩移交或保留任务提示后不再被重新追加到底部（#121088）。</p>
+<p>过期审批提醒（bda04a699）：会话回收与结束的两条清理路径此前都有遗漏——运行 id 每次恢复都会轮换，旧 id 上挂的审批条目永远等不到清理由新的运行时清除，重新打开的会话在滚动卸载内联锚点后会重新浮出「需要审批」条（#86577）；现在回收（session.reclaimed）和「已知活跃但收到 running=false」两条路径都会清掉对应审批条目。</p>
+<p>Bot Screen 粘贴（2d6657d72、f9f153ab1）：接管远程屏幕（noVNC）此前没有粘贴处理，Cmd/Ctrl+V 到远程输入框毫无反应（#123089）；现在画布上加了显式手势的粘贴监听（仅在本查看器持有租约、非只读时转发；不轮询、不记录剪贴板），并随 RFB 客户端一起拆除；超限粘贴按桥接的 256 KiB 上限截断。</p>
+<p>更新与安装链路</p>
+<p>Windows 更新收尾连环修复（5188378e2、45fe65498、d06a3b8a5）：更新被打断后遗留的源码补全（source-completion-pending）会由桌面端自己的后端在下次启动时收尾（venv_sync._finish_source_update）；而 Windows 上的收尾构建会走到「停止占锁桌面进程」（_stop_desktop_processes_locking_build）——此前只在 POSIX 上放过祖先桌面进程，于是它把自己所在的桌面端终止，子进程日志管道随之消失、整个进程树死在收尾清理标记之前，每次启动都会重复（#123499）；现在不再动自己所在的进程。移交流程的包装进程曾在重构时被写死 detached，导致 cmd 包装没有控制台、PowerShell 新开一个可见控制台，一次 QuickEdit 选择就卡住移交、标记清理与重启（#103222），现已恢复非 detached 方式；同一链上还修了控制台选择阻塞问题（运行时关掉 QuickEdit、选择期间跳过多余回显，日志文件照写）。</p>
+<p>用户文件与提交保护（78ee5e96d、20dabfa86、ff4682687）：更新替换了用户的未跟踪文件时，恢复路径会跳过语法、关键导入和拒绝路径的健康校验（_apply_stash 返回 False 后直接放行），一次改坏 Hermes 的恢复会带病完成更新；对应 autostash 也会被丢掉（#124641）。现在 _apply_stash 返回被替换的路径，恢复照旧做健康校验（坏了就重置工作树并以退出码 1 结束），并跳过暂存丢弃、记录为 parked 供找回；被替换判定仅当 HEAD 跟踪该路径时成立。另外，在游离 HEAD 上做的提交此前只活在会过期的 reflog 里（两种更新形态都会把 HEAD 移走；分支更新路径也没有任何提示，gated #124643）；现在移动 HEAD 前统一写入命名救援引用（refs/hermes-update-backups/detached-*）。</p>
+<p>无 git 的 Windows 全链路（6d9ae2da6、305072f4a、7a40c2875、084645fba、36c91657d）：部分 Win10 的 System32 tar 跑不了 bzip2 过滤，提取 pinned git（Git-2.53.0.3 tar.bz2）时直接死在 stage=prerequisites（#122512）；现在两个 win32 目标都改钉 PortableGit 自解压 7z（自带解压器与 usr/bin/bash.exe），下载后显式等待（stub 是 GUI 子系统 exe，PowerShell 的 &amp; 不等待）。执行从暂存区旁的 .sfx 临时副本走（Defender 在执行的扫描会常驻句柄，缓存目录只保留读句柄），解压失败抛 InstallError（超时不再逃逸）、stdin/stdout/stderr 全部 DEVNULL（stub 的子进程会端着管道不退出）、超时用 taskkill /T 连树收割。无 git 的 Windows 安装现在也能用 PM 自带的 git 完成更新与源码补全（305072f4a）。</p>
+<p>更新前清理与失败提示（3aa0ac5e0、21edd6d5a）：自启的网关（Startup 项）与面板（计划任务）拿着 venv，更新/卸载的移交在 15 秒门限后永远失败「venv shim 仍被锁」——因为它们在桌面应用之外启动，releaseBackendLock 看不到；现在新增 isExternalVenvHolder 选择器（exe 必须位于 &lt;venv&gt;\Scripts\ 下且明确是 Hermes 程序），移交前识别并结束外部持有者。另外，更新后回执读取失败（构建读不出来）不再建议「修复安装、检查杀毒软件隔离区」这种破坏性操作（#107685），改为说明发生了什么 + 一条非破坏性恢复步骤。</p>
+<p>依赖固定与准备（7546680ff、625f1d892）：ffmpeg 此前钉 BtbN 的每日自动构建——上游 14 天后删除每日 tag（只保留每月最后一个构建两年），所以 pin 写下去两周后就 404（#125350、#122240）；现在 pm update 只钉已完成月份的最后一个构建（当月每日构建也跳过），重新钉到 8 月末构建（3955eac07）；安装脚本恢复 -SkipSetup 别名、并把 ffmpeg 重钉到仍有效的 tag（54421a43c）。npm 依赖准备遇到 ENOTEMPTY 残留会自动重试（625f1d892）。</p>
+<p>会话与数据可靠性</p>
+<p>删除活动会话保护（40523600b、173770144、1a6a9b66b、230f89b47、adacbcc5f、907e3188d、d1849547e）：删除路径的活跃写入检查此前在事务外做，回合可能在「检查通过」与删除之间拿到租约（#123583）；现在检查移入同一写事务（_write_guards_reject），拒绝时行原样不动、批量删除原子跳过活跃行，并覆盖 delegate 子会话（级联不再动被保护的子行）。用户侧：选择器会提示会话活跃，批量删除会报跳过数量（skipped_active）；已结束的压缩行等空闲行仍可正常删除。维护侧顺带消除了重复的守护遍历。</p>
+<p>转录修复（f337631f4、7581677da、02b8c4a65、1a95a75b1、e4e783762）：写入回滚时把行 id 与摘要戳一并恢复——此前只有 append_messages_batch 做了恢复，archive_and_compact、replace_messages 和轮换移交会把回滚后的 id 留在字典上，SQLite 复用行号后，后续刷写发现摘要不匹配、把外来行当成自己的并静默丢弃用户消息；修复后捕获/恢复逻辑统一放进 _execute_transcript 路径。失活转录行原地修复、修复覆盖全部角色、并保持行身份安全（legacy 无摘要行只采纳内容、不整行覆盖，并为每次插入盖上摘要戳）。</p>
+<p>网关退避与防误杀（506cc14de、c0f8ac664、f39f76508、b6e6f0079、fc8539b7b、33a7ce0fa、bbaf54584、09472a30a、64804eea4）：runner 忙降级把事件放回适配器待处理槽后，带内 drain 会立刻重派——每会话约 400 次/秒空转整个繁忙窗口（打字、日志洪峰、平台连接风暴期间）；现在按会话统计连续未回应重入次数（含 pre_gateway_dispatch 重写的事件），阶梯退避 0.25~5 秒，首次仍立即以满足重启自恢复。孤儿清理（#122533）对仍在启动中的网关给予宽限、不再误杀（共享进程年龄探测）；归属按 home 判定，不再抢占别的 home 的网关（64804eea4）。</p>
+<p>压缩历史无损（f6ce8bb23、a7baa5f5e）：无损历史的抢救改动曾从「规范化历史」重建携带的头尾，反而抹掉了 _pressure_demote_tail 的工具结果收缩、让全超长尾无法压缩（#61932 回归）；修剪不再重写 tool_calls 后，头尾改从修剪副本组装，工具结果的收缩与精确工具参数可以同时保留，文档同步更新。</p>
+<p>cron · 脚本解释器与任务库保护</p>
+<p>Python 脚本外部解释器（6f7cc7e74、cb11c994f、3cdb0c80a、009699b8a、03156afc7、4d4aed0f9）：新增每任务 interpreter 字段（#8714）——Python 的 script / monitor_script 可以跑在用户自管 venv 的解释器上，导入 Hermes 运行时没有的包；不自动安装、冻结或恢复任何东西。POSIX 上改跑所选依赖 venv 的解释器（此前用 sys.executable 重新解析导入，直接 ModuleNotFoundError，#123044），其 pyvenv.cfg 的 site-packages 无需 PYTHONPATH 叠加、脚本派生的子进程也不再继承 store 路径；并加一条 python -c 引导把实时检出放在脚本目录之后（代码更新后不再导入旧代码）。所选解释器缺失时任务明确失败；依赖选择流程抛错时回退调用方解释器；引导保持普通运行的 __main__ 语义。</p>
+<p>解释器校验（4450cc9d90、6e69a8933a）：只接受 Python 解释器——解释器名字（或符号链接目标）不是 Python 镜像的一律拒绝（否则 interpreter=/bin/bash 的 .py 会被当 shell 执行）；随后按评审收紧：拒绝 pythonw（它丢弃捕获输出，agent 任务会静默）、清理时存为 null 由运行路径按未设置处理。</p>
+<p>任务库损坏保护（553388b32、758ad514e、c642f42bc）：任务库读不出来时，合并式 save_jobs 会把存储当空库（非修复的窥视返回 None、收缩合并跳过它），任何在损坏之后落地的保存——例如降级锁进程的非原子复制回退——都会静默替换磁盘上的所有任务；现在 fail closed：抛错、字节原样不动（replace=True 仍是显式灾备重写）。合并窥视内部同样 fail closed，可合并的修复仍正常合并；写修复前重新检查磁盘形状，避免覆盖降级锁进程的新副本。</p>
+<p>安全与保护</p>
+<p>邮件发件人解析（d0c588972、54b0f5db2、b821f8637）：From 头里带引号的伪装（&quot;Victim &lt;victim@example.com&gt;&quot; &lt;attacker@evil.test&gt;）此前取第一个尖括号对解析，白名单（EMAIL_ALLOWED_USERS）、配对和会话身份都按一个并非真实发件人的地址评估（#124322）；现在用标准库 parseaddr 取真实 addr-spec（引号文本作为显示名保留）。纵深防御：只有 Authentication-Results 里的 header.from 与解析出的 From 域对齐时才信任 dmarc=pass，否则回落到对齐的 SPF/DKIM 检查。健壮性：畸形 From 的回退正则此前在 32KB 输入上灾难性回溯、占住 GIL 约 23 秒（远程发件人即可触发）；现已改为先取 &lt;...&gt; 再在 Python 里检查 @（同接受集，100KB 约 3 毫秒）。</p>
+<p>SimpleX 白名单加固（467046753）：白名单（SIMPLEX_ALLOWED_USERS）此前同时匹配稳定 contactId（user_id）和可改的显示名（user_name）——任何 SimpleX 联系人把显示名改成与另一用户相同，就能借其绕过白名单（#44729）；现在只匹配不可变 contactId，运营者需使用数字联系人 ID。</p>
+<p>备份保护（736a06bea、6125c0c70、da1bc7d50、9a6417cd6、25a0b3e3d）：不完整的全量 zip 备份此前先发布到正式路径（_atomic_output_path）再改名——一次不完整的运行就把上一份完好备份毁掉；现在原子输出按发布时点判断：干净发布到正式路径、有失败项进 .incomplete.zip 回收站、全部失败直接丢弃（空回收包无用）。不完整回收包不再占保留配额（否则计数修剪会把最后的好备份删掉）、回收最多保留一个；失败成员的残余字节不再留成对读者可见的幽灵条目（#124564）。</p>
+<p>摘要脱敏（fb86bc708）：摘要输入此前先截断（HEAD+4096）再脱敏，而 PEM 模式只匹配完整 BEGIN/END 块——END 落在截断外的长密钥保持未脱敏，且在前面的密钥被脱敏、文本缩短后，其正文会落进进入持久化摘要的 1200 字符头部；现在恢复「先全长脱敏、再截断」的顺序（冷路径，一次汇总一次），输入上限不变。</p>
+<p>其他值得注意</p>
+<p>桌面端（次级）：</p>
+<p>悬浮输入框默认锁定底部（e928574ab、4b1da9729、9bb2ea1b5）：漂浮手势默认关闭（已有选择保留）；脱离停靠需要更明确的拖拽（阈值 16px→48px）；设置项以 lock、peel 等关键词可搜到。</p>
+<p>语音对话遵循自定义静音时长（c04e9a1d0）：voice.silence_duration 的用户设置在语音循环里生效。</p>
+<p>无障碍树对听写工具开放（ea647bd51、a2587b8c9、01db908bf）：Chromium 只在检测到辅助技术时才构建无障碍树，Wispr Flow 这类通过系统无障碍 API 输入的听写工具不注册、内容编辑区不可达（#118271）；现在打包启动也开放渲染器无障碍树，配置项桌面端可用（#122080）。</p>
+<p>看板（bb09271d6、aa25f9e85、23d95743a、37e89a7ab、b8a149cf4、818c09603）：被阻塞任务显示原因并可解除；非全页（分屏）里也能看到板切换器；默认板在事件订阅前解析；gc 永不删除工作区根本身（词法包含检查先行、只计真实回收）。</p>
+<p>媒体位置与灯箱跨重挂保持（806fa64fd、6013f62b6）；裸装回环 URL 保留显示（7ef36b551）、代码里的 URL 不转 chip（ddb56d0aa）；内联数学后紧跟 CJK 正文时的保留修复、转义反斜杠修复（f77bf679c、08453d780）；对话中图片不再压到下一个块（a1dcbc20a）。</p>
+<p>失败委派在 Agents 面板与状态栏可见（c488b42a8）；自定义 provider（custom:*）在设置与 Bot 模型选择器匹配（d1167fdff）；默认迁移成 custom:* 后旧的裸 provider 选择会被重新播种（652fb2eb5）；主模型应用后有确认提示（42592179e）；安装失败页可关闭（6f8dd5962、7e08c4524）；RTL 侧栏边缘与滚轮方向（44a0fe035、24bbdab4c、fd2bf1c15）；打印崩溃防护（ca16be564）；--profile 传进打包启动（8684bf3dd、2f86fae3b）；远程会话 cookie 内存镜像 + 401 重试一次（adc367815）、镜像按 OAuth 分区限定（84f87a18c）；已存密钥预览（a776efb06）；性格下拉只列可解析项（b6b3708db、9992d70f0）；About 不再显示 0.0.0 占位（9fa23760b）；状态行显示重试与恢复等待（861893da2）；空态可新建 cron（0559c367e）；启动失败单卡片（6b512010e）；消息凭据输入撑满行（a65641b2e）。</p>
+<p>cron / 网关 / 更新（次级）：</p>
+<p>发布通道读取重试收窄（0da04c192、d1484ab44）：先给瞬时失败加了重试（0da04c192），随后收窄为仅显式 hermes update 重试（d1484ab44）——被动检查（--version、横幅、桌面/面板更新检查）恢复单次读取、不再给版本行加重试退避。</p>
+<p>更新重启 dashboard systemd 单元（3e4fb3477、5dc05faf7）：systemd 监督的 hermes-dashboard 此前更新后仍跑旧代码；现在按 MainPID 判断归属后重启。Windows 网关生命周期按当前安装界定（46fba4c9a、878d90214）；重启 watcher 自行带上 checkout（5a0225dff）。</p>
+<p>cron ticker 让位（29ca3f277）：活跃网关在同 HERMES_HOME 掌管 cron 时桌面端 ticker 停摆，不再双跑。</p>
+<p>PM 构建快照保留（9fa34cfb2、7523696fb）：内置插件 dashboard dist 与成员自带 uv.lock 不被丢弃；store 规范化（42b1f1988、6a1770522）；代际收集（c11a6bc0b）。</p>
+<p>生态 / 工具链：</p>
+<p>邮件余项（3f4533b9d、517a97cd3、2d44f5512）：spf/dkim 裁决从句、From 长度封顶与注释处理、邮箱安全回退。</p>
+<p>文件（48196b0ce、fc53717f7、af595ff8a）：活动数据库与其 WAL/SHM 拒绝经下载/媒体路由读取（返回 409），预览保持 SQLite 锁。</p>
+<p>TUI answer-only 一批（f41c6517e、c0f1ed114、e9e93b5f5、e0a5c0710、5f32e201c、66447b4e9）：文件编辑的 tool.start/complete 配对、卡片生命周期、失败保留、推理/工具框架隐藏按开关生效；TUI 会话结束时回收会话内核（7fa45eb34）。</p>
+<p>Matrix 语音提及（cb7bdd217、35a24efaf、6016f3042、ec504c194、df2f8b8af）：录制时输入的 @提及作为独立 m.text 到达，语音与提及按 (房间, 发送者) 配对、认领最新一条、同批次等待入位。</p>
+<p>Docker Windows 挂载（1a7204211、b686f1b40、37933ff66、b9d5e4d17）：/workspace 已被卷占用时把已配置的工作目录挂到第二位置；原始 Windows 覆盖不另外发明工作区挂载。</p>
+<p>MCP（b4410b4ba、48cf36fb6、79dbb1450、6ca192476）：结果信封拆封后按文本分页（约 200 KB 文档不再整篇落在一行、换行全被转义）；「仅缺 MCP 连接」时提示明确；托管 Node 在 MCP stdio PATH 中优先的改动经复核后于当天撤回（会遮挡 PATH 中更早的查找项，报告中的布局未变）。</p>
+<p>网站星标探测（80512c90d、e2abb460b）：单请求 317 个仓库超过 GraphQL 资源上限、后续仓库保留旧数字（例如某仓库显示 26.5k、实际已 34.5k）；改为每 100 个一批（实测 4 个请求、317/317）；探测脚本另修导入路径——定时任务自 9 月 24 日起每次都崩、星数冻结（e2abb460b）。</p>
+<p>bot-mode 投递启动器（8024105d7、6c2bf8d63）：优先安装绑定的启动器、避免批处理 shim 被选进字面量投递 argv。</p>
+<p>压缩稳定性余项（ad4e4496c、f7be32556、e46d4c0ad、d8be40309、3a1a45dbf、56ee7d6f0、66240ddc5、be834681d）：回退交接可续建摘要、长引用不入摘要、Codex 停滞按原始错误文本匹配、传输超时保持终态；凭证余项：nous 单次刷新池（6a3db7c48、ec262e177、e61c45bc2、ddcd84599）、402 池点名（516535b54）：不再报「未配置 LLM」，而是点名已耗尽的 provider 池。</p>
+<p>终端 heartbeat 文案与 schema（e6f0966b0、4317ed0e7）、delegate 标题（b90b7ae7e）、status 渲染 profile home（2a977be99）、review 透出 gh stderr（8b7a1620a）、web toast 文案（e78e7ccde）等小修。</p>
+<p>技能：brag / brag-slim 以上游 stub 加入可选技能目录（a7c080ca6）：/brag 是 Hyperframes 工作流（自带音乐与音效库），/brag-slim 为单个 SKILL.md、由模型用本地工具生成整支视频。</p>
+<p>插件与技能目录收录（22 条含 catalog 的 feat：20 条 feat(catalog)/feat(plugin-catalog)，另含网站卡片排版与可选技能目录各 1；名单另含 2 条收录后的 fix pin）：</p>
+<p>anyrouter 模型 provider 插件（c0a655095）；next-prompt 收录与两次 pin（7b4e846e9、d78137788、4a36ade15）；memory-rewind 首收、1.1.0/1.2.0 更新与目录卡片（d50ac9388、a9babd1f7、bbac13713、700610832）；parrotnotes 首收与三级 pin（7f8c5e1e8、838914853、0ee1eb6bb、735b1b2d2）；hermes-routines 收录（ca216c5f2）；OrcaSlicer 收录（aee8da9c9）与 0.5.0 凭证安全版 fix pin（6f788a4bf）；web-meta-ai（20f01a0cf）；cortexlayer 记忆 provider（cd5d75145）；Index Network 收录（b7e5b6755）与 admission 修复 fix pin（5939ce460）；sigrex 1.0.1 加横幅（19d87b82e）；drag-to-pin-session SDK 版 pin（b0f569b09）；prompt-snippets v1.7.0（b9824efbc）；网站卡片排版统一（97a360783，仅样式）；可选技能目录 brag / brag-slim（a7c080ca6，见技能段）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-27：桌面端会话批量修复、cron 运行历史与 Opus 5.5 支持</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-27</link>
