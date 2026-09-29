@@ -5,8 +5,68 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 28 Sep 2026 10:57:47 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 29 Sep 2026 08:24:01 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-09-29：共享指标系统合入、桌面端体验批次、更新链崩溃自愈</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-29</link>
+      <guid isPermaLink="false">hermes-daily-2026-09-29</guid>
+      <pubDate>Tue, 29 Sep 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 9 月 28 日 06:30 ~ 9 月 29 日 06:30 合入 main 的提交（tip 增量采集，按合入时间计），共 628 个 commit（不含 merge），另有 1 个合并提交（校准 Spark 推荐、27B 推理默认 medium，#112107）。新增 76 个功能、394 个修复、2 个性能优化；修复按 scope：桌面端 80、遥测 44、网关 42、更新链 31、cron 20、review 16 等。</strong></p>
+<p>说明：本期是双线大合入日——共享指标系统（遥测/隐私）功能与修复合计 80 条；桌面端 100 条（feat 20 + fix 80）。新增功能里遥测/隐私相关 36 条、桌面端 20 条、目录与模型 8 条、其他 12 条。</p>
+<p>📌 今日要点：</p>
+<p>共享指标系统：v3 决策数据（每会话摘要、里程碑、按模型/供应商 token、TTFT、每日快照）+ v5 信号与六项可选效率计数；桌面端首次运行同意、设置 › 隐私开关</p>
+<p>桌面端体验批次：分区右键菜单、浏览器面板真开关、压缩计数进上下文仪表、排队提示展开、日志尾部搜索、平台状态过滤、会话拖进项目、模型价格与推理档位</p>
+<p>更新与安装链路：partial clone 崩溃自愈、浅历史自愈、「不再假报完成」、回滚不留在坏代码</p>
+<p>网关与定时任务：停靠 profile 重启与如实报告、积压消息补投、外部 worker 引导失败即停、属主 profile 交付、存活探测点名</p>
+<p>安全与性能：子进程密钥清理扩面（适配器密钥 + 面板密码/签名密钥）、LSP 不受信工作区默认拒绝、缓存前缀跨 profile 共享</p>
+<p>重点条目：</p>
+<p>共享指标与隐私</p>
+<p>决策数据核心（26e7a9ac3）：shared metrics v3 的决策数据扩展——契约、存储与运行时：每会话摘要、每安装一次的里程碑、按模型/供应商的 token 合计（主模型与辅助模型按任务分列）、模型路由的首 token 时间（TTFT）、技能加载的内置技能名；每日快照含安装时长、主供应商、终端后端、消息平台数量与语言。进程级事实（配置、斜杠命令、压缩、模型切换、回退、扩展安装）获得 shared_metrics_events 调用点 API；每个新维度都是封闭枚举、区间或公开目录名，不采集自由文本。</p>
+<p>v5 信号四类（c13a4abc8）：tool_unavailable——模型调用了本会话未启用的内置工具（带工具名与目录供应商/模型，未知名字仍走 v4 的 unknown_tool）；provider_setup——各端供应商接入流程的开始/完成/放弃/失败（CLI setup、CLI model、TUI、桌面端、dashboard），带封闭失败分类，陈旧标记在下次启动记为放弃；feature_adoption——每功能每安装首次真实使用时记一次，按属主 profile 的安装时长分桶；feature_disabled——关闭默认开启的工具集/技能/插件/平台/设置（及改回默认），在配置写入关卡做差，每种每日一次。</p>
+<p>v5 效率六项（607dff390）：六项可选、分桶计数：每回合成本（用户看到结束的回合：token/工具调用/API 调用桶 + 结果；分叉、委托子任务、会话关闭中止不计）、浪费 token（撤销/重试/中断三种原因，来自 v4 摩擦点、不重复探测）、工具输出截断（每条工具结果、按回合预算判定后分桶，覆盖单条溢出、回合预算与自带截断，原始大小上报）、工具开销（启用工具数 + schema token 桶 + 执行面）、启用未用、提示词缓存断裂。</p>
+<p>桌面端同意与宿主事实（520f0e9ed、91fbaa8d3、ce80e8d81）：首次运行出现共享指标同意流程；设置 › 隐私 新增开关。宿主事实新增 RAM 总量与 GPU 类别；启动到就绪延迟每次启动上报一次（桌面端主进程闩锁：渲染重载、多窗口、后端重连不重复上报）。同日另有 44 条遥测修复（统计打磨与边界处理）。</p>
+<p>桌面端 · 体验批次</p>
+<p>分区菜单与浏览器开关（ad2d4822e、dbc5ec8f9）：表头被隐藏或从未渲染的分区此前没有可发现的关闭入口——分区菜单只挂在表头条与编辑遮罩上，全宽面板右键也找不到 Close/Minimize（#92500）；现在面板主体挂同一份菜单。浏览器面板的 Ctrl+Shift+L（macOS 为 Cmd+Shift+L）此前只能打开、没法从键盘关闭；现在会先问布局树那个镜像预览面板是否真的在屏幕上（未关闭、未隐藏、未最小化、没被兄弟标签停在后面），不在就打开、在就关闭。</p>
+<p>压缩计数进上下文仪表（aa96575ed）：计数从独立状态栏项折进上下文仪表——压缩过的会话在百分比后出现层叠图标 + N（与侧栏压缩续行同一图标），面板里「Compressions: N」挨着「N% Full」；没压缩过的新会话不在仪表上显示，计数只留在面板。</p>
+<p>排队提示展开全文（e865b1f34）：排队面板此前每条只显示截断的一行，读长条目要把内容装回输入框；现在预览折两行，长条目/多行条目有就地展开、收起开关（aria-expanded 箭头）展示可滚动全文；编辑/发送/删除不变。</p>
+<p>日志尾部原地搜索（1b91b8eaa）：匹配高亮、当前项滚入视野、「3/6」计数、上/下步进（Enter、Shift+Enter、Ctrl+G，macOS 为 Cmd+G），复用查找栏键位与标签；命令中心系统日志与 MCP 日志面板共用同一组件（不再分叉）；清空搜索后恢复跟随尾部。</p>
+<p>消息平台状态过滤（1b8569f41）：搜索旁新增状态过滤页签，只为确有平台处于的状态出现（错误、需关注、已连接、未激活）；选中后详情面板进入过滤态，刚被切换而离开过滤的平台保持打开；消息页与网关菜单改用同一状态分类器，同一个 bot 不再显示两种状态。</p>
+<p>会话拖进项目（c4d14871e）：侧栏会话拖拽新增可解析目标——侧栏项目行；落下时调用与右键「移动到项目」相同的 moveSessionToProject RPC，是快速路径而不是新能力。</p>
+<p>模型价格与推理档位（a9d14d0ac、67bc56765、2de175e8a、ad799e37f、2ffa4977b）：模型目录菜单显示每模型定价与缓存读取率；价格总开关放在 设置 → 外观 → 通用 → 模型价格，默认关闭、选择持久化。推理档位新增会话级阶梯：off → minimal → low → medium → high → xhigh，两端收敛，max/ultra 不在阶梯上（一步不会跨进贵档）；快捷键面板新增「推理档位升/降」两个动作，与听写一样默认不占键位。</p>
+<p>更新浮层「复制完整更新日志」（c395693c8）：此前最多显示 6 条提交标题；现在取全量、新增按钮一键复制为 type(scope): subject - author 格式。</p>
+<p>桌面修复其他（37942a69c、511a6b1c1、70f869464、b9df1ccca、d968ee260、b52c73c3e、78999579c、79a6fd3e9）：已完成的工具卡在转写刷新后保留；Ctrl+1…9 恢复「先切鼠标所指标签页、没有标签才切 profile」的分派（#92569 回归）；标签删除作用于当前连接范围；构建 heap 追加不再破坏继承的 NODE_OPTIONS；打包不再经过 cross-env（bin 未暂存致 cross-env: not found #110121；参数裸引号被剥改写路径 #103010）；hermes update 把丢失的已装 Hermes.app 装回来；NVIDIA EGL 回退限定在已确认损坏的驱动系列（615.x 不再被卷进 CPU 渲染）；Linux 启动器指向能真正起窗的 CLI，已打包时跳过重建（#126650）。</p>
+<p>语言包 · 沙箱 · 目录</p>
+<p>可插拔分层语言包（9bcbe7b5d、6f2a01fce）：#126296——插件语言包与用户自定义覆盖层叠在自带 locale 之上；TUI 新增 i18n 层（en 目录、nanostore 运行时、RPC 包加载器、_keys.tui.json 发射）；桌面端补全 locales，完整更新日志复制复用 CopyButton。</p>
+<p>Bot Screen 进终端沙箱（399d95690）：#121169——terminal backend（docker、modal、daytona、singularity）默认是裸 Python + Node 基础镜像；能托管 Bot Screen、computer_use 与浏览器的是带 exec 前缀的 spawn-per-call 后端（docker、singularity 等，经 docker exec -i / apptainer exec），SDK 后端（modal、daytona、vercel）不能托管、auto 会拒绝并点名 opt-in；配套发布 nousresearch/hermes-sandbox:desktop 镜像（含显示栈）。</p>
+<p>模型与镜像目录（f21b9476b、7c799a656）：Claude Sonnet 5.5（09-28 发布）收录进 OpenRouter 与 Nous Portal 目录，两端均在线验证（Portal 推理开/关都返回 200）；Vercel 新沙箱默认改用托管镜像 universal:latest（Node 24 + Python 3.14）；钉住的 vercel_runtime 仍有效并压过镜像（带弃用警告），快照恢复两者都不送；模板种下的 node24（含 setup 向导抄进 .env 的副本）由迁移 49 清掉；新配置 terminal.vercel_image。</p>
+<p>TUI 与 CLI 小改进（e49e35982、2803e850d、a0ec0d286）：输入框为空时连按两次 Esc 中断当前回合（审批/澄清层与语音按键优先）；按住说话先把在播的 TTS 停掉再开麦；/s 是 /steer 的单字母别名（CLI 起、各端共用）。</p>
+<p>更新与安装链路</p>
+<p>partial-clone 崩溃自愈（fc6144e3c、ffa881734）：partial clone（--filter=tree:0）在 git 2.53/2.54 上每次 fetch 都崩——index-pack --promisor 走 repack_local_links()，把合法缺失的 promisor 对象喂给 pack-objects --exclude-promisor-objects-best-effort，pack-objects BUG()（POSIX 上 SIGABRT）；现在命中 BUG 指纹、加 POSIX signal 6 行或 Windows repack fatal 之一时，本次置空 remote.origin.promisor 重试一次。配置跟进（5849446b0、de98f8890、010618c76）：不再硬编码 tree:0，改读克隆自己的 partialclonefilter 原样沿用（5849446b0）、完整克隆不带走 filter；更新后的 tag fetch 只在已是 partial clone 时传 filter（de98f8890）；两处共用一次 commit-graph fetch，仅 history 真缺的 depth-limited 克隆在 unshallow 时可能用 tree:0（010618c76，非全局废除）。</p>
+<p>浅历史自愈（e377309d8、6b51b0fd4、010618c76）：depth-1 安装远远落后 main 时，普通 fetch 会拖进几乎全量对象图、每次撞 300 秒网络上限；能让后续 fetch 变增量的 unshallow 又排在成功 fetch 之后——死循环。现在受限 fetch 前先治愈浅历史；fetch reflog 里钉住旧浅接枝的条目会过期；pre-fetch 治愈与更新后的 tag fetch 共用一个 commit-graph fetch。</p>
+<p>更新不再假报「完成」（f77f1a2a3、52d814cfd）：恢复冲突、未跟踪基线未知、或未跟踪文件被替换时，此前仍打印 Update complete! 且退出 0（#122557）；现在 stash 在恢复、丢弃、或被用户要求停放前保持未结算，未结算的 stash 成为完成行且不算成功（退出非 0）；任何更新结论前先给未结算的 stash 命名。</p>
+<p>分支回滚与切换安全（9e8202f80、a4ed80529、57b3868d5、495ab057f、a58fc4fa8、593eaf6c0、353ac62b3、f4b49df25）：回滚无法重新检出被停放分支时（如被另一 worktree 持有）按提交 detached 恢复，不再留在坏分支、恢复提示不重复失败命令；运行中的 checkout 跨越分支切换更新保留、修复基线贯穿 fork 完成、按紧邻 tip 验证陈旧分支修复、区分早期 fork 同步与待决修复；更新前拒绝进行中的 Git 操作、回退重置前证明分叉。</p>
+<p>更新其他（2cf037300、54684326e、c70374b56、f8c3e7638、0c397dd6a、e31769374、a153adcc2、9c02d6868）：PM 环境 venv 里 hermes update 归属其 checkout（不再误报 Not a git repository）；持有 gateway.lock 但无 gateway.pid 不再中止 Windows 暂停门（updater 自己 --replace 后遗留的状态）；SSL_CERT_FILE 映射进 GIT_SSL_CAINFO；默认浏览器后端会被降级时补装 Browser Use CLI（180 秒上限、非致命）；预接管的 dashboard 经安装绑定的 launcher 重拉（0c397dd6a）；手动的折到当前安装的 sys.executable + 仓库入口、1 秒内退出算重启失败（e31769374）；更新时按配置的网关平台安装 SDK（此前只警告）；命名 profile 更新同样迁移安装根的默认 config.yaml。</p>
+<p>网关与定时任务</p>
+<p>多 profile 边界（61bd7e302、659423a95、195bf48ee、4b8a57038、63d8a0d5b、35e0cac79、f373cff9d）：网关重启会重启此前停靠（parked）的 profile，状态查询优先读运行时、如实报告活跃网关（#124553）；路由 profile 的积压消息 spool 开机重放；停止通知经各自的 bot 送达每个被服务 profile 的主频道（#118233）；默认 profile 的扁平平台在 multiplexer 重键中保留（#123088、#123869）；适配器仅重连被拒后 standalone 失败的任务记入属主 profile 的 delivery ledger、等适配器重连再投，避免丢消息。</p>
+<p>cron 外部 worker（744f05e22、308072df8、9ec6b94ec、94f83d972、f57d23574）：依赖引导失败不再带病继续——无租约路径会在网关释放 generation 后于活 worker 脚下被删、下一次依赖导入在任务中途中弹；引导走 PM 的提交选择、排在 cron.jobs 之前；worker 入口持有已提交依赖 generation 的租约、恢复激活的 site-packages。</p>
+<p>属主 profile 交付（8be50587d、7e849e554、b9372c409、40715d95a）：二级 profile 的 cronjob 手动运行经属主 profile 的适配器交付（此前 Telegram 私信从错的 bot 到达）；没有自身凭证、只靠主 profile 路由的卫星，手动运行交网关 ticker 投递（此前 CLI 进程报 platform 未配置）；卫星路由读主 profile 的分层配置（#121212）。</p>
+<p>存活探测点名（dd0004018、fc15ec8f）：liveness 回答「是不是有个调度器在 tick 这个 profile」并点名（自己 home 的锁/pid，或本 home store 里新鲜的 ticker 心跳）；新 serve ticker 视为调度器活着（#121881、#99631、#99579）。</p>
+<p>路由与 prompt pin（49bc08d27、7823f8771、0ba9e1b7f、f660ba228、4bbbfce3a、3275dcead、bf7879bc1）：router 拒绝时记录 live rejection；压缩崩溃恢复保留 prompt pin（否则首个内部回合会把系统提示翻面）；pin 持久化且不越过其隐私策略、路由态剔除畸形 pin、重注入加围栏、CLI 交接清理。</p>
+<p>安全与性能</p>
+<p>子进程密钥清理扩面（66019e559、6c2a53367）：子进程环境黑名单此前只从 provider registry 与 OPTIONAL_ENV_VARS 推导，不少网关适配器直接从环境读密钥而不在清单上（WhatsApp Cloud token/secret、WEIXIN_TOKEN、元宝、飞书、Telegram webhook secret、Photon 等）；现在这些适配器密钥（按形状匹配）、以及各 provider profile 的 env 密钥（不限 auth_type，含 OAuth profile 的粘贴密钥），都会从 terminal、后台与 PTY、cron 脚本、hermes_subprocess_env 与 skill passthrough 等子进程出口剥离。Hermes 自有密钥另有 terminal、execute_code 与 skill passthrough 出口的黑名单兜底：dashboard basic-auth 密码与签名密钥（足以伪造 dashboard 会话）、dashboard drain 与 OIDC client secret、anon secret 与 Meet 实时密钥——进入静态黑名单。</p>
+<p>LSP 不受信工作区（59ec28114、f5c754d43、e92970202、da2b64304、09d14ea13）：语言服务器此前在每个 git worktree 里的每次 write_file/patch 都无审批启动——rust-analyzer 在 didSave 跑 cargo check（build.rs、过程宏），jdtls、kotlin、elixir、zls、clojure、haskell 语言服务器启动时求值构建文件；pyright 曾被指向 checkout 自己的 venv python、Vue 与 TS 语言服务器加载仓库自带的 node_modules/typescript。现在不受信工作区默认拒绝并跳过工具链 lint 回退，绝不用被打开仓库自带的解释器与 TypeScript SDK；信任锚改为会话工作区与启动目录的 git worktree（含 TERMINAL_CWD；$HOME 及以上不作锚），或 lsp.trusted_workspaces（不再只看进程 cwd）；计划任务与看板 worker 不自动信任；vue-language-server 不进入不受信工作区。</p>
+<p>性能两则（f29163388、b1206115a）：prompt 缓存——profile 行（含 home 路径）此前位于稳定缓存层，每个 home/profile 的稳定前缀都不同，首个请求要为工具与稳定系统付整笔缓存写入（Opus 上约 2 万 token）；移到易变尾部后，同一主机上不同 profile 的稳定前缀逐字节一致，多 profile 网关共享同一份缓存前缀，不再按 profile 各付约 2 万 token 的缓存写入（Opus）。child-env——每 home 插件声明的 manifest 盖章从每次 spawn 逐目录 is_dir/exists/stat（且一次 scrub 取两遍）改为每根一次 scandir、每候选一次 stat、按文件签名键控。</p>
+<p>其他值得注意</p>
+<p>平台作用域系列（大）：fix(review)、fix(tui_gateway)、fix(dashboard) 一批把会话行、镜像状态、子运行注册表、展示配置写入、审批模式 RPC、cron 交付目标、语音配置逐项绑定对应 profile；dashboard 未知 ?profile= 在 PUT /api/env 等处答 404（f793ccad2d）、插件 API 路由在请求 profile 作用域内运行（11598aebe：kanban 路由使用 plugin mount 已绑定的作用域）。</p>
+<p>agent：合并回合前缀单点拼接并排除出 token 估算（7cdee5d06、57b0ed015）；空吸收回合保留未答用户文本（bc1e29353、87cefde20）；turn lease 系列——新会话首回合也持租约、清扫过期超 24 小时的死租约行、会话行读取在租约准入之后（057bbb3fb、c8173e038、6c1f0bc3c）；background review 在入队 profile 的上下文运行（a94085829）。</p>
+<p>worktree（77019b3b7、e3fffd8c1、71b1a6fa9、be1181c53、d31d9b372、6941423f4）：窄克隆从远端 tip 开分支、远端分支 fetch 落地后才注册、origin/ 分支在 tag 钉住的窄克隆上转换、slash 名分支保持本地；合法分支名（如 fix+1、feat/foo@bar）不再被 sanitizer 改写而跳过基线 fetch，改交 git check-ref-format --branch 校验；origin 基线改用 tracking refspec fetch（tag 钉住的窄克隆也能取回远端分支）。</p>
+<p>kanban（89cb27ab6、39c737465、5392a83cc、7e3b34ca8、fdac8a189、25b6a9f01、11598aebe）：未知负责人跳过每卡记一次（#122422）、module 形式 worker 的 import root 进 env（#122299 等）、PR 验收以负责人 profile 的 gh 登录运行、凭据启动失败退出码保留、dashboard 的 Specify/Decompose 解析所属 profile 的 aux-LLM key。</p>
+<p>bot-mode（9979e56cc、be0a4147a、875635bb1、be9fd2a69、6c9420706）：投递 runner 在裸存储解释器上激活依赖、回复等待保持不经激活；投递不确定只保留给已 live-admit 的 DM（be0a4147a 在 875635bb1 上收窄）；Windows 重拉不产生第二个投递结论。</p>
+<p>docker / logging / state / pm（48353b2b8、8e9d1b90c、2ba97b01d、b05f767b0、35272ce28、73f7fc2ca、92ce6f476、a31e618e7、dd3ba4b4b、b23d4f4b3）：docker 用打包 Python 起 TUI gateway、standalone profile 的 s6 槽随容器启动；日志 rollover 保持所有权；/proc/locks 读取改为三次取并集，漏读很难再连续发生；busy 的 state.db 不算租约等待；pm 修 agent-browser exec bit、关闭租约竞争窗口、收集废弃租约、npm 工具走用户 registry。</p>
+<p>其他：delegation 恢复完成移到首次消费（34c2dc5cb）；models 目录 SWR 刷新写入请求方 profile 缓存（5f73e52c7）；mcp 远程头在属主的新密钥作用域下渲染并重新插值（c8756dbd6、c418294ec）；a2a 端口门与启用门作用域化（75b6d946c、68c205b5b）；compression 终止标记立即持久化（85a9d1c55a）；time 会话起始时间用自身日期 UTC 偏移（8a2fb31fbc）；hermes logs 的 --since/--level 处理未盖章行与 MCP 输出（fc4dbe32df）；Qwen OAuth 状态卡显示 token 有效期（57d7a15c28）。</p>
+<p>插件目录收录（476a8c352、0aaf2e736、6348313c0、553c42fb2、73df7546b、3ab533295、a0719b079）：4 个新条目——hermes-session-reset-policy；antigravity-oauth（模型供应商插件）；Nachos；PIR8（brain-graph、android-emulator、OR Picker——OR Picker 分桌面插件与模型供应商两条）——外加 memory-rewind 连发 1.3.0、1.3.1、1.3.2 三个小版本。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-09-28：桌面端启动与聊天修复、Windows 更新链加固、cron 脚本解释器</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-09-28</link>
