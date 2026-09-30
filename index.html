@@ -22,9 +22,80 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 64 期 · 25687 个提交 · 每日自动更新 ·
+<p class="meta">共 65 期 · 25931 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-01" class="day">
+      <h2>Hermes 日报 2026-10-01：桌面端 UI 缩放默认改为 90%，聊天文字可独立设置字号</h2>
+      <p><strong>本期覆盖 9 月 30 日 ~ 10 月 1 日合入 main 的提交，共 244 个 commit（不含 merge），另有 8 个 merge。新增 3 个功能、175 个修复、1 个性能优化。本期是一次大规模加固：fix 占 72%，其中桌面端相关 121 条。口径按「合入 main 的时间」统计，含作者时间较早但本期才进入 main 的提交。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端显示调整：整个窗口的 UI 缩放默认从 100% 降到 90%，聊天正文另有一个独立的字号倍率。</p>
+<p>焦点不再被抢：流式输出期间桌面端不再抢 Windows 前台焦点，隐藏到托盘时会释放键盘焦点。</p>
+<p>交互修复：忙碌时按 Enter 直接把内容送进当前回合，不再默默排队；输入框空闲时 Queue 操作隐藏。</p>
+<p>Windows 平台专项：启动不再闪出一串控制台黑框，安装路径带空格、SSH 客户端位置等一批平台问题同步修复。</p>
+<p>语音与唤醒稳定：STT 租约按连接/配置归属，不再串台；Windows 上麦克风读数不刷新时的唤醒失败也修了。</p>
+<p>重点条目：</p>
+<p>桌面端显示（本期仅有的桌面端新功能）：</p>
+<p>窗口 UI 缩放默认 90%（31c0bea35f）：问题——桌面端默认以 100% 缩放打开，在高分辨率屏上显得拥挤。修复——把默认缩放级别从 1.1 档位的对数映射改为 0.9，两个缩放状态源（主进程 zoom.ts 与渲染层 store/zoom.ts）同步改。效果——新装或未自定义过缩放的桌面端，整个窗口默认按 90% 显示，侧边栏、设置页、工具栏一起变小。</p>
+<p>聊天文字字号可与窗口缩放解耦（5cf347c096）：问题——之前聊天正文和窗口其余部分共用一个缩放倍率，想放大正文就会连带把侧边栏和面板一起放大。修复——新增桌面端本地设置 Chat Text Size（默认 110%），只作用于会话正文、代码块、表格和输入框编辑器（含浮窗与行内编辑输入框），不改侧边栏、设置、工具栏、图片和窗格几何；对话字号与行高从各自的根 token 派生，不做全局 token 乘法也不嵌套 CSS zoom。效果——设置 → 外观 → 排版里多了 Chat Text Size 一行，可单独调正文大小。</p>
+<p>运行中弧线动画的渲染层缩小（14a250fbd2、1ad2eb1ecf）：问题——侧边栏行、HUD 输入框、Nous provider 行上「正在工作」的弧线动画，把 ::before 层做成宿主 300% × 300%（9 倍面积）的遮罩合成层，而一个周期里其实只有一段渐变可见。修复——先改为 220%，评审指出 220% 时层边缘正好落在宿主边缘、抗锯齿会在环的底部和右侧留下缝，最终定为 240%（含周期 50%、位移 -50%、停点 18.75/25/31.25/43.75/50%）。效果——周期像素、颜色停点、速度方向不变，逐帧对比差异不超过 8/255；渲染约为宿主的 5.76 倍面积而非 9 倍，官方实测渲染线程省下约 1.5 个百分点的一个核心，GPU 进程无变化。</p>
+<p>焦点与输入交互：</p>
+<p>忙碌时按 Enter 引导当前回合（a3936ae0c6）：问题——只要客户端还认为会话在压缩，回合中途输入纯文本按 Enter 就会被丢进队列，而这个压缩标志在压缩中止时没有终止边，导致整个回合后续的纠正都进排队。修复——删掉客户端这道门（网关本来就会在压缩锁下回答 queued）；已排队文本再按一次 Enter 会 steer 进实时回合（上屏、不打断、不等待收尾），只有 steer 带不动内容或回合拒绝时才回退到立即发送的打断路径。效果——回合进行中改口能立刻生效，不再卡在队列里。</p>
+<p>流式输出不再抢 Windows 前台焦点（8d30c4eaab，#83998）：问题——Windows 上 BrowserWindow.show() 和 focus() 都会抢占系统前台，focusWindow() 无条件 show()+focus()，更新提示和深链接处理也照做，于是流式过程中任何环境 IPC 走到这些路径，都会把其他程序原生的保存/确认弹窗顶掉（报告里的记事本复现）。修复——focusWindow() 改用 showInactive() 显示，focus() 前先用 isFocused() 判断，更新 toast 和深链接调用点同样处理，策略抽成纯函数模块 electron/window-focus-policy.ts 并加单测；用户主动触发的唤起（宠物浮层开关、HUD/快速输入唤起）保留 show()+focus()，点击即授权。效果——后台刷新和流式输出期间不会再把别人正在用的窗口顶掉。</p>
+<p>隐藏到托盘时释放键盘焦点（49b17a0401）：问题——Windows 上隐藏的 Chromium 窗口既不产生 blur 也不会释放 UI 线程的键盘焦点，按键和读屏器被关在不可见页面里。修复——两个隐藏入口（延迟最小化处理和关闭到托盘）共用的 hide() 里，隐藏前显式 blur。效果——最小化到托盘后键盘焦点回到原程序。</p>
+<p>Bot Chat 后台刷新不再抢焦点（0dfc3e39b9）：问题——Bot Chat 的过期瓦片探测在后台刷新时会把焦点抢走。修复——该探测改为只丢弃不激活（discard-only）。效果——后台刷新静默进行，不打断正在输入的内容。</p>
+<p>压缩提示打开前清掉过期 Bot Chat 标签（f8bf71b06e，#120810）：问题——每次 Bot Chat 压缩后会留下两个以 bot 名命名的标签页，既有的谱系守卫依赖侧边栏附带的谱系元数据，而隐藏的 Bot Chat 谱系不携带该数据，守卫失效。修复——在 openStoredBotChat 里加一个按 owner 限定的过期 Bot Chat 探测（与名单点击走同一套），针对注册 id + 解析出的 tip 执行，覆盖活动刷新与回收两种打开路径。效果——不再出现重复标签页，其他标题的侧边标签不受影响。</p>
+<p>Bot 名单点击定位到已在主区打开的会话（99aa3ca0af，#125899）：问题——若该 bot 的瓦片已丢失（关闭主标签会把相邻瓦片提升到工作区并丢掉自己的瓦片），名单点击会点空：对话其实已在主区，focusOpenSession 对 Bot 域不认领 main 命中（同一存储 id 的 Bot 标签必须还能新建），原地导航又是空操作，结果没有任何东西把工作区面板提到前面。修复——抽出 frontMainIfSelected，在 openSession 原地导航的分支里、焦点没落到任何地方时调用。效果——Bot 名单点击总能正确前置到已打开的会话，Sessions 域的 main 语义和 Bot 标签新建都不受影响。</p>
+<p>输入框空闲时隐藏 Queue 操作（374eaf5143）：问题——输入框空闲但仍显示 Queue 操作。修复——空闲时不渲染该操作。效果——空闲态界面更干净，不会误触排队。</p>
+<p>Windows 平台专项：</p>
+<p>启动不再闪出一串控制台黑框（b9b1328b7d，#117781、#101895）：问题——无控制台的父进程（pythonw 后端、分离的守护进程）在每个裸 spawn 上都会分配一个可见控制台，Windows 启动时要闪 7~8 个黑框，GPU 状态栏每 5 秒还闪两个。修复——把 windows_hide_flags() 的创建标志贯穿桌面端能触达的每个 hermes_cli spawn 点（gitlock 的 tasklist 探测与 git 底层调用、计划任务的 PowerShell 探测、更新器的 git 运行封装、安全目录配置探测），并把状态栏每轮两次 nvidia-smi 读取合并成一次带缓存、隐藏窗口的查询；状态栏在文档隐藏时停止轮询、恢复可见时继续。效果——启动过程和状态栏刷新都不再闪控制台窗口。</p>
+<p>最大化后保持缩放（f92ef3c17c）：问题——Windows 上最大化窗口后缩放丢失。修复——在最大化路径上保留缩放状态。效果——最大化/还原不再把界面字号打回默认。</p>
+<p>SSH 客户端改为动态解析（a35f600b8a，#103288）：问题——桌面端把 Windows 的 ssh 硬编码到 System32 OpenSSH，用户装了 Git for Windows 的 ssh 或自定义路径也用不上。修复——所有 ssh 调用（-G 配置探测、ssh-config:resolve IPC、SSH 终端、SshConnection）统一走一个纯解析器，顺序为 config.yaml 的 desktop.ssh_path → System32 OpenSSH → Git for Windows 的 usr\bin\ssh.exe → 裸 ssh，非 Windows 保持裸 ssh；本地 ssh -G 探测失败会打上 terminal 标记，启动直接停在带客户端名与 ssh_path 设置指引的失败浮层上，而不是每 2 秒重试同一个探测。效果——自定义或 Git 自带 ssh 的用户能正常连远程后端。</p>
+<p>带空格的 Windows 命令不再被截断（b9cb268def）：问题——shell: true 时命令行交给 cmd.exe，会在第一个未加引号的空格处截断，安装路径带空格（如 C:\Users\John Doe\…）时所有探测和后端启动都失败。修复——新增 windowsShellCommand()，在四个委托给 shell 的调用点应用：--version 探测、serve --help 探测、两处 spawnOwnedBackend。效果——用户名或路径含空格的 Windows 环境可以正常启动。</p>
+<p>内嵌终端加 MSYS 路径转换守卫（0f6554792f，#101826）：问题——Git Bash/MSYS 会把 /FI 这类斜杠开头的原生参数重写成假路径，tasklist /FI 之类的命令在内嵌终端里跑不通。修复——在桌面端 PTY 环境里设置 Python terminal_tool 已经使用的 MSYS_NO_PATHCONV 与 MSYS2_ARG_CONV_EXCL 默认值。效果——内嵌终端里的 Windows 原生命令参数不再被改写。</p>
+<p>WSL 剪贴板避免杀软隔离（026a00916a）：问题——WSL 剪贴板写入会被杀毒软件隔离。修复——调整 WSL 剪贴板路径规避 AV 隔离机制。效果——WSL 环境下复制粘贴恢复正常。</p>
+<p>裸本地路径可直接打开（b5a5ef7c16，#80946、#53170）：问题——hermes:openExternal 只接受能被 URL 解析的输入，聊天里的媒体链接、Markdown 链接、产物面板里的裸本地路径全部是死点击：new URL(&#x27;C:\Users\x\a.md&#x27;) 会把盘符解析成假 scheme c:，被网页白名单拒为「Invalid external URL」，POSIX /…、~/…、UNC 和相对路径则直接抛异常走同一个拒绝分支；协议相对的 //cdn.example.com/img.png 也打不开。修复——新增纯函数模块判断本地路径形状（POSIX、~/、盘符、UNC，且不把 //host 当路径），协议相对 URL 补 https 后打开；裸路径分支在 new URL() 之前生效，走与 file: 路由同一套审计过的路径解析和缺失文件预检，再用 shell.openPath（失败回退到在文件夹中显示，且回退不会再次打开、避免循环）。效果——聊天里的本地文件路径和协议相对图片链接都能点开，打开失败会在日志里留下具体路径。</p>
+<p>只读后台终端给出说明和新 shell 入口（1063a63716）：问题——后台终端变只读时界面只报错，不说明原因也没有出口。修复——解释只读状态并提供新建 shell 的入口。效果——遇到只读终端不再卡死。</p>
+<p>语音与唤醒稳定性：</p>
+<p>语音操作按单一 owner 归属（7ee2840c06）：问题——一次听写/对话里的（连接, profile）在预热、转写和释放三个环节各自读取环境作用域，未打标记的半程会重新读取周边作用域，导致切网关或切 profile 时租约释放到了错误的后端，过期的 STT 续接还可能落地。修复——在听写/对话开始时解析一次（连接, profile）并贯穿全流程；录音器和对话丢弃所有在卸载、end() 或新一轮 start() 之后才落定的续接（预热、转写、提交）；syncSttLease 每个独立落定的 acquire 都真实发送，只在仍是「最新意图」的排队 acquire 上合并；空闲卸载守护按最后一次加载/使用共享模型的调用方策略执行。效果——连续开关语音不会串台，切换连接/配置后租约在正确的后端上释放。</p>
+<p>STT 预热就绪带入转写（e40f293796）：问题——麦克风打开时发起的模型预热与转写提交之间没有就绪屏障，冷加载会吃掉转写请求 180 秒的解码预算。修复——录音器 stop() 和对话轮次路径提交音频前，先等待麦克风打开时发起的预热；仅预热的模型也注册进空闲卸载守护，让 stt.local.unload_after_idle_seconds 同样生效；就绪状态是校验出来的而不是记住的——HTTP 200 但 body 是 action &quot;error&quot; 时清掉就绪并在下次 acquire 重试，校验过的预热只信任一个短窗口，对话中途被空闲驱逐会在下次开听时重新预热；租约管理与去重状态按意图产生时捕获的 owner（连接/profile）作键，贯穿到线上调用。效果——冷启动不再是转写超时，切换网关/配置中途也不会把租约释放到错的后端。</p>
+<p>STT 租约响应类型化、预热测试加固（44ea2b68d7）：问题——渲染层校验预热结果使用的响应类型没有 backend 实际返回的 warmed 字段。修复——AudioSttLeaseResponse 补上 warmed，测试 mock 完整响应形状（ok/action/warmed），并修正预热测试里对调用位置和 mock 工厂的写法。效果——预热结果校验对得上真实契约，测试不再有假通过。</p>
+<p>客户端直连 STT 的幻觉过滤与 barge_in 开关（e49a6afe07，#126708）：问题——直连后端的转写没有走中继路径那套 Whisper 静音幻觉过滤，安静音频上会提交出「thank you」这种幻听回合；voice.barge_in 开关也只对 TUI/网关的监听生效，桌面端监听器不受控。修复——网关通过 /api/audio/voice-config 下发确切契约（与 tools/voice_mode_transcript.py 同一份短语表与重复正则），transcribeAudioClientDirect 在每条线路上把命中的转写映射为空（静音），直连转写与中继转写结果一致；voice.barge_in 现在也会关闭桌面端的打断监听器，键不是显式 false 就不武装监听。效果——安静音频不再产生幻听回合，打断行为可以用配置统一控制。</p>
+<p>Windows 麦克风读数不前进时回退阻塞读取（d79de94195，#118552）：问题——Windows DirectSound 设备即使有音频流入也永远报告 read_available == 0，唤醒词的轮询守卫原地空转、永远不调用 read()，唤醒词不触发且没有任何诊断信息。修复——饥饿超过 _READ_STALL_FALLBACK_SECONDS 后告警一次、把该流的计数器标记为不可靠，并改为阻塞读取；真正卡死的阻塞读取由 _halt_thread 在 join 超时后中止捕获释放。效果——这类设备上唤醒词恢复正常，同时保留原有的中止保证。</p>
+<p>唤醒捕获的麦克风读取失败可恢复（e7039c879f）：问题——本地麦克风读取失败会直接掐死唤醒捕获。修复——增加有界的读取失败恢复，重新打开捕获。效果——偶发读取失败不再永久终止唤醒。</p>
+<p>恢复后保持 halt 钩子武装（47b62eab06）：问题——_recover_capture 重开麦克风后，_run 仍把 self._cap 指向已关闭的捕获，_halt_thread 无法中止卡在重开流里的阻塞读取。修复——每次成功恢复都重新武装 self._cap。效果——恢复后的捕获依然可以被干净地中止。</p>
+<p>聊天与后台任务：</p>
+<p>clarify 的长选项和多行选项不再被静默丢弃（056da73d0b，#124127）：问题——normalizeChoices 会丢掉超过 200 字符或含换行的选项，而 choices_offered 仍把它报为已展示，用户在一组缺项里作答、模型也永远不知道实际展示了什么。修复——桌面端过滤改为对齐工具契约：上限 MAX_CHOICE_CHARS=8000（与 clarify 工具在源头执行的值一致，按裸文本计，&#x27;(Recommended)&#x27; 标签不占额度），保留换行让选项理由可以折行。效果——长选项文本在卡片里折行显示而不是消失。</p>
+<p>全部空白或超限的选项改为报错（a4c31d592b，#73152、#124127）：问题——一组全空白的选项会悄悄退化成开放式问题，模型不知道选项丢了，桌面端为选择题显示自由文本卡片；超过界面渲染能力的选项在下游被丢弃，而 choices_offered 仍报告为已展示。修复——_normalize_questions 对两种情况返回工具错误：非空选项列表却没有存活标签时点名该问题，选项超过 MAX_CHOICE_CHARS（8000，schema 里也声明为 maxLength）时给出位置和上限；省略或空选项列表仍是开放式，这是文档化的自由文本提问方式。效果——模型能感知到自己的选项被拒，而不是在错误的前提下继续。</p>
+<p>后台任务完成通知带上退出码和输出尾部（879b1b0982，#108075）：问题——后台任务完成通知只有命令行首行，看不到结果。修复——通知正文增加退出码（exit N）和输出尾部最后三行（存在时）；数据本来就存在于 reconcileBackgroundProcesses 消费的 GatewayProcessEntry 里，只是被丢掉了。效果——通知从「npm run build」变成「npm run build (exit 0) + 输出尾部」，一眼看出成功还是失败。</p>
+<p>复用 tool call id 不再覆盖已完成的工具行（5dc1c084e9，#128009）：问题——同一条消息里 id 重复的 tool.start 会被合并进已完成的工具行，新调用的参数和错误覆盖成功那次，一个已加载的技能会渲染成失败；另外桌面端按原始 tool call id 存了一份行内 diff 的旁路表，工具行优先读旁路表而非自己 part 上的 diff，id 复用时最新补丁存到共享 id 下，所有还带着该 id 的行都显示最新 diff。修复——稳定 id 匹配只认领未落定的 part（与 toolCallOwnerMessageId、applyStoredToolResultToParts 的做法一致），没有未落定同 id part 的完成仍落到已完成 part（当它重复该 part 的结果或不携带结果时）；工具行改为读自己 part 的 toolResultMetadata 里的 inline_diff，删掉旁路表。效果——重复 id 不再让成功的调用显示为失败，工具行只显示自己的 diff。</p>
+<p>客户端不可达的远程图片经网关代理（82bbc694b5，#74564）：问题——agent 生成的内联图片（FAL CDN URL）如果桌面端客户端访问不到，就是一个折叠的空框，没有可用回退。修复——网关新增 GET /api/media/proxy，代表客户端抓取白名单内的远程图片（fal.media/fal.run/storage.googleapis.com 及其子域，20 秒超时、图片 content-type 校验、25MB 上限），返回与 /api/media 相同的 data_url；渲染层用 gatewayImageProxyDataUrl 包装并按 owner 连接/profile 固定，useMediaImage 对内联 https 加载失败只重试一次代理，重试按来源闩锁，失败或重挂载都不会循环。效果——agent 生成的图片在客户端直连不到时也能显示出来。</p>
+<p>空会话不再反复 404（ddd0cc6944，#123622）：问题——session.create 是懒创建的，全新会话的 state.db 行只在第一次发消息时才写，因此「新对话」瓦片打开但没输入过时，有存储 id 却没有对应记录；转写时间线的挂载读取和周期性活动/瓦片同步不知道这一点仍然去读，对着一个不可能存在的行反复 404（首次发送前 desktop.log 里出现 4 次「Session not found」）。修复——把已有的「本轮创建」记账抽成独立小模块，本轮创建且本地消息为零的会话跳过转写/时间线读取。效果——新开未输入的会话不再刷 404。</p>
+<p>新草稿的第一条 prompt 能发出去（a6803ce0eb，#128476）：问题——输入框把未保存的对话标记为 __new__:&lt;uuid&gt;，但 dispatchSubmit 仍只把 null 作用域当作会话前状态，于是把这个新键当 composerScope 传下去，session.create 之后 sessionContextDrift 的输入框分支比较 __new__:&lt;uuid&gt; 与新存储 id 不等，中止了发送，网关留下一个空会话、prompt.submit 从没发出。修复——dispatchSubmit 里把新草稿作用域映射为 null（提交作用域和恢复比较都是），draftKey(null) 解析到当前活动的新桶，暂存与清除仍指向同一草稿。效果——新对话的第一条消息能正常发送。</p>
+<p>终端挂载在 xterm 宿主晚连接时重新挂载（60e2e33e9b，#118004）：问题——字体等待在 host.isConnected 为 false 的 await 边界返回 null，挂载处理器静默返回，以致在宿主连接之前渲染的面板永远空白——不打开终端、不生成 PTY、没有日志也没有重试。修复——轮询帧直到宿主连接，然后重试一次等待+挂载，销毁时取消监听；agent 镜像终端同样处理。效果——终端不再永久空白。</p>
+<p>仅附件无文本时的输入框溢出（198c89be56，#92664）：问题——只有附件、没有正文时，AttachmentList 会把弹性输入框撑开导致溢出。修复——约束附件行的伸展。效果——纯附件状态下输入框不再溢出。</p>
+<p>发布构建：</p>
+<p>--branding stable 让渠道构建用正式身份（13dbe260aa）：问题——预览渠道总会铸造自己的并排身份（Hermes NAME、ai.hermes.channel.h&lt;token&gt;），而普通 --build-commit 构建带的是 Hermes Agent &lt;sha7&gt; 和红色图标，没有办法用官方名称、图标和包 ID 发布某个确切 commit。修复——--branding stable 配合 --channel 时，渠道创建改为从已发布的 stable 渠道记录复制身份，而不是预留新 token；品牌一旦创建就固定，用另一个 branding 重新派发会被拒绝；stable 未发布或在一次性命名空间里也会拒绝；--branding 不带 --channel 直接拒绝而不是静默回退成 sha 品牌的一次性构建；工作流新增 branding 输入并转发到分配步骤。效果——可以用正式名称和图标发布任意 commit 的渠道构建。</p>
+<p>stable 渠道记录缺失时的回退（09681e7959，#129541）：问题——--branding stable 会从 R2 上已发布的 stable 渠道记录复制身份，而生产上还没有 releases/channels/stable.json（渠道流水线在上次 stable 发布 v2026.9.24 之后才合入，此后没有 stable 通过它发布），于是每次 stable 品牌构建都在分配阶段失败（报「none is published」），包括第一次真实派发。修复——stable 记录不存在时改用 product_identity()，即 channel_publish 一直用来承载每次 stable 发布的身份；有记录但没有 head 仍然拒绝，第一个 stable 发布之后它的记录重新成为唯一权威，这条回退路径会自动停止运行。效果——stable 品牌渠道构建现在可以正常派发。</p>
+<p>会话创建对旧运行时的兼容重试：</p>
+<p>cwd_explicit 参数导致旧版拒绝时的重试（dd3bc8f485、3da8b24bab、6ef1a8c953）：问题——已发布的 v0.21.3（v2026.9.14）在准入时就校验参数（4000），但这条拒绝消息是裸的「invalid params for session.create: cwd_explicit: Extra inputs are not permitted」，没有「out of sync (different versions)」后缀（那个后缀是 v0.21.4 才加的），于是桌面端无法识别这是版本不一致；且已发布标签 v0.21.3~v0.21.5 都不声明 cwd_explicit，三个版本都会拒绝来自 main 的桌面端。修复——改为匹配稳定的 `session.create: cwd_explicit:` 前缀，保留「标志确实发送过」的守卫，覆盖两种措辞、两种传输和一个其他字段的不同步拒绝；只对真正的准入拒绝重试一次（此前任何提到该字段的错误文本都会触发重发，甚至标志没发过也重发），辅助函数从 3200 行的 hook 移到同主题的 session-create-request.ts，并补两个不变量测试。效果——桌面端与 v0.21.3 及以上旧运行时建会话时能自动降级重试，不再直接失败。</p>
+<p>更新与自愈：</p>
+<p>更新窗口期间被降级的 cron 任务 prompt 恢复（55f616694c，#82990）：问题——更新变更窗口里的某个写入者把每个 agent 任务 prompt 换成了任务自己的名字，而任务数量不变，于是基于计数的 restore_cron_jobs_if_emptied 安全检查没有察觉这次丢失，用户的定时任务提示词被清空。修复——增加字段级安全网（对应已有的配置模型设置安全网）：只恢复 id 能匹配到快照任务、且当前 prompt 为空或塌缩成任务名的存活 agent 任务的 prompt 字段，用户合法编辑过的、只是内容不同的 prompt 永远不会被覆盖；接进当前 profile 与每个同级 profile 的迁移后恢复序列。效果——更新不再吃掉定时任务的提示词。</p>
+<p>更新标记崩溃后自愈（0ca79e3602、0590ab25fe，#77259、#120635、#125932）：问题——更新器崩溃时 Drop 没跑，会留下过期标记，之前对过期字节只是「忽略」而不是清除，于是后来每次获取锁都被拒，直到 20 分钟上限；另外 kill(pid,0) 对僵尸进程返回存活，让已死但未回收的更新器看起来还活着。修复——Rust 侧 live_marker_owner 读取时直接移除过期标记（pid 已死、超过上限、无法解析），并给 pid_is_alive 增加 pid-0 与僵尸处理（Linux /proc 状态、macOS ps stat）；Python 的 _pid_is_running 通过新的 _process_state 探针获得同样的僵尸感知（read_live_update 经 update_lock._pid_alive 继承），CLI 门从 20 分钟缩短到数秒自愈；Electron 的 readLiveUpdateMarker 接入新的可注入 posixProcessState 探针，桌面端启动门不再卡在僵尸持有的标记上。效果——更新崩溃后不会长时间锁死后续更新。</p>
+<p>技能目录：</p>
+<p>社区同名技能不再被误标为已安装（9e63cdc4b8）：问题——技能按名称安装，已安装标记会匹配任何同名条目；该身份只对一方命名空间成立，社区源里有重名的独立技能（docx、xlsx、pdf），每个仿名条目都显示已安装勾选和 ON/禁用开关，还能通过「已安装」筛选。修复——这类条目既不是已安装技能也不能并排安装，浏览器直接丢弃，官方条目保留原有名称匹配。效果——技能目录里不再出现冒充已安装的社区重名条目。</p>
+<p>其他：</p>
+<p>Linux 启动静默退出修复（1177cfef4c，#78101）：问题——main.ts 在 requestSingleInstanceLock() 返回否的瞬间就 app.exit(0)，没有过期锁处理也没有日志；Linux/X11 上僵尸/僵死 Electron 进程会留下 SingletonLock 符号链接，其 PID 仍能通过 kill(pid,0)，Chromium 的存活探测认为它活着，于是之后每次启动都静默无反应。修复——新增 removeStaleSingletonLock()（平台/主机名/进程状态可注入），读取符号链接、解析 &lt;hostname&gt;-&lt;pid&gt;，只在 /proc/&lt;pid&gt;/stat 显示 Z 状态或已消失时删除，看起来还活着的持有者或共享 home 上其他机器的锁都不动；启动路径清除后重试一次拿锁，退出前始终写日志。效果——Linux 上被僵尸锁卡住的启动可以自愈，且丢失锁的原因可诊断（该路径的真实符号链接/proc 行为仅 Linux 适用，发布前需在 Linux X11 上验证）。</p>
+<p>被拒 provider 的 key 可从「Update API key」直接打开（77b727551b）：问题——provider 被拒时提示用户更新 key，但没有入口。修复——从「Update API key」直接打开该 provider 的 key 页面。效果——凭证被拒时能一步跳到修改页。</p>
+<p>无 provider 的会话路由到设置页（961c79220a）：问题——会话没有可用 provider 时只弹一个死胡同提示。修复——改为路由到设置流程。效果——用户能顺着流程把 provider 配好。</p>
+<p>记住的本地工作目录按 profile 隔离（5d4d8aa6d3）：问题——记住的本地工作区 cwd 在不同 profile 之间混用。修复——按 profile 限定作用域。效果——切换 profile 不会带错工作目录。</p>
+<p>仅重定向运行时也保留首条发送（2f1d308850）：问题——只重定向了活动运行时的情况下，首条发送会被丢掉。修复——这种情况下保留第一次发送。效果——切换运行时不丢消息。</p>
+<p>MEDIA 标签尾部标点与退化路径（7327624d35）：问题——裸 MEDIA 标签捕获会带上尾部标点，退化路径也被接受。修复——裁剪尾部标点并拒绝退化路径。效果——MEDIA 标签解析更稳。</p>
+<p>补充说明：</p>
+<p>本期无 Revert 类 commit（被恢复的功能）；无国内平台相关变更。</p>
+<p>计数口径：subject 以 feat(/fix(/perf( 或 feat:/fix:/perf␣ 开头（大小写不敏感，排除 Revert 字样），与历史各期一致。总 244 条中 test 32、refactor 9、chore 7、ci 5、fmt 4、style 4、docs 2，其余为各 scope 的修复。</p>
+    </section>
+    
     <section id="2026-09-30" class="day">
       <h2>Hermes 日报 2026-09-30：GPT-6.1 Sol 发布当天收录、桌面端 76 项修复、会话消息获得终身编号</h2>
       <p><strong>本期覆盖北京时间 9 月 29 日 06:30 ~ 9 月 30 日 06:30 进入 main 的提交（tip 增量采集；个别提交自带的提交日期早于窗口，系窗口内经合并进入），共 266 个 commit（不含 merge），另有 18 个合并提交。新增 9 个功能、173 个修复、4 个性能优化；修复按 scope：桌面端 76、会话 11、更新链 11、CLI 8、Relay 7、检查点 7、tui_gateway 6 + tui-gateway 3 等。本期无国内平台相关变更，无 Revert 类提交。</strong></p>
