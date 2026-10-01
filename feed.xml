@@ -5,8 +5,112 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 01 Oct 2026 07:16:53 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 02 Oct 2026 06:51:07 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-02：桌面端模型菜单支持星标收藏，更新与构建提速</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-02</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-02</guid>
+      <pubDate>Fri, 02 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 10 月 1 日 ~ 10 月 2 日合入 main 的提交，共 649 个 commit（不含 merge），另有 3 个 merge。新增 15 个功能、380 个修复、6 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端模型菜单支持星标收藏，收藏的模型单独排在最上面一块</p>
+<p>桌面端一批体验修复：X / Instagram 嵌入改跑沙箱 iframe、宽内容不再横向滚动、被停止的回复有标记、失败卡片重启后还在</p>
+<p>代码审查面板补上 diff 范围选择器，未提交改动 / 分支 / 上一回合可切换</p>
+<p>更新与构建提速：输入没变的前端跳过重编译，渲染包重复校验去掉，一次构建少跑约 960 个进程</p>
+<p>插件目录新增「禁止覆盖核心」准入检查，落盘密钥权限收紧，遥测选择铺到所有入口</p>
+<p>重点条目：</p>
+<p>桌面端 · 模型菜单可以收藏</p>
+<p>a413ffd96e feat(desktop): star models into a Favorites section of the picker</p>
+<p>641af6dfc5 feat(desktop): shift-click a model to pin it to the top of the picker</p>
+<p>cc2306e336 feat(desktop): pin models to the top of the model menu</p>
+<p>问题：模型下拉菜单按提供方分组、组内按字母排序，天天用的那个模型落在哪完全看提供方名字排到哪，认证了十来个提供方之后，一天要翻好几次同一行。修复：每行前面加了一颗星，点一下即收藏或取消收藏，既不选中模型也不关菜单；收藏的模型单独在上方形成一块，没收藏时这块不出现。三个手势等效：点星标、Shift+点击整行、在搜索框里按 Shift+回车；键盘高亮按行 key 保持，收藏后行移动到新位置高亮跟着走。效果：常用的模型固定在最上面，收藏存成渲染层本地偏好，输入框旁的模型 pill、会话卡片、看板里的模型覆盖读的都是同一份；搜索时收藏块和其它行一样参与过滤，不会一直钉在顶上。这三个 commit 是同一功能的连续打磨，最终词汇统一成 Favorites，代码里 store/favorite-models.ts 存在、pinned-models.ts 已删除。</p>
+<p>桌面端 · 社交嵌入改跑沙箱 iframe（安全）</p>
+<p>e1bc6064f9 fix(desktop): render X and Instagram embeds in isolated iframes</p>
+<p>f9f132915f fix(desktop): remount social embeds per descriptor and share the default height</p>
+<p>问题：X（推特）和 Instagram 的嵌入渲染器是把厂商的 widgets.js / embed.js 直接注入应用主文档，而主文档上挂着桌面端的 preload 桥 window.hermesDesktop —— 厂商脚本一旦被投毒或被劫持，就等于拿到了这个桥的完整权限。修复：两种嵌入都改到沙箱化的跨域 iframe 里渲染，高度只接受厂商源和该 iframe 自己发的消息。顺带修了一个复用 bug：社交渲染器把量到的高度放在 state 里，React 复用到另一个帖子时会沿用上一条的高度，现在按帖子 id 做 key，每条帖子都是新的 frame 和高度。效果：嵌入内容再也不能直接摸到桌面端桥；320px 的兜底高度也统一到 embed-size.ts 里的 EMBED_DEFAULT_H。</p>
+<p>桌面端 · 宽内容不再横向滚动</p>
+<p>330d9d6df9 fix(desktop): wrap wide markdown and fences instead of scrolling the transcript</p>
+<p>问题：宽 markdown 内容会强制横向平移 —— 工具输出里的代码围栏、用户气泡、机器人群聊房间都会长出横向滚动条（群聊房间最糟，是裁切而且完全没有滚动入口），超长的纯文本兜底渲染也从不换行。修复：markdown-text 容器加 min-w-0 让 flex 链不再被内容撑开、超长文本兜底软换行；工具正文的代码围栏软换行；用户气泡里的围栏软换行；群聊房间从 overflow-x-auto 改成 pre 软换行；表格保持内容自适应的 auto 布局，单元格按词边界换行。效果：超长不可断的 token 在表格卡片内部滚动（和代码卡片一致），而不是把每一列都挤成一个字母一列。</p>
+<p>桌面端 · 回合状态看得见</p>
+<p>159542e251 fix(desktop): mark replies the user stopped as &quot;Response stopped&quot;</p>
+<p>86ef1afc40 fix(desktop): keep failed-turn error cards after a restart</p>
+<p>b236dca1b6 fix(desktop): keep pre-compression transcript reachable after in-place /compress (#105256)</p>
+<p>问题：用户手动停止的那条回复，事后看不出是「被停止」还是「说完了」；失败的回合重启之后错误卡片消失，找不回原因；就地执行 /compress 之后，压缩前的对话记录翻不回去。修复：停止的回复在会话记录里标成 Response stopped（agent/turn_api_call.py 与桌面端 use-prompt-actions 同步改）；失败回合的错误卡片写进可持久化的存储，重启后仍在（agent/conversation_loop.py 加 hydration 逻辑）；/compress 的斜杠命令在压缩后保留压缩前记录的入口（use-prompt-actions/slash.ts）。效果：停止、失败、压缩这三种「上下文断掉」的情况都还能追溯到原因。</p>
+<p>桌面端 · Windows 文件监听事件风暴</p>
+<p>3ae62879c3 fix(desktop): break win32 fs.watch event storms by falling back to polling</p>
+<p>问题（#118974）：Windows 上 fs.watch 会在短时间内爆出大量事件，把主线程钉死。修复：新增 watch-storm-breaker —— 加了一个带守卫的 watch，同一个目录在时间窗内事件数超阈值时，关掉原始 fs.watch、回退成慢速 stat 轮询，并打印一行告警。效果：事件风暴不再拖死窗口，代价是极端情况下刷新变慢。</p>
+<p>桌面端 · 代码审查面板补上 diff 范围选择器</p>
+<p>b27d9eb7c0 feat(desktop): add review-pane diff scope selector (Uncommitted / Branch / Last turn)</p>
+<p>问题：审查面板的文档一直承诺支持三种 diff 范围，但渲染层把范围硬编码成 uncommitted，导致 Branch 和 Last turn 两个范围虽然 Electron 侧实现和多语言文案都写完了，用户却根本点不到（#84347）。修复：面板头部加了范围选择器，选中的范围贯穿文件列表与 diff 读取；新增 $reviewScope（持久化）和 $reviewTurnBase（按仓库目录记 HEAD）两个 atom；「上一回合」的基准是每个仓库目录在回合开始时记下的 HEAD，由会话状态驱动，所以固定卡片的工作树和后台会话各有自己的基准。效果：三种范围都能用；暂存/取消暂存/回退和提交、建 PR 的按钮只在「未提交改动」范围下出现，另外两个范围是只读。</p>
+<p>性能 · 更新不再无条件重编译所有前端</p>
+<p>d49da55d4c fix(update): skip recompiling the TUI and web UI when their inputs are unchanged</p>
+<p>问题：源码更新路径无条件重建每一个前端，其实每个编译器都写了一份「对同样的输入会不会产出同样的字节」的凭据（启动路径早就信任它）。修复：更新路径也复用这份凭据（参考 #125749 由 @Froraut 提出）。桌面端保持无条件构建 —— 内置的 install stamp 带着 commit，任何移动 HEAD 的更新都会改变桌面端的输入。效果：输入没变的 TUI 和 Web UI 在更新时直接跳过重编译。</p>
+<p>性能 · 桌面端构建校验去重</p>
+<p>0954ad4b9b fix(desktop): verify the renderer bundle once per build, not twice</p>
+<p>94c15c7b70 fix(desktop): syntax-check every renderer chunk in one process</p>
+<p>c7d193a127 fix(desktop): reuse running Node for renderer syntax checks</p>
+<p>问题：npm 在每个 npm run build 之后都会跑 postbuild 钩子，而桌面端编译器（scripts/build/desktop.mjs）在发布 dist/ 之前已经跑过一次 checkDistBuilt —— 于是每一次更新、每一次打包都会把刚校验过的字节再校验一遍，加上逐块语法检查，相当于多跑约 960 个进程（#123216）。修复：去掉这个重复钩子（nix 的 checkPhase 直接调守卫）；逐块语法检查改成在一个进程里查完所有渲染块，并复用已经在跑的 Node。效果：构建/更新时的进程开销大幅下降。</p>
+<p>性能 · 会话列表查询重新走对索引</p>
+<p>a1bb2ceb5b perf(state): session-list subqueries stay on idx_messages_session under stale planner stats (#119403)</p>
+<p>问题：sqlite_stat1 是在 idx_messages_session 存在之前写下的（该索引 08-02 才由 #76877 加入），统计表里没有这个索引的行，计划器就猜它选择性高，把「每会话最近活跃时间」和「预览」两个子查询都路由过去 —— 结果列出每个会话都要读它全部的消息行。#122283 已经用时间范围把最近活跃子查询挪回覆盖索引，但预览子查询还会翻车。修复：两个子查询都用 INDEXED BY 明确钉到 idx_messages_session(session_id, timestamp)。效果：在一份生成的 515 会话 / 12.5 万条消息的 state.db 上，一次桌面端 list_sessions_rich（按最近活跃排序、含置顶、取 40 条），SQLite 页缓存未命中量：老统计 1033 MB → 改动前 521 MB → 现在 5.6 MB。</p>
+<p>性能 · 桌面端图表渲染缓存与延迟</p>
+<p>57d9818616 perf(desktop): cache and defer mermaid renders</p>
+<p>e0d4eeac8f perf(desktop): defer mermaid admission one paint so the source fallback renders first</p>
+<p>问题：默认的 deferUntilIdle 等 requestIdleCallback，在测试环境被 stub 成永不触发的空操作（第一张未缓存图在测试里根本不渲染），真实浏览器里也会把渲染推迟到消息正文首帧之后。修复：缓存 mermaid 渲染结果，并把延迟改成推迟一个动画帧（没有 rAF 时退回定时器），让源码兜底先画一帧，再去导入解析 mermaid 运行时。效果：图表滚动与首屏更顺，未缓存的第一张图也有兜底内容先显示。</p>
+<p>性能 · 凭据回退节流</p>
+<p>105e876586 perf(fallback): stamp the early-reopen throttle before loading the pool</p>
+<p>问题：早开闸节流只在「池被 bench 过」时才打戳，于是处于冷却、池又没被 bench 的会话（退避但没重置、链耗尽的冷却）每一回合都会重新读 auth.json，而原来的 main 在这条路径上是不做 I/O 直接返回的。修复：节流间隔一允许检查就先打戳。效果：这种会话最多每探测间隔重新加载一次池，早点检查也只会复用探测已经缓存的判定。</p>
+<p>插件与技能生态</p>
+<p>aa859fd4c8 feat(plugin-catalog): refuse plugins that override Hermes core or Desktop at runtime</p>
+<p>问题：目录里的插件本应只通过公开接口扩展 Hermes，但一个插件可以在原地替换核心函数、方法或桌面端 UI —— 那会和所有改同一处的插件互相打架，并且任何一次核心发版都会把它炸掉。修复：新增 no core override 准入检查（hermes_cli/plugin_validate_core_override.py），对 __init__.py 与 dashboard/*.py 的 import 闭包做静态污点分析：核心值（Hermes 模块以及 hermes_plugins.*，及其属性链）如果被 import、importlib / sys.modules 查找、getattr、迭代或经由插件 helper 拿到，再被重新绑定（属性赋值/删除、setattr/delattr、写 sys.modules、写核心模块的表、mock.patch、把核心值交给会 setattr 参数的 helper），就拒绝准入；import 闭包之外的测试、benchmark、CI/smoke 脚本不参与判定。桌面端 lint 新增 app DOM reach 规则（在文档级查询应用自己的 data-slot/data-tour/data-sidebar/data-testid 标记，以及对 document.body 挂 childList/subtree MutationObserver）。顺带修了 lint 的注释剥离器不跳过字符串字面量的 bug：一个含 /* 的字符串（例如 glob &#x27;**/*.md&#x27;）会打开一段假注释，把它到下一个 */ 之间的所有行从所有规则里藏掉。在 466 棵固定树上做过 A/B：新检查命中的正好是人工确认过的越权项，零崩溃。</p>
+<p>b9204ea975 feat(plugin-catalog): add woof</p>
+<p>新增社区目录插件 woof（recastsystems/hermes-woof），在你自己的 NVIDIA GPU 上规划、启动、观察和对比 WOOF 天气模拟：用 WOOF 自带规划器定规模、本地或 ssh/WSL GPU 主机上启动、预报跑的过程中把地图推到聊天里、对比物理方案或分辨率、跑多臂研究战役、用雷达和地面观测给结果打分。注意它需要 Linux x86_64 + NVIDIA GPU（其它平台只能做规划）；hermes woof install 会往 ~/woof-env 装 recast-woof 并下载 WOOF 表与可选地理数据（约 1.6 GB），跑的时候以脱离后台任务执行 WOOF CLI、把事件以 user 角色消息推进聊天。</p>
+<p>c13232e90c feat(skills): external mounts get an &#x27;external&#x27; provenance tier (#108032)</p>
+<p>问题：从 skills.external_dirs 挂载的技能本来是外部作者写的，但所有来源面都把它们压平成 &#x27;agent&#x27;：使用报告、看板的集合版孪生、桌面端目录/详情 UI，以及学习路径图 —— 后者会把一个用过的外部挂载渲染成「学到的技能」。修复：tools/skill_usage 的 provenance() 增加 &#x27;external&#x27; 档（同名本地副本仍然优先），web_routers/skills 的 /api/skills 按 hub &gt; bundled &gt; external &gt; agent 分类，learning_graph 把路径落在外部目录的技能标成 source=&#x27;external&#x27;、且永不算学习里程碑，桌面端 SkillInfo.provenance 增加 &#x27;external&#x27;、目录里标注 external、详情面板仍可原地编辑。效果：挂载来的技能不再冒充「自建技能」。注意这是「来源」而非「可变性」——维护者明确否决了对外部挂载做只读强制（PR #17512），因为拒绝只会催生静默的本地副本。</p>
+<p>安全与隐私</p>
+<p>6c3aae398a fix(security): harden at-rest secrets in browser profiles, media caches, and the in-flight journal</p>
+<p>问题：Chromium 调试 profile、媒体缓存、vision/computer-use 缓存目录是用裸 makedirs 创建的，继承 umask（0755），里面的文件落成 0644。在文档化的 HERMES_HOME_MODE=0701 遍历口子下，这些库（Cookies、Login Data、截图、入站媒体）对同机其它本地账号可读。修复：目录按属主专享 0700 创建、模式随 mkdir 一起传入（没有先建后 chmod 的时间窗），并按项目既有的 hermes_cli.config._secure_dir / _secure_file 策略做对账，保留托管/NixOS 组共享的豁免和 HERMES_UID/HERMES_GID 属主；缓存文件用 os.open 写成 0600。另外：删除会话时，残留在 localStorage 里等着自然过期的「进行中回合尾巴」（用户输入 + 工具调用）现在会在两个删除面上都被清掉（侧边栏 removeSession 和设置里的永久删除）。</p>
+<p>00227371f2 fix(agent): redact strict URL userinfo credentials</p>
+<p>严格 URL 里的 userinfo（user:password@host 形式）凭据现在会被脱敏，配合压缩前脱敏的预期一起对齐。</p>
+<p>a0cad39f5d fix(a2a): fail closed on non-loopback bind with empty trusted-peers allowlist (#126756)</p>
+<p>问题：A2A 服务绑在非回环地址、而 trusted-peers 允许列表为空时，会失败开放（谁都能连）。修复：这种情况直接失败关闭；文档补上「非回环绑定必须配置 A2A_TRUSTED_PEERS 的要求」。同时保证在设了允许列表时，无 token 的本地回环对端仍然受信。</p>
+<p>eafbe60bf9 fix(pairing): purge revoked users from live allowlist sets in place</p>
+<p>09c9ed2a61 fix(matrix): apply pairing revocations live</p>
+<p>问题：撤销配对的用户只是从持久化记录里删掉，实时的允许列表集合里还留着，已经跑着的进程仍然认他。修复：撤销时就在原地从活的允许列表集合里剔除该用户，Matrix 的配对撤销也即时生效，不用等重启。</p>
+<p>4152c69636 fix(whatsapp): bind cloud webhooks to configured identity</p>
+<p>e5e2d5508f fix(whatsapp): tighten cloud webhook identity binding and its diagnostics</p>
+<p>问题：WhatsApp 的云端 webhook 没有校验来源身份，任何知道回调地址的一方都能投递。修复：webhook 必须匹配配置好的身份，并把身份不匹配记成可诊断的原因。</p>
+<p>3082d00c82 fix(webhook): transact subscription mutations</p>
+<p>56845fedc5 fix(webhook): stat-gate dynamic route reload without the writer lock</p>
+<p>问题：webhook 订阅的增删改不是事务性的，并发改动可能互相覆盖；动态路由重载每次都要拿写锁。修复：订阅变更走事务；动态路由重载改成先 stat 判断再决定要不要重载，读路径不再抢写锁。</p>
+<p>模型、图片与工具</p>
+<p>5bb6127c5b feat(models): add the gpt-6.1-sol-900k Codex OAuth picker variant</p>
+<p>背景：#128248 注册了 gpt-6.1-sol 但没把它放进 -900k 的选项里，因为 Codex 上 272K 以上没有任何验证。09-29 在 ChatGPT OAuth 路由上做了实测（流式 /responses、服务端回报的 input_tokens、effort low）：gpt-6.1-sol 在 684,566、898,681、918,137 输入 token 下都完整完成、三个探针全部召回，约 931K 及以上被 context_length_exceeded 拒绝，和模型页 922,000 的最大输入一致。而线上目录写的是 272K、上限 872K，依然卡着这个提升。效果：新增 gpt-6.1-sol-900k 这个 Codex OAuth 选择器变体；资格按精确 slug 判定而不是 gpt-6-sol 家族前缀，所以点号 slug 是独立一条验证线、不会合成 -pro 变体，计费按基础模型。</p>
+<p>bf1bc78e63 feat(image_gen): expose the Krea 2 sliders to the agent only when the active backend declares them</p>
+<p>Krea 2 的画质滑杆只在「当前实际使用的后端声明了它们」时才暴露给 agent，而不是一股脑塞给所有后端；配套的 fix 系列把 creative_controls / supports_upscale 能力键写进文档，并让本地 Krea 风格参考图按总大小设上限、内嵌进请求（这样沙箱外也能用磁盘上的文件），读取前先过凭据守卫。</p>
+<p>8e00bfdf06 feat(kanban): add in-process schedule tool</p>
+<p>新增 kanban_schedule 工具：把当前任务停在 scheduled 状态，等待时间或外部事件。它结束当前 run、让任务变成不可派发，直到编排器解除（orchestrator unblock）才恢复 —— 它本身不创建定时器，唤醒标记（如 SCHEDULED_UNTIL=&lt;ISO8601&gt;）写在 reason 里由外部机制处理。</p>
+<p>6489ef982c fix(desktop): route Ctrl+W to the shell over an interactive terminal</p>
+<p>桌面端在交互式终端上按 Ctrl+W 时，按键交给终端 shell，而不是被应用自己吃掉。</p>
+<p>运行时与网关</p>
+<p>823385e5cb fix(agent): keep generated images/videos out of swept media caches (Closes #126445)</p>
+<p>生成的图片和视频不再被媒体缓存的清理扫掉。</p>
+<p>b6aae42c3b fix(agent): cut a runaway repetition loop while it streams, callback or not</p>
+<p>问题：模型陷进重复输出时，以前要等整个流结束才处理（而且有回调路径才处理）。修复：流式过程中一旦超过尾巴窗口就检查一次，直接切断跑飞的重复循环，无论有没有回调。</p>
+<p>804239bc27 fix(gateway): hold /loop wakeups while hermes is paused</p>
+<p>faeb7eecc9 fix(gateway): heartbeats respect hermes pause instead of spamming the paused notice</p>
+<p>问题：hermes 处于暂停（pause）状态时，/loop 的唤醒和心跳照跑，还会反复刷「已暂停」的提示。修复：暂停期间 /loop 唤醒被挂住、恢复后继续；心跳遵守暂停状态，不再刷提示。</p>
+<p>⚠️ 同日回滚说明（本期窗口内的这批改动已被撤销，当前版本不存在）</p>
+<p>本期 commit 列表里会出现一批「审批与澄清面板不再超时」的功能，以及「在打包版里恢复 YouTube 嵌入」，但它们合入后当天就被回滚了，现在都不生效，请不要把它们当成可用能力：</p>
+<p>afc47d6e4f Revert &quot;feat(approval): a turn can hold its approval prompts open until answered&quot;</p>
+<p>8edfe92501 Revert &quot;feat(cli): approval and clarify panels wait until answered&quot;</p>
+<p>2252d4303f Revert &quot;feat(tui,desktop): approval and clarify cards wait until answered&quot;</p>
+<p>eb049af69c Revert &quot;feat(desktop): copy and Bot Mode group turns follow no-deadline prompts&quot;</p>
+<p>03477e9ae2 Revert &quot;fix(desktop): restore YouTube embeds in the packaged app&quot;</p>
+<p>c1c065567f 等 5 条 Revert &quot;fix(desktop): scope preview tabs to the session that opened them&quot; 系列（浏览器预览标签的会话隔离一并回滚）</p>
+<p>验证方式：git grep &quot;set_prompts_wait_for_answer&quot; 与 git grep &quot;rendererBaseUrl&quot; 在 origin/main 上均为空，说明这些能力不在当前代码里。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-01：桌面端 UI 缩放默认改为 90%，聊天文字可独立设置字号</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-01</link>
