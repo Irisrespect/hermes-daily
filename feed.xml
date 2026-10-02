@@ -5,8 +5,131 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 02 Oct 2026 06:51:07 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 03 Oct 2026 06:48:59 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-03：桌面端预览标签按会话隔离，更新不再重复重装桌面端</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-03</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-03</guid>
+      <pubDate>Sat, 03 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖北京时间 10 月 2 日 06:30 ~ 10 月 3 日 06:30 进入 main 的提交，共 220 个 commit（不含 merge），另有 9 个合并提交。新增 13 个功能、128 个修复、1 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端预览标签改为归属打开它的会话，可单独钉住跨会话，删会话自动清理（本期最大一批，约 25 条）</p>
+<p>桌面端新增 Classic Hermes 金/海军蓝主题，设置 → 外观或 /skin classic 可选</p>
+<p>hermes status 默认只打印一屏摘要，新增 --short，--full / --deep 才打印全部小节</p>
+<p>部分克隆安装的 .git 不再无限膨胀（实测 2475 个包、39 GiB），update 时自动折叠</p>
+<p>更新不再每次重装桌面端；Windows 打包版更新检查报 invalid JSON 的根因修好</p>
+<p>重点条目：</p>
+<p>桌面端 · 预览标签改成按会话隔离（约 25 条，重做 + 回归修复）</p>
+<p>03855f9594 fix(desktop): scope preview tabs to the session that opened them</p>
+<p>1cd91c69c5 fix(desktop): keep session-scoped preview tabs owned, restorable and rotation-safe</p>
+<p>4fc8c909cb fix(desktop): keep a draft&#x27;s preview tabs in the draft until its first send</p>
+<p>db91e4d993 fix(desktop): deleting a session prunes its preview tabs in every profile bucket</p>
+<p>d481030dff fix(desktop): agent preview tools see only their own profile&#x27;s pins and runtime&#x27;s tabs</p>
+<p>bc636d37a3 fix(desktop): scope every agent preview tool to the requesting session</p>
+<p>8e737698bc fix(desktop): keep the agent&#x27;s read_preview / drive_preview inside the session&#x27;s tabs</p>
+<p>8bb014d6a9 fix(desktop): resolve preview tab owners through compression rotation; one write per agent close</p>
+<p>bdba2705f4 fix(desktop): hand a pre-stored-id agent preview to the runtime that opened it</p>
+<p>8685505b0b fix(desktop): third-review follow-ups for per-session preview tabs</p>
+<p>c40d5be063 fix(desktop): harden preview session-scoping reuse paths</p>
+<p>f3747bc1e7 fix(desktop): preview tab menu reads the live pin state so Pin toggles back to Unpin</p>
+<p>30b27de069 fix(desktop): keep a hidden session&#x27;s live Browser mounted across session switches</p>
+<p>c2b049241d fix(desktop): a fresh draft&#x27;s drawer no longer shows another runtime&#x27;s pending tab</p>
+<p>问题：预览标签（打开的文件、URL、artifact）是窗口全局的——在一个会话里打开的文件，会一直显示在其它每个会话的输入框上方；同一文件从 file:// 和普通路径两个入口进来，还会各占一行。修复：标签改为归属打开它的会话（打开时记下 sessionId），抽屉只渲染当前会话的标签加上一组显式钉住的标签；钉住的标签故意在所有会话可见，每个预览标签的条带上有钉住开关。文件标签的 id 做了规范化（去掉 file:// 前缀），同一文件在不同入口间自动去重；删会话会连带删掉它的标签（钉住的不删）；旧的无归属标签在加载时迁移为钉住。这是 #73890 的设计重做：该改动一度因回归被撤（#130852），1cd91c69c5 保留隔离同时逐条修掉回归——条带上的「+」浏览器打上当前焦点会话的戳，不会被下一个切换的会话认领；openPreview 带 owner 参数（默认焦点会话）；agent 的 preview.open/preview.close 把事件的 runtime id 映射到存储 id，所以侧边小卡里的 agent 预览落在、也只关掉那张卡自己抽屉里的标签；复用在「owner 能看见的标签（自己的 + 钉住的）」之间决定，会话 B 打开的 URL 不会改导航会话 A 的浏览器。效果：一个会话里打开的文件不再飘到所有会话；本期这一组共 14 条，加上隐藏会话浏览器与删除清理（下一条），桌面端相关修复合计 36 条。</p>
+<p>桌面端 · 新主题：Classic Hermes 金/海军蓝</p>
+<p>77f54c5c35 feat(desktop): offer Classic Hermes gold/navy as an explicit theme pick (#76579)</p>
+<p>9b6e759751 fix(desktop): one Classic Hermes card after the reverted build, and a light Classic</p>
+<p>问题：桌面端没有官方的经典皮肤。修复：把 CLI 的经典金字配海军蓝皮肤做成桌面端内置主题，id 为 classic，在设置 → 外观里可选，也能用 /skin classic（或 gold、hermes）切换；它是从 CLI 的 default 皮肤颜色经 skinToDesktopTheme 同一路径转出来的。故意不注册在 default 名下：默认配置就是 display.skin: default，后端同步和启动兜底都会采用这个值，所以把 default 重新启用（即被撤的 #130015）会把所有从没选过主题的用户一起刷成经典金色并缓存下来。default 保持退役、别名指向 Nous，只有主动选中才画 Classic；桌面端也不把选择写回 display.skin，跟其它桌面主题一样只存在本地。9b6e759751 收尾：跑过被撤版本的桌面端会把 CLI 的 default 皮肤以「Classic Hermes」的名字缓存在本地，于是出现两张 Classic 卡（旧的一张预览金色、应用却是 Nous），/skin 列表里也有两行；现在 readCached 同时丢弃全部退役名字（default、gold、nous-light，收进 presets.ts 的 RETIRED_SKINS 供 store 和主题提供方共用）并写回清理后的映射，首次启动即从磁盘上消失；顺带修了 Classic 在浅色模式下不生效的问题。</p>
+<p>CLI · hermes status 默认打印一屏摘要，新增 --short / --full / --deep</p>
+<p>a3149156ec feat(cli): make the summary the default `hermes status`, --full for every section</p>
+<p>c82ad613ec feat(cli): add hermes status --short</p>
+<p>问题：hermes status 过去默认打印全部小节，一屏放不下；而且「消息平台」一节用 check_fn 这个被动的「SDK 可导入」探针判断，对所有内置插件都返回真，全新安装会把 Discord、Slack、Matrix、Teams、WhatsApp 等十来个平台都列成「已配置」，其实一个凭据都没有。修复：hermes status 默认只打印一屏摘要（模型、提供方、已连接提供方、网关、平台、定时任务），--full（别名 --all，行为一直是全量所以没变）和 --deep 才打印全部小节；Hermes Console 因为不接受参数，仍打印完整报告。摘要读的是规范数据源而不是重新推导：提供方来自 list_authenticated_providers（就是 /model 选择器给的那份列表，只用缓存目录、不做自定义端点探测），平台来自 GatewayConfig.get_connected_platforms（网关自己对要启动哪些适配器的判断，也会拒绝占位 token）。完整报告里的平台一节现在用同一个判定，不再列出没有凭据的平台。另加 c82ad613ec 的 --short：更精简、不含密钥的状态摘要，提供方列表由注册表驱动，新增提供方和端点在无需改渲染器的情况下自动出现。效果：一条 hermes status 就是一眼能读完的状态；要细节时 --full / --deep。</p>
+<p>更新与安装 · 部分克隆的 .git 不再无限膨胀</p>
+<p>add654131f fix(update): fold lazy-fetch packfiles so a partial clone&#x27;s .git stops growing</p>
+<p>6880ffc1af fix(update): make the partial-clone pack fold and maintenance keys work together (#129712, #127711)</p>
+<p>35eacd248a fix(update): keep git&#x27;s own lazy-fetch pack fold on in a partial clone</p>
+<p>4e3fcd5cd7 fix(update): give the lazy-fetch pack fold room to finish and say when it runs out</p>
+<p>a28aaa1edf fix(update): migrate the first cut&#x27;s gc.auto=0 too, by both cuts&#x27; fingerprint</p>
+<p>ddebc788f2 fix(update): only migrate the maintenance.auto=false Hermes itself wrote</p>
+<p>73c17151f6 fix(install): disable auto maintenance in tree:0 clones (#127711)</p>
+<p>问题：tree:0 安装检出的 promisor 远程上，每一次按需 fetch 都会写下自己的小 packfile，没有任何更新路径会合并它们，于是 .git 无上限增长——实测一个约 1 GiB 的仓库出现 2475 个包、39 GiB（#129712）。修复：在 update 已有的 debris-cleanup 步骤里跑 git gc --auto，借用 git 自己的阈值——包数低于 gc.autoPackLimit（默认 50）时毫秒级退出，超过就把按需 fetch 的包折叠成一个；折叠后的包重新标回 .promisor 让 git 2.53+ 的 fetch 继续可用，且这次 gc 不写 commit-graph。几个后续 commit 把维护键的矛盾理清：之前的 #127711 持久化了维护键来掐掉一个 commit-graph 的按需 fetch 循环，但其中 gc.auto=0 会让 gc --auto 变成空操作（106 个包还是 106 个），而 #127721 的指纹只匹配 10 月 2 日那批、9 月 29 日那批会漏掉，所以 ddebc788f2 只迁移 Hermes 自己写的那个键、a28aaa1edf 把两批的 gc.auto=0 都按指纹迁移掉。4e3fcd5cd7 把折叠的超时上限从 120 秒提到 20 分钟（实测 750 个包 / 530 MB 的历史在 7.4 核上 5.8 秒折完，但 39 GiB 的包目录在慢盘上完全是另一个量级），超时会返回 None 并如实告知，不再无声地从零重跑。效果：这类安装的 .git 不再随每次更新膨胀，之前涨到几十 GiB 的检出能在一次 update 里收敛。</p>
+<p>更新 · HEAD 没动就复用已打包的桌面端；Windows 更新检查器修复</p>
+<p>9f19f99166 fix(update): reuse the packaged desktop app when HEAD has not moved</p>
+<p>2bf86dd20c fix(desktop): run the Windows update checkers from bundled core code</p>
+<p>00302e636c fix(update): a same-commit update that failed still owes its tail on launch</p>
+<p>38254027bf fix(update): an adoption stamp never discharges an owed completion tail</p>
+<p>6770bc9578 fix(update): skip source-update completion when the stamp names HEAD</p>
+<p>问题：更新完成时一律重建、重打包、重装桌面端（连「Already up to date」、重试的收尾、接管重入都算），还可能为了腾出输出位置而停掉正在运行的应用。修复：当已打包应用内嵌的 install-stamp.json 指的提交就是当前 HEAD、且新鲜度凭据是当前的，就直接复用它；只看新鲜度不够——内嵌的 stamp 只有构建会改写，所以一次没有触碰其它桌面端输入的 pull 之后，凭据显示「当前」但应用其实还指着上一个提交。另外三个收尾修复让「欠的完成尾巴」不被 stamp 误销：未变更提交上的 hermes update 会先重新武装完成标记再跑尾巴，尾巴失败或被杀时旧 stamp 仍然指着 HEAD，下次启动会静默清掉标记而不是重试；现在只有早于 stamp 的标记才算已处理，adoption stamp 也不再误销尾巴。2bf86dd20c 修 Windows 打包版每次更新检查都报「Microsoft Store returned invalid JSON」：Store 检查器、App Installer 检查器和重启等待器原本在被排除的 payload 快照路径下解析（快照长期排除 apps/ 和 scripts/），已安装的包根本没有 apps/ 目录，payload 的 python 打不开脚本就退出 2、stdout 为空，解析器就把空输出报成 invalid JSON；现在这两个检查器跟着核心代码一起走。效果：HEAD 没动的一次更新不再白跑一遍桌面端重建，也不会为此停掉应用；Windows 版的更新检查不再恒定报错。</p>
+<p>卸载 · --dry-run 不卡 TTY、遗留安装记录被识别、workspace 的 node_modules 保留</p>
+<p>2eadea653a fix(cli): let uninstall dry-runs run without a TTY and list the install record</p>
+<p>049028e0f1 fix(cli): honor --dry-run in uninstall --gui</p>
+<p>80efaa56ee fix(gui): detect leftover desktop install records</p>
+<p>f9fec19d96 fix(gui): keep shared workspace node_modules on uninstall --gui</p>
+<p>问题：三个独立问题。其一，dry run 从不询问，但 `hermes uninstall --dry-run` 仍走交互终端门禁，stdin 不是 TTY 时直接被拒；GUI 卸载计划也漏掉了 desktop-installed-apps.json，预览和实际删除的东西对不上。其二，在 macOS 上 `hermes update` 和 `hermes desktop` 会把 desktop-installed-apps.json 里列出、但已经不见了的 Hermes.app 重装回来，而这正是 GUI 卸载负责删除的记录；gui_is_installed() 不看这个记录，于是手动删掉应用之后 `hermes uninstall --gui` 报告「没装 GUI」直接返回、记录没删，下一次更新又把应用装回来。其三，`hermes uninstall --gui` 以「workspace 根只有 Electron」为由删掉 hermes-agent/node_modules，但根 package.json 是 npm workspace（吃 apps/*、ui-tui、ui-tui/packages/*、web、tests-js），根 node_modules 里放着 TUI 和仪表盘的提升依赖，Electron 自己解析的是 apps/desktop/node_modules（那个仍然删）。修复：--dry-run 从终端门禁豁免（与 --gui、--data 一致）、预览列出 desktop-installed-apps.json、--dry-run 在 --gui 路径下也生效；gui_is_installed() 计入安装记录；workspace 根不再被当成 GUI 产物，改为列在「保留」下。效果：无 TTY 的脚本里 dry-run 能跑；手动删过应用的用户能用卸载真正清掉记录，不再被下次更新装回来；卸载 GUI 不会顺手删掉 TUI 和仪表盘的依赖。</p>
+<p>桌面端 · 消息悬停显示发送时间、模型菜单名称完整、YouTube 嵌入修好、模型切换状态</p>
+<p>b3059921bc feat(desktop): show when a message was sent on hover</p>
+<p>69fdbb7cdc fix(desktop): model picker keeps names whole; provider labels its favorites once</p>
+<p>7817bf522a fix(desktop): play YouTube embeds through a loopback player host</p>
+<p>fd1a93d319 fix(desktop): a failed primary model switch restores the wire stamp</p>
+<p>cf4d943e4b fix(desktop): a tile model switch withdraws the old route&#x27;s wire stamp</p>
+<p>0f85d2367a fix(desktop): re-stamp the effort wire level after a new pick</p>
+<p>33bb9f5b3a fix(desktop): stop a stale reasoning wire level from labelling the composer</p>
+<p>c24c8c2731 fix(desktop): merge folded replies by stored source identity</p>
+<p>40a2637fae fix(desktop): scope pane fallback menus to the clicked content</p>
+<p>f3f6a4d068 fix(desktop): prioritize edit targets in pane context menus</p>
+<p>feat：悬停一条消息会连悬停操作一起显示它的时间——当天显示「3:27 PM」，前一天显示「Yesterday, 3:27 PM」，更早显示「Sep 28, 3:27 PM」；同一批的后续把当天消息补上相对时间与完整日期。用户气泡显示在 Restore/Stop 旁边，回复显示在操作栏开头。当 display.timestamps 打开时它自动隐身，因为转录本来就已经打印每个时间戳（#118405）。</p>
+<p>修复：模型选择器的 Favorites 区之前每行都挂一个提供方 chip，加上变体、fast、effort 三个 chip，而只有名字允许收缩，于是名字被挤成一个字母（#130349）；现在混提供方的 Favorites 区在每个提供方的行组上方只标一次名字，变体标签仍是名字后的实心 chip，fast 和 effort 改成它旁边编辑用脱字符的描边 chip，继承来的 effort 不再每行都盖。</p>
+<p>修复：YouTube 嵌入只在页面的 http(s) origin 与播放器 origin 参数匹配时才工作，否则报 153；打包版渲染器是 file://，Electron 又会丢掉带戳的 Referer 头。现在主进程里惰性起一个 127.0.0.1 的宿主，每个视频服务一个包装页，file:// 渲染器的 YouTube iframe 指向它；渲染器本身仍在 file://，所以设置和后端连接都不动，开发/网页渲染器本来就是 http origin，继续直接嵌入。</p>
+<p>修复：模型切换的四个状态问题——主模型切换失败回滚时，pill 上的 clamp 箭头会消失到下一条 session.info 才回来（现在回滚时把捕获的 stamp 还回去，跟分栏路径一致）；分栏换模型时会撤回旧路由的 wire stamp；换档后重新盖 effort 的 wire 档位；过期的 reasoning wire 档位不再标在输入框上。</p>
+<p>其他：折叠回复按存储的源身份合并；面板右键菜单的兜底项限定在被点击的内容上，并恢复文本、可编辑、链接、图片菜单。</p>
+<p>桌面端 · 隐藏会话的浏览器静音隔离 + 删除会话清理子代理/待办</p>
+<p>263fe5ccbd fix(desktop): mute a hidden session&#x27;s kept Browser and restore its sound on return</p>
+<p>4097709b0c fix(desktop): report and mute a Browser guest that attaches after its session is hidden</p>
+<p>3cb409bed8 fix(desktop): mouse back/forward and reload never act on a hidden session&#x27;s Browser</p>
+<p>87a128a656 fix(desktop): keep popped Browser tabs out of docked closes after the session-scope rebase</p>
+<p>6d09e7aff7 fix(desktop): clear subagent and todo state when a session is deleted</p>
+<p>5edd4ddf38 fix(desktop): clear subagents/todos under the mapped runtime id on delete</p>
+<p>29757dab7b fix(desktop): clear goals and background status with a deleted session&#x27;s subagents and todos</p>
+<p>问题：隐藏（切到后台）的会话会保留它的 Browser，音频却还在放；会话隐藏之后才挂上来的 Browser guest 不受管控；鼠标侧键的前进/后退和刷新会作用到隐藏会话的 Browser 上。另外 removeSession 虽然会给存储和运行时的会话 id 调 clearQueuedPrompts，但按会话分的两个 store（$subagentsBySession、$todosBySession）从来没在删除时清理，而后续回合也不会清（被删的会话没有下一个回合），于是残留条目会一直堆到渲染进程结束。修复：隐藏会话保留的 Browser 静音、切回来时恢复声音；隐藏之后才挂上来的 guest 会被上报并静音；隐藏会话的 Browser 不再响应鼠标前进/后退与刷新；会话范围重构后弹出的浏览器标签不再被停靠关闭误伤；删除会话时按 clearQueuedPrompts 的既有做法把子代理、待办、目标、后台状态一并清掉，并按映射后的运行时 id 清理。效果：后台会话不再出声也不会被误操作，删会话后不残留占位。</p>
+<p>平台/插件目录 · 新增 go-whatsapp 与 0bull 社区插件</p>
+<p>36922ad064 feat(plugin-catalog): add go-whatsapp</p>
+<p>7d67d552c4 feat(plugin-catalog): add 0bull community plugin</p>
+<p>插件目录新增两条可安装条目：go-whatsapp（WhatsApp 平台插件）和 0bull 社区插件。（插件目录里的条目需要用户在能力目录里自行安装，不是随核心默认装好。）</p>
+<p>密钥 · TUI 与仪表盘可以保存浏览器登录、输入 2FA 码</p>
+<p>5c975b9ed8 fix(tui): answer the vault save-login and verification-code prompts</p>
+<p>a8d7bc3ea1 fix(tui): render the vault.save_login prompt so browser logins can be saved</p>
+<p>问题：TUI（以及内嵌它的仪表盘）对 vault.save_login 和 vault.code 一律回 -32601，所以浏览器登录在 TUI 里永远存不下来，也没法输 2FA 码。修复：两张卡跟解锁提示一起放在共享的 maskedPrompt.tsx（标识和验证码按输入显示，密码遮罩），文案全部本地化；一个 SENSITIVE_PROMPTS 列表统一驱动 Esc/Ctrl+C 拒绝、request.cancel 清理、标签页标题标记和宠物状态，新加一个凭据提示不会漏掉其中某一处（此前在保存登录卡上按 Esc 什么也不做）。效果：TUI 和仪表盘里走浏览器登录时能正常保存凭据、能输入验证码。</p>
+<p>Cron · 主机睡眠不再算任务空闲；发送不再被 60 秒等待误杀</p>
+<p>2f267112ce fix(cron): stop counting host sleep as job inactivity</p>
+<p>c6293dcd57 fix(cron): preserve suspend credit across idle sampling</p>
+<p>266f11c5c5 fix(cron): establish suspend baseline before worker startup</p>
+<p>e7b68e4a4a fix(cron): a live send that outlasts the 60s wait keeps running instead of being killed</p>
+<p>be5e9f72c6 fix(cron): a partly delivered split send is not re-sent by the standalone fallback</p>
+<p>问题：cron 的空闲看门狗用墙钟计时，笔记本合盖睡眠的时间被算成任务空闲，一个真正在干活的 cron 任务可能因为机器睡了一觉而被判超时杀掉。修复：新增 AwakeIdleMeter，每次看门狗检查同时读墙钟和 time.monotonic()，后者在 macOS（mach_absolute_time）和 Linux（CLOCK_MONOTONIC）睡眠期间会暂停，两个时钟的差值就是睡着的时间，这段睡眠不计入空闲，直到 agent 记录到新的活动；cron 空闲看门狗和回合存活看门狗都用它，真正清醒着空闲 600 秒的任务仍会被杀（#131523）。另外两条：266f11c5c5 在 worker 启动前先建立挂起基线；e7b68e4a4a 修发送被误杀的 bug——_live_send_text 用 future.cancel() 区分「从没启动的发送」（死锁的循环，回退到独立通道）和「正在发送」（视为已送达，重发会重复），但 run_coroutine_threadsafe 的 future 要等协程结束才离开 PENDING，于是中途 cancel() 返回 True，正在发送的消息被拦腰取消，独立通道又把整份载荷重发一遍；限速的多段发送（企业微信每分钟 30 条那种）经常超过 60 秒，一个 55 段的 cron 载荷因此只到了 25 段却被报失败。现在超过 60 秒等待的发送继续跑完；be5e9f72c6 让「已部分送达的分段发送」不被独立兜底再发一次。</p>
+<p>流式 · Relay 每个分片先交付再取下一条</p>
+<p>c3b4a30eff fix(relay): hand each streamed chunk over before the provider sends the next</p>
+<p>d6a46d8103 fix(relay): keep concurrent provider streams draining</p>
+<p>问题：开启共享指标后，每个提供方流都走 Relay 的托管管线；Relay 在交付当前分片之前就去拉下一条，而提供方的读取阻塞了这条流的私有事件循环，于是每个分片都要等下一条到了才交付。桌面端上的表现是回复看起来停了、计时器却还在走，排队的跟帖在等一个其实仍在运行的回合；一次 steer 会中止用户根本还没看到的文本，用户气泡一条条堆起来中间却没有输出。修复：把读取挪出事件循环（上一个 commit 的改动），修正注释写明真实原因，并把原来那个双循环饥饿测试换成单流契约（在旧代码上会死锁），另加一个核心 e2e 用例，在提供方暂停、Relay 托管执行开启的情况下同时 steer 和排队。d6a46d8103 让并发的提供方流保持排空。效果：分片递到就交付，桌面端不再出现「停了但没停」的假死。</p>
+<p>Agent · 并行工具调用 id 归一化</p>
+<p>54bc5e509c fix(agent): write normalized call_id through transport ToolCall provider_data</p>
+<p>3f3ae12c4a fix(agent): normalize the final staged tool batch by effective id</p>
+<p>5136d31952 fix(agent): keep response-item halves and lone surrogates intact in mint-time id normalization</p>
+<p>e631b6bd82 fix(agent): normalize provider-minted parallel tool ids</p>
+<p>2ce704550b fix(agent): execute local tool batches through per-tool pipeline</p>
+<p>问题：并行工具批次里提供方铸造的 call_id 需要归一化；但 transports.types.ToolCall 的 call_id 是 provider_data 上的只读视图，在 validate_tool_calls 里 setattr 会抛 AttributeError，Responses 传输的批次直接挂掉（#130363）。修复：改写底层的值，让 id 和 call_id 保持一致，两种真实传输都端到端覆盖；最终 staged 的批次按生效 id 归一化；归一化时保住 response item 的两半和孤立代理项不被破坏；本地工具批次走每个工具自己的管线。效果：用 Responses 传输并行调工具不再因 id 报错。</p>
+<p>其他</p>
+<p>386e31a56f fix(desktop): ship exact-size, theme-aware MSIX icons instead of one 44px tile</p>
+<p>c0c029c376 feat(desktop-sdk): model menu row decorations (MODEL_MENU_ROW_AREA)</p>
+<p>b33c32fcf3 feat(desktop-sdk): data-session-switching marker on the chat surface</p>
+<p>98cceaef2b fix(pm): keep restored runtimes usable after locked displaced cleanup (#128955)</p>
+<p>806acb68ec fix(telemetry): move shared metrics flush off turn path</p>
+<p>cf8039af22 fix(telemetry): memory providers that moved to the catalog keep their public label</p>
+<p>b5077dc57b fix(observability): flush worker keeps the turn&#x27;s profile and never misses a trigger</p>
+<p>Windows MSIX 图标：安装包只带了一张 44x44 的 Square44x44Logo.png，HiDPI 的 Windows 11 机器上任务栏和开始菜单的每个槽位都在放大这张 44px 位图，又没有 altform 变体，Windows 就自己给图标加了底板。现在按微软要求的各尺寸（scale-125/150/200/400 与 targetsize-16..256）和三种主题形态（不带限定、altform-lightunplated 亮色、altform-unplated 暗色）分别生成，跟 macOS 深色模式拿到的同一套拆分。</p>
+<p>桌面端 SDK 两条插件贡献点：modelMenu.row 数据贡献让插件给菜单每行提供 icon / badge（以前主题只能 MutationObserver 偷改菜单，现被目录规则第 8 条禁止），ModelFamilyRow 在它自己的两个固定槽位里画出来；data-session-switching 标记让聊天表面在会话切换的两个阶段（routed 会话加载中、线程列表滚动恢复就位时）带上 data-session-switching=&quot;true&quot;，主题用纯 CSS 就能挂，不必再 rAF 轮询焦点 store 和滚动位置。</p>
+<p>PM：锁定导致的位移清理之后，恢复回来的 runtime 仍保持可用（#128955）。</p>
+<p>遥测与可观测性：共享指标 flush 挪出回合路径；迁到目录里的记忆提供方保留对外的公开标签；flush worker 保住回合的 profile 且不漏触发。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-02：桌面端模型菜单支持星标收藏，更新与构建提速</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-02</link>
