@@ -22,9 +22,159 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 67 期 · 26800 个提交 · 每日自动更新 ·
+<p class="meta">共 68 期 · 27664 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-04" class="day">
+      <h2>Hermes 日报 2026-10-04：桌面端精确订阅速度档位，插件新增按 profile 隔离的宿主进程</h2>
+      <p><strong>本期覆盖北京时间 10 月 3 日 06:30 ~ 10 月 4 日 06:30 进入 main 的提交，共 864 个 commit（不含 merge），另有 1 个合并提交。新增 80 个功能、330 个修复、6 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端新增精确订阅速度档位（Standard / Fast / Ultrafast），「保持电脑唤醒」多了「仅在任务运行时」档</p>
+<p>插件系统新增 plugins.isolation: host，第三方插件在按 profile 隔离的宿主进程里运行（默认仍是进程内）</p>
+<p>插件可声明 requires.gpu 门控显卡；插件市场与目录本期更新一大批条目</p>
+<p>同名技能统一优先级，skill_view 不再拒绝加载，斜杠命令只注册唯一名</p>
+<p>消息平台：Telegram 并发更新、邮件认证发件人、Discord 白名单只按账号名、Slack 频道门控、Matrix 字节上限</p>
+<p>压缩与状态存储一大批加固；profile 导出不再打包凭证库；cron 密钥作用域与重试槽位修复</p>
+<p>重点条目：</p>
+<p>桌面端 · 精确订阅速度档位 Standard / Fast / Ultrafast</p>
+<p>3778021382 feat(desktop): exact subscription speed tiers (Standard / Fast / Ultrafast)</p>
+<p>95cb32ab0e fix(desktop): seed the composer with an exact speed tier from config</p>
+<p>bb2a08495f fix(desktop): keep new chats working against a pre-Ultrafast backend</p>
+<p>d8e72728d0 fix(desktop): release settled edit stamps and complete speed labels</p>
+<p>9cf6b73df0 fix(desktop): reconcile speed tiers with current menu and evict settled rollback state</p>
+<p>db68ebd223 fix(models): keep Daybreak and gpt-5.6-cyber on the Priority speed tier</p>
+<p>问题：订阅模型的加速档位在整条链路上被折叠成一个布尔值——目录只报 fast，预设和草稿只存布尔，session.create 只接受 fast，设置里只有一个 Fast 开关，因此选了 Ultrafast 默认会被读成 Fast，新开的聊天还可能把它丢掉。修复：每个模型由同一个路由感知的解析器报出精确的 ultrafast 档位（Daybreak 别名不提供加速，它们的 priority 请求会被忽略）；session.create 接受精确的 service_tier 并优先于旧的 fast 标志，未知档位直接拒绝；桌面端在预设、草稿创建、会话选项和标签里保持精确档位，记不住的不支持档位回落到 Standard，编辑失败会与已确认状态对齐；设置 → 模型 → 主模型 对支持 Ultrafast 的模型给出 Standard / Fast / Ultrafast 三选一，其余模型保留 Fast 开关。效果：Ultrafast 不再被降级成 Fast，速度档位在菜单、标签和实际请求之间保持一致。</p>
+<p>桌面端 · 保持唤醒改成三档，新增「仅在任务运行时」</p>
+<p>3acd949217 feat(desktop): keep-awake follows the turn — a &quot;while working&quot; mode alongside off/always</p>
+<p>问题：「保持电脑唤醒」原本是布尔值：要么关，要么只要桌面端开着就一直持有机器级电源阻塞（#101991）。想跑通宵无人值守任务的人必须提前预判手动打开；而打开后笔记本又被钉醒一整周，连任务跑完之后的空闲时段也算上。修复：改成三档——off 从不持有（默认不变）、while-working 只在有任务在飞时持有、空闲即释放、always 等于原来的 on。阻塞器直接接到已有的「有任务在飞」信号上（mergeActiveWork 计数 &gt; 0，和流控用的是同一个表达式），不新增监听器、定时器或 IPC 通道。旧的两份持久化值（渲染端 localStorage 的 hermes.desktop.keepAwake.v1 和主进程 keep-awake.json 的 { on }）读一次后按 true→always、false→off 迁移，无法识别的值回落到 off 而不是信任。效果：无人值守任务不会让机器休眠，任务跑完也不再无谓地钉住笔记本；老用户看到的行为不变。策略是三段纯函数，可脱离主进程测试。</p>
+<p>桌面端 · 退出行为：弹出式浏览器窗口不再拖垮整个应用</p>
+<p>d0c1bd206d fix(desktop): keep the app alive while a Browser pop-out is open</p>
+<p>38413a36a8 fix(desktop): exit on window close and restore window on second instance (#130810)</p>
+<p>67d502a1d4 fix(desktop): run last-surface quit fallback when the last Browser pop-out closes</p>
+<p>bd54e94d97 fix(desktop): clear quitInProgress when a re-entered quit is held</p>
+<p>41ffe047f4 fix(desktop): base last-chat-window quit fallback on quitInProgress state (#130810)</p>
+<p>44533f11e3 fix(desktop): call isFocused on the window instead of destructuring it</p>
+<p>问题：「关闭最后一个聊天窗口就退出」（#130810）在本窗内合入，并留下两个后果。一是弹出式 Browser 窗口（spawnBrowserWindow）是用户可见的，但没登记成聊天窗口，于是 Windows/Linux 上关闭主窗口会走 app.quit()、连带杀掉弹出窗口（此前 window-all-closed 不触发，应用会继续运行）。二是最后一个弹出窗口关闭时又要正确走到退出兜底。修复：把已有的 browserWindows 会话注册表（closed 时自删）与 chatWindows 一并计数，这是最小正确改法——用 registerChatWindow 会把活跃工作关闭守卫也挂到弹出窗口上；用 quitInProgress 状态判断最后一次退出，被拦下的重入退出时清掉标志；顺带修了在窗口上直接调用 isFocused 的写法。效果：开着弹出窗口关主窗口不再杀掉整个应用，最后一个承载窗口关闭时仍能正确退出。</p>
+<p>桌面端 · 机器人身份与连接归属修复</p>
+<p>c55a6e3d9f feat(desktop): identity-attribution traces for multi-connection bot rosters</p>
+<p>7229edf52a fix(desktop): Edit Profile saves only edited fields; stale rows never reconcile</p>
+<p>3326147075 fix(desktop): name each bot from its own backend; saves never publish cached fields</p>
+<p>be3fd671d7 fix(desktop/bots): name a bot by what its own backend reports on every surface</p>
+<p>e67255e7e4 fix(desktop): record the primary connection while a secondary is foregrounded</p>
+<p>90a0b34628 fix(desktop): Bots roster only caches rows from the connection it is keyed under</p>
+<p>问题：多个连接下的机器人列表会串味——「编辑资料」会保存所有字段而不是只保存改动的字段，过期行永远不会被对齐；机器人的名字取自缓存字段而非它自己的后端；次要连接在前台时会记错主连接；机器人列表缓存了不属于自己连接的行。修复：新增身份归属追踪（identity-attribution traces），编辑资料只保存被改动的字段、过期行不再参与对齐，机器人名字一律由它自己的后端在每条界面上给出，列表只缓存它归属的那个连接的行。效果：多连接场景下机器人的名字、连接归属和保存结果都对得上。这一类没有进视频，属于多连接/机器人名单用户可见的修复。</p>
+<p>插件系统 · 按 profile 隔离的插件宿主进程</p>
+<p>5fa55d1678 feat(plugins): run third-party plugins in a per-profile plugin host (plugins.isolation: host)</p>
+<p>ad5c8e336e fix: plugin host review findings (async ctx, caller session, restarts, per-profile dashboard)</p>
+<p>21564d22dd fix(plugins): model-provider plugins load under plugins.isolation: host on Windows</p>
+<p>问题：共享池部署里，一个租户的插件 Python 不能跑在装着另一个租户数据的解释器里；要让插件自己感知租户又不现实。修复：新增 plugins.isolation: host——非内置插件全部在按 profile 按需启动的宿主进程里导入，宿主只带该 profile 的环境，插件拿到的是 RemotePluginContext，Hermes 为工具、钩子、命令、技能和提供方对象注册代理（都是它检查的那些抽象基类的子类）。宿主可重入：插件的处理函数可以在 Hermes 等待它时回调 Hermes。所有用户代码导入路径要么路由到宿主（一般路径、memory/context-engine/cron、模型提供方 profile 走缓存的无凭据提取、仪表盘 API 走 ASGI 桥），要么明确拒绝；有一张表记录哪些东西不能跨进程（存活的网关对象），hermes plugins validate/show 会读它。宿主崩溃会带着它的插件重启（有次数上限）。Windows 上模型提供方插件也能正确加载（21564d22dd）。默认仍是 in_process，不主动开启行为完全不变。</p>
+<p>插件系统 · requires.gpu 按显卡厂商门控插件服务器</p>
+<p>f1c79255fe feat(plugins): requires.gpu gates a plugin server on the host&#x27;s GPU vendor</p>
+<p>问题：可移植插件可能需要特定厂商的显卡，而它又没有一个可检查的安装位置。修复：插件可声明 requires: {gpu: nvidia}；在非 NVIDIA 机器上 Hermes 拒绝安装、隐藏该服务器的工具，市场卡片上写「需要 NVIDIA GPU」。该要求与 app: 独立；读不出的显卡（unknown）放行，避免一次注册表或 sysfs 读取失败把有卡的用户挡在外面；目前只接受 nvidia（gpu_class() 报的是最高优先级厂商，只对 NVIDIA 这个问题有准确答案）。已注册的服务器在这种宿主机上报告新的 unsupported_gpu 状态，贯穿网关契约和插件标签页。第一个使用者是 RTX Remix Toolkit。</p>
+<p>插件市场与目录 · 本期新增/更新一大批条目（feat(plugin-catalog) 65 条 + feat(catalog) 7 条）</p>
+<p>f3065afb51 feat(plugin-catalog): add linkup plugin</p>
+<p>e93f5e2321 feat(plugin-catalog): add Gmail Desktop plugin</p>
+<p>20847d3d18 feat(plugin-catalog): add groq-provider</p>
+<p>7faaff495a feat(plugin-catalog): add cloudflare-workers-ai-provider</p>
+<p>17e4345f3f feat(plugin-catalog): add ntfy-approval</p>
+<p>7b068fe1d0 feat(plugin-catalog): add Jira Browser</p>
+<p>0dc3bed5a3 feat(plugin-catalog): add hermes-cron</p>
+<p>a2920b79f8 feat(plugin-catalog): add jp-corporate</p>
+<p>0f9bccd313 feat(plugin-catalog): add pep-ref</p>
+<p>23f04127bd feat(plugin-catalog): add wiki-ref</p>
+<p>fe25f312fd feat(plugin-catalog): add memtomem (community, memory) @ v0.6.6</p>
+<p>157bf02dcb feat(plugin-catalog): add tam memory provider (total-agent-memory)</p>
+<p>98eca3117b feat(plugin-catalog): add deja-vu memory provider</p>
+<p>cd71fb5576 feat(plugin-catalog): add made-shelf community plugin</p>
+<p>a68bd25a03 feat(plugin-catalog): add snag-shelf community plugin</p>
+<p>38bbb3e991 feat(plugin-catalog): add rfc-ref</p>
+<p>b8a5ce74a7 feat(plugin-catalog): add osv-ref</p>
+<p>d5b2d98993 feat(plugin-catalog): add hermes-anilist plugin</p>
+<p>bc3612cd07 feat(plugin-catalog): add memanto</p>
+<p>41ff7cee35 feat(plugin-catalog): add dexio memory provider</p>
+<p>974dd8fd00 catalog: add hermes-council (LLM Council plugin, v1.0.0)</p>
+<p>1b9cb0f07c catalog: add Hermes Atoll plugin</p>
+<p>677b954106 feat(catalog): add God&#x27;s Eye View desktop integration</p>
+<p>18b490024c feat(catalog): add vidIQ creator workflows</p>
+<p>4202407604 feat(catalog): add SerpApi plugin</p>
+<p>a5ebfefdf8 feat(catalog): add Hermes Agent Builder</p>
+<p>本期新增的工具类插件包括 linkup 搜索、Gmail Desktop、Jira Browser、ntfy-approval 审批；新增的模型提供方包括 groq-provider、cloudflare-workers-ai-provider；日本政府与统计类数据有 jp-estat、jp-egov-law、jp-corporate、jp-charts；开源规范检索一组包括 pep-ref、rfc-ref、osv-ref、wiki-ref；记忆提供方有 memtomem、tam（total-agent-memory）、deja-vu、dexio、memanto；社区插件有 made-shelf、snag-shelf、hermes-anilist、hermes-council（LLM Council）、hermes-beads、Hermes Atoll；桌面集成有 God&#x27;s Eye View。另有 hermes-cron 及多轮版本 pin，以及若干插件版本升级（bot-forge 到 v0.15.2、prompt-studio 到 1.8.0、provider-status 到 1.5.11、reaction-feedback 到 1.0.2、whatsapp-agent-platform 到 0.2.0 支持媒体等）。</p>
+<p>技能系统 · 同名技能的优先级、隐藏与去重</p>
+<p>f525ecdb9c fix(skills): skill_view applies cross-directory precedence instead of refusing</p>
+<p>340be3750d fix(skills): slash commands register only names that resolve uniquely</p>
+<p>0a2bfe01ec fix(skills): a disabled load path refuses an offer-gated duplicate too</p>
+<p>b82b4ac65c fix(skills): a disabled load path hides only the duplicate it names</p>
+<p>a08d099059 fix(skills): skills.disabled also matches a duplicate&#x27;s exact load path</p>
+<p>7025dd1cee fix(skills): preload and cron say &quot;Ambiguous&quot; instead of &quot;Unknown&quot;/&quot;not found&quot;</p>
+<p>a24d7382d3 fix(skills): list and prompt index advertise only names skill_view loads</p>
+<p>0180cace40 perf(skills): skill_view&#x27;s disabled check loads config once</p>
+<p>de0e8b3bb4 perf(skills): memoize the shadow identity decision, not only the warning</p>
+<p>问题：skill_view 以前遇到同名技能落在多个技能目录就直接拒绝加载，于是被本地副本遮蔽的外部技能（哪怕相对路径相同，例如 productivity/xdup）用什么标识符都打不开，而 skills_list、提示索引和斜杠命令却照常显示本地那份。修复：统一成一套层级顺序 project &gt; local &gt; skills.create_dir &gt; external_dirs，由 get_skill_search_roots() 做唯一目录排序，层级按实时 profile 根判定而不是导入时的常量；同一层级里两个不同技能重名仍然拒绝。斜杠命令改为从共享技能目录构建，只给能唯一解析的名字注册 /命令，同层重名仍可用精确路径（/skill a/one）调用，被遮蔽的副本从不注册；/reload-skills 会清掉目录缓存，不再提供过期的视图。skills.disabled 也按重复项的确切加载路径匹配，禁用一条路径只隐藏它指名的那个副本。两个修复的措辞统一成「Ambiguous」。效果：同名技能不再是「列表里看得见、却加载不了」的状态。另有两处性能修复。</p>
+<p>消息平台 · Telegram 并发处理与代码围栏</p>
+<p>5907983b96 fix(telegram): enable concurrent update processing (PTB default serializes all updates)</p>
+<p>a6d7e08fd1 fix(telegram): keep same-chat updates in order under concurrent dispatch</p>
+<p>5f7b1e2d65 fix(telegram): anchor fenced-code regex so inline triple backticks aren&#x27;t mangled</p>
+<p>3480de0402 fix(telegram): match CRLF-terminated closing fences</p>
+<p>c82abc309a fix(telegram): widen fence anchors to keep mid-line and indented blocks</p>
+<p>问题：python-telegram-bot 默认把所有更新串行处理，一条慢消息会拖住其它聊天。修复：打开并发更新处理，同时保证同一个聊天里的更新仍然按序派发。代码块方面，围栏正则被重锚：行内三反引号不再被误当作代码块，以 CRLF 结尾的关闭围栏能匹配，中线与缩进的代码块也保留。效果：Telegram 不再被单条消息串行化，代码块渲染不再被扭曲。</p>
+<p>消息平台 · 邮件、Discord、Slack、Matrix</p>
+<p>c2f595d6af fix: authenticate senders in public email mode</p>
+<p>81706c8b30 fix(email): authorize before fetching MIME bodies</p>
+<p>c4343445c4 fix(email): warn when a listed sender&#x27;s mail fails authentication</p>
+<p>675bad762a fix(discord): resolve allowlisted usernames by username only, not display name or nickname</p>
+<p>462389ea5e fix(discord): a numeric allowlist entry removed after connect stops authorizing</p>
+<p>b376591778 fix(slack): slash commands obey allowed_channels and ignored_channels, like messages</p>
+<p>0089fca37d fix(slack): gated slash commands get a bare ack, not &quot;Running /x&quot;</p>
+<p>d584836ffa fix(matrix): keep every outbound event under the homeserver&#x27;s byte cap</p>
+<p>邮件：公共模式开始认证发件人，并在拉取 MIME 正文前先做授权（此前会在授权之前就去取正文），列在白名单里但认证失败的发件人给出告警。Discord：白名单用户名只按唯一账号名解析——以前解析会依次尝试 member.name、display_name、global_name，共享服务器里任何人只要把昵称或显示名改成白名单用户名就能抢到解析出的 ID（私信、工具、审批按钮），把真正的用户挡在外面；连接之后被移除的数字白名单项也不再继续授权。Slack：斜杠命令改为和普通消息一样遵守 allowed_channels 与 ignored_channels，被门控的斜杠命令只回一个空应答而不是「Running /x」。Matrix：homeserver 会拒收规范 JSON 超过 65536 字节的事件（M_TOO_LARGE），而 Matrix 的出站文本按字符切分（默认 16000、上限 65535）；每条消息文本会出现两次（body 加 formatted_body），一次编辑出现四次，实测中文格式化分片约 95 KB 会被拒、英文流式编辑约 80 KB 也悬。修复：按字节上限约束每个出站事件后再发送。</p>
+<p>稳定与安全 · 压缩与状态存储一大批加固</p>
+<p>2d5ed7dd88 fix(compression): keep a refused write_file&#x27;s outcome in its stub</p>
+<p>3c17b9fd66 fix(state): free a ghost&#x27;s title at rename time instead of skipping it</p>
+<p>fb4aac296b fix(state): exclude empty ghost sessions from title uniqueness</p>
+<p>7de2fbb98f fix(compression): mark a dead cron run and a non-zero exit in their stubs</p>
+<p>2cad7ef208 fix(compression): only an error-bearing result counts as a refused call</p>
+<p>24d05b24d0 fix(state): keep the content key for tool result rows in display dedupe</p>
+<p>ab86a20aec fix(gateway): recover busy follow-up from the slot that holds it</p>
+<p>这一窗修复数量最多的两个 scope 是 compression（26 条）与 state（21 条）。压缩侧：被拒的 write_file 在存根里保留结果，只有带错误的返回才算被拒调用，一次死掉的定时任务和非零退出会在存根里标出来，被拒的工具调用不再被当成真的跑过来总结，修复丢弃的行按来源命名而不是回落到水位线。状态侧：会话标题的唯一性修复重做——空幽灵会话不参与唯一性判定、重命名时释放幽灵的标题而不是跳过、按来源排序、绝不让用户自己设置的标题被丢掉、失败时整体回滚。网关侧：忙状态的后续消息从持有它的槽位恢复，待处理事件在守卫释放后排空。效果：压缩和状态存储是本期最集中的加固，长会话与定时任务场景更稳。</p>
+<p>安全 · profile 导出不再打包凭证库</p>
+<p>9c18f8c28c fix(profiles): keep every credential store out of profile exports</p>
+<p>39b99be19b fix(profiles): drop nested credential stores from the default-profile export too</p>
+<p>fc33275f22 fix(profiles): keep Hermes&#x27; recovery copies of credential stores out of named exports</p>
+<p>41f2510362 fix(profiles): browser-profiles/ and browser_profiles/ are credential stores</p>
+<p>69613ebc5f fix(profiles): honcho.json is a credential store, and a file cannot replace a store&#x27;s directory</p>
+<p>8c1adb7d6d fix(profiles): a distribution can neither plant nor replace a nested credential store</p>
+<p>问题：命名 profile 的导出只剔除 auth.json、.env 和 bot-desktop，Hermes 从 profile home 读取的其它凭证库都会被原样打进归档：.op.env（1Password 服务账号令牌）、npmrc、OAuth 令牌文件、mcp-tokens/、vault/、浏览器 profile 和各平台会话；其中 .op.env 和 npmrc 还绕过了文本脱敏环节。修复：新增 PROFILE_CREDENTIAL_PATHS（相对根路径）作为唯一清单，从命名导出里排除，并把它的根条目并入 DEFAULT_EXPORT_EXCLUDE_ROOT，让发行版安装把这些当作用户自有；默认 profile 的导出同样处理嵌套凭证库；Hermes 自己保存的凭证恢复副本也不进命名导出；发行包既不能植入也不能替换嵌套凭证库。效果：分享或导出一个 profile 不会顺带泄露令牌与浏览器会话。</p>
+<p>定时任务 · 密钥作用域与重试槽位</p>
+<p>9715a7c6fe fix(cron): install the fire secret scope before the body&#x27;s first crash-notice exit</p>
+<p>c8815a52c5 fix(cron): bind the profile secret scope for the dispatch-failure notice</p>
+<p>8840751b8d fix(cron): reuse the gateway&#x27;s hook registration helper inside the secret scope</p>
+<p>946eafdf2f fix(cron): register the owning profile&#x27;s config hooks in the external worker</p>
+<p>c84ef16384 fix(cron): unreachable-model re-runs no longer use up repeat slots</p>
+<p>2bd75984ab fix(cron): crashed or undispatched ladder re-runs no longer spend a repeat slot</p>
+<p>068d709c55 fix(cron): a transport-cancelled ladder re-run no longer spends a repeat slot</p>
+<p>b7505a1602 fix(cron): name a malformed base_url as invalid; read custom providers via the public view</p>
+<p>1903b2b6e3 fix(cron): bind a stored provider key to its configured origin, not its hostname</p>
+<p>定时任务这一窗修了三组：一是密钥作用域——在任务体的首次崩溃通知退出之前就把 fire 密钥作用域装好，派发失败通知绑定 profile 的密钥作用域，外部 worker 里注册所属 profile 的配置钩子；二是重试槽位——模型不可达、崩溃或未派发、传输被取消而重跑的梯次任务都不再消耗重试槽位；三是自定义提供方——畸形 base_url 报为 invalid 而不是抛异常，存储的提供方密钥绑定到它配置的 origin 而不是主机名。</p>
+<p>其他值得一句</p>
+<p>96ac3d349f fix(web): restore free fast search for anonymous guest users</p>
+<p>8abd6dc2b5 fix(local-runtime): detect Intel and AMD GPUs for auto backend</p>
+<p>2e6924bd10 fix(local-runtime): size AMD/Intel GPUs by the engine&#x27;s own device type</p>
+<p>c8301ea6c9 fix(local-runtime): Vulkan/HIP launches subtract what other programs hold on the card</p>
+<p>4bb9e57bfd fix(mcp): SIGKILL a dead MCP server&#x27;s descendants that ignored SIGTERM</p>
+<p>d6bb42e8ba feat(activate): add activate.fish for the fish shell</p>
+<p>71d120be6b fix(install): wire ~/.local/bin into ~/.bash_login for login-bash users</p>
+<p>c9ea2140ad fix(voice): honor configured silence_threshold and stop gating streaming TTS on sounddevice</p>
+<p>web：注册账号门控是上一次改动抢救版误加的，导致匿名访客拿不到免费的托管快速搜索、回落到无密钥的环；现在只按身份判断，访客身份重新进入自动识别与救援路径。本地模型：补齐 Intel 与 AMD 显卡检测用于自动选择后端，按引擎自身的设备类型估算 AMD/Intel 显卡显存，Vulkan/HIP 启动时减去别的程序已占用显存。MCP：关闭时对忽略 SIGTERM 的后代进程组补发 SIGKILL（此前只检查组长 PID 是否存活，组长退出后拒绝退出的后代永远不被升级）。activate.fish 让 fish 用户也能进入开发环境（跳过 PWD 等只读名）。安装：把 ~/.local/bin 写进 ~/.bash_login，登录 bash 用户也能找到命令。语音：尊重配置的 silence_threshold，流式 TTS 不再被 sounddevice 门控。</p>
+<p>性能（6 条）</p>
+<p>0180cace40 perf(skills): skill_view&#x27;s disabled check loads config once</p>
+<p>de0e8b3bb4 perf(skills): memoize the shadow identity decision, not only the warning</p>
+<p>76a2f2a2d7 perf(inventory): resolve fast capability once per model</p>
+<p>355ab82811 perf(tui_gateway): run session.save on the RPC pool</p>
+<p>b93892d63d perf(tui): bound the share_nous client-text scrub to a 2x-cap window</p>
+<p>4f478350ea perf(debug): redact support egress once</p>
+<p>技能查看的禁用检查只读一次配置、遮蔽身份判定做记忆化；模型清单每个模型只解析一次快速能力；会话保存放到 RPC 池上执行；分享脱敏窗口限制在 2 倍上限内；支持信息导出的脱敏只做一次。</p>
+    </section>
+    
     <section id="2026-10-03" class="day">
       <h2>Hermes 日报 2026-10-03：桌面端预览标签按会话隔离，更新不再重复重装桌面端</h2>
       <p><strong>本期覆盖北京时间 10 月 2 日 06:30 ~ 10 月 3 日 06:30 进入 main 的提交，共 220 个 commit（不含 merge），另有 9 个合并提交。新增 13 个功能、128 个修复、1 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
