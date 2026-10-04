@@ -22,9 +22,142 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 68 期 · 27664 个提交 · 每日自动更新 ·
+<p class="meta">共 69 期 · 27957 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-05" class="day">
+      <h2>Hermes 日报 2026-10-05：Home Assistant 搬出内核成官方插件，命令行可管本地模型</h2>
+      <p><strong>本期覆盖北京时间 10 月 4 日 06:30 ~ 10 月 5 日 06:30 进入 main 的提交，共 293 个 commit（不含 merge），另有 3 个合并提交。新增 27 个功能、115 个修复、1 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端修了一批多网关场景下的串线问题：主连接重连、失败 RPC 重放、新建聊天草稿与项目树会话行的归属全部改回按 registry 路由走</p>
+<p>Home Assistant 从内核搬进官方插件目录，hermes update 会自动给用过 HA 的 profile 装回来，平台名、工具名、配置项和环境变量都不变</p>
+<p>本地模型接进命令行：hermes model 多了本地模型入口，llama.cpp 升到 v0.5.0，Linux x64 与 arm64 都拿到 CUDA</p>
+<p>安装与更新的 Node libatomic 修复链：过去装完才失败的 Node 现在在安装边界就修，需要 sudo 时提前授权，非交互模式绝不弹密码提示</p>
+<p>平台与安全：Discord 设置向导会拿 token 去问 Discord，Telegram 审批提示恢复推送，profile 导出与 @file 展开新增一批凭证目录排除</p>
+<p>插件目录本期又新增一大堆条目（omh、hermes-dreaming、hermes-otel、prompt-studio 1.9.0、talaria-webui、mistral-vibe、openai-compatible 图像提供方等）</p>
+<p>重点条目：</p>
+<p>桌面端 · 区域菜单的完整快捷键不再被裁掉</p>
+<p>32172d4622 fix(desktop): let the zone menu grow so spelled-out shortcuts stay visible</p>
+<p>问题：区域（zone）菜单的宽度写死成 w-40，而菜单本身带 overflow-x-hidden，Ctrl+Alt+T 这类完整拼写出来的快捷键会被直接裁掉看不见。修复：让菜单按内容撑开，不再限制固定宽度；同时补了一条测试（e4ef7ea875）要求菜单必须放得下一个完整拼写的快捷键。效果：拼写完整的快捷键在菜单里能完整显示。</p>
+<p>桌面端 · 多网关切换后的归属与重连一批修复</p>
+<p>aae0a97a56 fix(desktop): reconnect the primary socket to its own route, not the foreground</p>
+<p>6cd5b5ca18 fix(desktop): never replay a failed RPC on a different gateway</p>
+<p>042e925ea2 fix(desktop): keep a newer new-chat draft from a late switch re-home</p>
+<p>f6c15b0971 fix(desktop): tag project-tree session rows with their registry source</p>
+<p>be3c9206a9 fix(desktop): clear the pinned new-chat route when a gateway switch commits</p>
+<p>ad4fed6b8d fix(desktop): keep an active local registry secondary as a resumed session&#x27;s owner</p>
+<p>cd6d6086e6 fix(desktop): re-check primary ownership after the reconnect ticket mint</p>
+<p>97565aeac5 fix(desktop): drop a primary reconnect lookup a connection apply replaced</p>
+<p>ffe3d823fa fix(desktop): keep a stale primary recovery from overwriting the foreground descriptor</p>
+<p>2b5abdfafe fix(desktop): keep review-flagged owner rules in the gateway-switch fixes</p>
+<p>问题：桌面端支持多个网关/连接同时挂着，而好几个地方分不清「主连接」和「当前前台连接」。主连接重连时调的是不带 profile 的 getConnection()，主进程会按窗口的前台路由去解析——于是前台是一个次要（secondary）连接时断线，主连接会被重新拨到那个次要后端上；一个 RPC 传输失败后，重试逻辑会走当前活动路由把原始载荷重发，如果这中间发生了网关切换，请求就被重放到另一个来源上了；从网关分组里起的新聊天草稿会钉住 $newChatRoute，selectConnection 提交后没有清掉这条路由，下一个 session.create 就落到了上一个网关上；项目树（projects.tree）返回的会话行没有带 connection_id，打开只出现在树里的会话会回落到裸 profile，resume/prompt 跑到 Home 上，而当前实际用的是「本机」；切换过程中仍在记账（rememberConnection）时起的草稿，会被切换的迟到 re-home 清掉。修复：主连接重连改成按主连接自己登记的 registry 路由（或旧的 profile）拨号，只有启动和连接应用才继续跟前台；失败的 RPC 只在本派发路由仍然活动时重试，否则原样抛出原错误；每次新建聊天归属意图都过 captureNewChatSource 并递增一个 intent revision，selectConnection 开始时快照它，只有没有更新的意图时才 re-home 草稿；projects.tree 的行按 REST 请求被钉住的同一个 registry 连接打标，并在来源变化后丢弃迟到的响应；网关切换提交时清掉那条被钉住的 new-chat 路由，被取代或失败的切换不动更新的草稿。效果：多网关场景下重连、会话恢复、新建聊天和项目树打开会话都落在正确的那个后端上。</p>
+<p>桌面端与仪表盘 · 允许名单一个框一个 ID</p>
+<p>344a23bce5 feat(messaging): edit allowed users one ID per box on Desktop and dashboard</p>
+<p>问题：允许名单（*_ALLOWED_USERS、LINE 群组/房间、SimpleX 群组）在设置里渲染成一整个空输入框加一个「«redacted:…»」占位符，保存过的列表看起来就像一个被隐藏的密钥，还只能整条替换。修复：后端 messaging 环境变量行带上 is_list，列表行带上明文值（ID 不是密钥，密码字段仍然只输出脱敏值）；桌面端和仪表盘改成每个条目一个可见输入框，带删除的 x 和「+ Add another」（回车也能加），粘贴一串逗号分隔的列表会自动拆成多个框；保存时仍然写回网关本来就解析的那串逗号分隔值，把所有条目删空再保存就是清掉这个键。桌面端各语言的允许名单说明都改成「one per box」。效果：允许名单可见、可逐条增删，不再是黑盒。</p>
+<p>插件系统 · Home Assistant 搬出内核，成为官方插件</p>
+<p>fb9fc8a3dd refactor: move Home Assistant out of core into the homeassistant catalog plugin</p>
+<p>403fc8beee Plugin catalog: homeassistant (official, NousResearch)</p>
+<p>问题：Home Assistant 的网关平台（plugins/platforms/homeassistant）和 ha_* 工具集（tools/homeassistant_tool.py）一直打包在内核里，任何一个 HA 的特殊情况都要在内核里写一段专用代码。修复：两者改由官方目录插件 homeassistant（NousResearch/hermes-homeassistant）提供，平台名、工具集/工具名、配置键和环境变量都保持一致；迁移表放在 hermes_cli/left_core_migration.py，复用了 memory-provider 迁移的辅助函数——凡是用过 HA 的 profile home（.env 里有 HASS_TOKEN、platforms.homeassistant 启用或存着 token、或选了 homeassistant 工具集）都会被 hermes update 按审核过的 pin 装上插件，另外在 agent start / gateway start 时每进程惰性装一次（遵守 security.allow_lazy_installs），结果会送到终端、桌面端和聊天里，网关启动时的结果交给该 home 的第一个 agent。内核里 HA 的三个特例改成通用的 PlatformEntry 接缝：trusted_inbound（事件总线平台的允许名单旁路）、display_tier（内置显示默认值）、shared_env_prefixes（插件工具共享环境变量的 profile 克隆归属规则），cron 投递走已有的 cron_deliver_env_var 接缝，HASS_TOKEN 仍然按已安装插件的 manifest secrets 从子进程里剥离。效果：HA 变成和其它插件一样的可独立更新的条目，平台与工具对用户的使用方式不变。</p>
+<p>插件系统 · Home Assistant 迁移过程的一批边界修复</p>
+<p>e641b71913 fix: a removed Home Assistant plugin stays removed after update and restart</p>
+<p>c26b88957c fix: an offline machine pays the Home Assistant plugin fetch once an hour, not every start</p>
+<p>9d66f96340 fix: HASS_TOKEN stays out of child processes when the Home Assistant plugin is absent</p>
+<p>3eac7065ab fix: a channel-less profile clone drops Home Assistant identity while its plugin is absent</p>
+<p>bd591f3d49 fix: a preinstalled Home Assistant plugin no longer turns its tools on everywhere</p>
+<p>3564e9cc24 fix: Home Assistant tools stay off on platforms where core had them off</p>
+<p>c19dd99597 fix: a user plugin cannot mark a core platform trusted_inbound</p>
+<p>2da37476a5 fix: Home Assistant migration reads the platform config the gateway loader merged</p>
+<p>c63bc3dcbd fix: every profile a multiplex gateway serves gets its left-core plugin before its adapters start</p>
+<p>f7689f40a4 fix: send_message to a Home Assistant target names the install command while its plugin is absent</p>
+<p>8e3b5b5446 fix: agent-start left-core migration tolerates agents without a startup-warning sink</p>
+<p>问题：把 HA 从内核搬到插件目录之后，迁移本身留下一串边界问题——用户主动删掉的 HA 插件会在 update 和重启之后又回来；离线机器每次启动都要为拉 HA 插件花一次等待；插件不在场时 HASS_TOKEN 仍会留在子进程环境里；没有渠道的 profile 克隆会丢掉 HA 身份；预装过的 HA 插件会在所有地方都打开自己的工具；内核里本来关闭 HA 工具的平台会被插件重新打开；用户插件可以自行把一个内核平台标成 trusted_inbound；迁移读取的是内核配置而不是网关 loader 合并后的平台配置；多路复用网关服务的每个 profile 要在适配器启动前拿到它的 left-core 插件。修复：这一批逐条把上述行为对齐到「插件不在场就该完全消失、在场就只在该在的地方生效」——离线机器改成至多每小时拉一次而不是每次启动都拉，同时补齐 send_message 到 HA 目标时的安装命令提示、以及在 agent 启动缺少 startup-warning 通道时的容错。效果：删了就真删、离线不白等、密钥不漏、内核原有的关闭状态不被插件覆盖。</p>
+<p>插件市场与目录 · 本期又新增/更新一大批条目</p>
+<p>a3ba1e5080 feat(plugin-catalog): add omh community plugin</p>
+<p>954cf6cd3f feat(plugin-catalog): add hermes-dreaming</p>
+<p>ebc5283782 feat(plugin-catalog): add hermes-otel</p>
+<p>91ec17d3af feat(plugin-catalog): add openai-compatible image provider</p>
+<p>c27c2bc989 feat(plugin-catalog): add hermes-cloud-file-manager plugin</p>
+<p>bd9271df06 feat(plugin-catalog): bump prompt-studio to 1.9.0</p>
+<p>9585b17be7 feat(plugin-catalog): add talaria-webui</p>
+<p>071ddfc80c feat(plugin-catalog): add model-drift-watch</p>
+<p>92fef8a075 feat(plugin-catalog): add parlor</p>
+<p>15d61d79d4 feat(plugin-catalog): add mistral-vibe plugin</p>
+<p>7c9600edf1 feat(plugin-catalog): add pushover-hermes-plugin</p>
+<p>470d5468ed feat(catalog): add Usage Ledger 0.4.3 Windows beta</p>
+<p>164c6b625a feat(catalog): add Ando platform beta plugin</p>
+<p>5f5a8d7b3b feat(catalog): add the pinned Pushary approval plugin</p>
+<p>问题/说明：本期的目录面非常热闹，新增和更新的条目包括社区插件 omh、hermes-dreaming（做梦/后台整理）、hermes-otel（OpenTelemetry）、openai-compatible 图像提供方、hermes-cloud-file-manager、talaria-webui、model-drift-watch、parlor、mistral-vibe、pushover 通知插件、Usage Ledger 0.4.3 Windows beta、Ando 平台 beta、Pushary 审批插件等；prompt-studio 升到 1.9.0。每个条目合入时都带一条 disclosure（作者、来源、是否打过内核补丁）并在 merge 时复核，一部分条目的 pin 因为评审又回退/重钉过。效果：插件目录继续以「一个条目一个 PR」的方式扩张，社区插件走同一条审核流水线。</p>
+<p>状态 · 会话恢复认识 cron_ / bg_ / room_ 等各种 ID 形状</p>
+<p>0788e759dd fix(state): session recovery must recognize cron_/bg_/room_ ids</p>
+<p>d7732ca75e fix(state): recognize every persisted session-id shape in salvage</p>
+<p>问题：会话恢复的 salvage 分类器只用 SESSION_ID_PATTERN（^\d{8}_\d{6}_）判断「这一格是不是会话 ID」，而好几个一等公民界面是自己派生 ID 的：cron 是 cron_{job_id}_{时间戳}、/bg 是 bg_{时间}_{hex}、房间分发是 room_{sha256 前 32 位}。拿一份真实的 3373 会话 store 实测，379 个 ID（11.2%）过不了这个模式——恢复逻辑对这些行直接返回 None，于是静默丢掉每一个 cron/bg/room 会话（修复前保留 2994 行，修复后 3370 行）；更糟的是 parent_session_id 用的是同一套判断，一个 cron 任务的子会话带着不被识别的父 ID 却因为自己的时间戳 ID 分类正常而成为「结构证据」，单个坏样本就能否决整张 sessions 表的布局推断，把列名映射搞成空。修复：hermes_state_ids 里加 SESSION_ID_RECOGNIZERS 和 is_known_session_id()，把每个铸造点固定下来的形状都锚定成识别规则，之后又补上 TUI/桌面端 /bg、api_{epoch}_{hex8}、api-{sha256}、run_{uuid4}、原生 uuid4 这几种持久化形状。效果：cron/bg/room 会话不再被恢复流程丢掉，父会话 ID 也不会再毒化整张表的布局推断。这一类没有进视频，属于存档恢复/迁移路径上的用户可见修复。</p>
+<p>插件系统 · 强制重装同一来源保留用户文件</p>
+<p>ddde067010 fix(plugins): a forced reinstall of the same source keeps the user&#x27;s files</p>
+<p>问题：install --force --ref 是把插件挪到新 pin 的推荐做法，但它会把整个插件目录替换掉：未跟踪和 git-ignore 的文件（插件状态、本地配置）被删掉，跟踪文件里的改动也直接丢失，没有任何备份。修复：从插件当初安装的那个来源重装时，像 update 一样保留用户文件，跟踪文件里改过的部分复制到 plugins-backup/；换一个来源安装仍然是干净开始。效果：挪 pin 不再顺手删掉用户的插件状态和本地修改。</p>
+<p>技能 · 角色标签占位符统一改成花括号</p>
+<p>154e2601b8 fix(skills): brace the remaining role-tag placeholders that reach the model</p>
+<p>42d40a1503 fix(skills): brace the documented tool placeholder in bundled SKILL.md docs</p>
+<p>问题：skill_view 会把技能全文返回，所以打包的 SKILL.md 也在请求面上——三个打包技能里文档写的尖括号工具占位符被 OpenRouter 网关的分类器当成 role-tag 注入，整个请求被 HTTP 403 拒绝（&quot;Request blocked: prompt injection patterns detected&quot;），Hermes 的按提供方重试也走同一条路，导致会话在那个提供方上无法恢复。除了文档路径，还有三条作为工具结果返回给模型的报错字符串同样带这个形状（工具调用桥的「不是已知工具名」提示、model_tools 与连接器网关的连接器名报错）——工具结果会进历史并每轮重发，所以一条这样的报错会像加载技能一样毒化会话。修复：全部改成已经在 native-mcp.md 里用的花括号形式，并加了一个数据驱动的守卫测试扫描 skills/ 与 optional-skills/ 下的违规文件；操作提示：拉取这次改动后要重建 skills/.hub/index-cache/ 缓存。效果：这类文档和报错不再触发网关的注入拦截。</p>
+<p>本地模型 · hermes model 里出现本地模型入口</p>
+<p>400cd69261 feat(cli): local models in `hermes model`</p>
+<p>问题：本地模型的管理过去只在桌面端的 Local Models 面板里，命令行没有入口。修复：当 PM 给这台机器固定了引擎时，hermes model（以及 hermes setup）里会多一行 Local models，整个流程在进程内驱动桌面端 Local Models 面板背后同一套 handler，两个界面走一条代码路径：按这台机器定价的目录（★ 是推荐）、已经在磁盘上的模型、quickstart（固定引擎、下载模型、启动服务、设默认）和激活。进度从桌面端轮询的同一个 job view 渲染；Ctrl+C 可以暂停下载，再选一次同一个模型就从保留的字节续传。效果：本地模型从下载到设默认可全程在终端里完成。（commit body 记录了实测：目录下载在 3% 暂停后能续传完成、磁盘模型可激活、hermes -z 与交互式聊天都能对着结果跑。）</p>
+<p>本地模型 · llama.cpp 升到 v0.5.0，Linux 拿到 CUDA</p>
+<p>54e2a59bbc feat(pm): ship llama.cpp v0.5.0 (b11146) with Linux x64 CUDA</p>
+<p>361963828d feat(pm): llama.cpp CUDA on Linux arm64; bundle libgomp for Linux engines</p>
+<p>9c951a9f11 feat(desktop): show local models on Linux x64</p>
+<p>问题：上游在 b10964 之后才第一次发布 ubuntu-cuda 归档，所以 llamacpp-cuda 过去只有 Windows，Linux 上的 NVIDIA 用户只能退回 Vulkan；另外每一个上游 Linux 版 llama.cpp（包括 CPU 版）都会链接系统 libgomp，而 WSL、容器这类精简宿主没有这个库，正常的安装流程又不会去碰系统包管理器。修复：把每个 llama.cpp 后端都固定到 b11146（v0.5.0），llamacpp-cuda 加上 linux-x64 与 linux-arm64；引擎归档不带 CUDA 库，所以 Linux 目标同时钉住版本化的 cudart tarball，并在 stage() 时按 $ORIGIN RUNPATH 把它放到 llama-server 旁边；每个 Linux 引擎还钉住 Ubuntu 24.04 的 libgomp1 .deb（glibc 2.38，正是上游自己设的下限）并同样 stage 到 llama-server 旁边，24.04 生命周期结束后的 pool URL 由镜像覆盖；上游在同一窗口去掉了 win-cuda-13.3，所以 win32-x64 移到 13.4 与 arm64 对齐。桌面端的本地模型开关同步在 Linux x64 和 arm64 打开；arm64 的 CUDA 路径已在 arm64 硬件（RTX Spark N1X，WSL）上按真实下载/落盘/校验流程实测通过，llama-server 报出 CUDA0。效果：Linux 的 NVIDIA 用户拿到 CUDA 而不是 Vulkan，精简宿主上的 Linux 引擎不再缺 libgomp。</p>
+<p>安装与更新 · Node libatomic 修复链</p>
+<p>ad6760a416 fix(pm): repair Node libatomic at install boundary</p>
+<p>a3b80c749c fix(install): ask for sudo up front when Node will need libatomic</p>
+<p>af90026aa0 fix(update): run the libatomic pre-install spawn only on Linux</p>
+<p>c4d4ac569f fix(pm): install libatomic before the detached update child, not a sudo ticket</p>
+<p>7d509de7e1 fix(pm): let hermes update authorize sudo before restaging Node</p>
+<p>847acaf1fb fix(install): never prompt for sudo under --non-interactive</p>
+<p>e9886b5919 perf(pm): attempt the libatomic install once per process</p>
+<p>问题：在缺 libatomic.so.1 的 glibc 宿主上 Node 起不来，而 PM 的 libatomic 修复是在自己的安装锁下跑 sudo -n 的——sudo 需要密码的机器上这个自动尝试永远不可能成功，curl | bash 最后还是以 &quot;pm install failed&quot; 结束；反过来，Hermes 在任何情况下都不应该在非交互模式下弹密码提示（会挂住自动化）。还有一些浪费：每个依赖 node 的 root（npm、浏览器工具）在失败后都会重新 stage 一次，于是一个没有 libatomic 的宿主会在安装锁下把包管理器跑一遍又一遍。修复：libatomic 的修复挪到安装边界（在分离出去的 update 子进程之前）就做；当 glibc 宿主缺 libatomic.so.1 且接了终端时，在 prerequisites 阶段先把 sudo 凭据缓存下来，让后面那次非交互安装能过；非交互模式（--non-interactive）绝不提示 sudo；root、免密码 sudo、musl 和无终端运行的行为都不变；libatomic 的预安装 spawn 只在 Linux 上跑；libatomic 的安装结果按进程缓存一次（顺带改用 platform.freedesktop_os_release() 而不是手写解析，并在最小镜像的包列表为空时先跑一次 apt-get update）。效果：缺 libatomic 的机器装 Node 不再以失败收场，自动化安装不会卡在密码提示上，同一个进程也不会重复跑包管理器。</p>
+<p>安装 · Windows 上带中文/Unicode 的 Python 路径</p>
+<p>eb35beb955 fix(install): preserve Unicode bootstrap Python paths on Windows</p>
+<p>c3f925242a fix(install): preserve Unicode Python paths in developer setup</p>
+<p>说明：bootstrap 阶段和开发者安装路径过去会把带 Unicode 的 Python 路径弄乱（编码/转义丢失），现在原样保留。对把仓库或 Python 装在中文目录下的 Windows 用户是直接可见的修复。</p>
+<p>平台 · Discord 设置向导会拿 token 去问 Discord</p>
+<p>4c4ad0d387 feat(discord): setup checks the bot token with Discord and prints the invite link</p>
+<p>f785deb261 fix(discord): setup survives rich-text pastes, keeps existing allowed users, and states the intent failure correctly</p>
+<p>fedac42bc1 fix(discord): wizard invite link is a superset of the documented Recommended permissions</p>
+<p>937f23db2d fix(discord): invite link and docs drop the unused Use External Emojis permission</p>
+<p>问题：Discord 一直是最好配的网关里最难配的那个——.env 模板里根本没有 Discord 段落，向导存下你粘的任何东西，用户得自己找到 Message Content Intent 开关、手工拼 OAuth2 邀请 URL，还要开开发者模式才知道自己的用户 ID。修复：向导改成用粘进来的 token 调 GET /applications/@me——被拒的 token 会重新询问而不是存下来，Intent 没开会给出直达开关的链接并重查，邀请链接直接打印并带上适配器实际使用的权限，允许名单默认填应用所有者（或已接受邀请的团队成员）；离线时仍然存 token 但保留手动开启 Intent 的提醒。向导本身从 7000 行规模的适配器里搬进了 plugins/platforms/discord/onboarding.py。评审又补了几处：带弯引号的 token 过去会撞到 HTTP header 报 UnicodeEncodeError，现在过同一套非 ASCII 剥离；重新配置不再用所有者覆盖已有的 DISCORD_ALLOWED_USERS，而是从现有条目出发只做追加；Intent 没开时 Discord 是直接拒绝连接（close 4014）而不是发空白消息，向导、模板和文档统一说清这一点；邀请链接的权限整数先按文档补成超集，随后又把适配器根本用不到的 Use External Emojis 删掉，让向导、voice-mode.md 和 zh-Hans 文档三处一致。效果：Discord 配置从「自己找开关拼 URL」变成向导自检 + 直接给出邀请链接。</p>
+<p>平台 · Telegram 审批提示恢复推送</p>
+<p>e26d4cb3e3 fix(telegram): push approval prompts instead of silently delivering them</p>
+<p>af6f618d3d fix(gateway): push the clarify text fallback on Telegram</p>
+<p>问题：Telegram 默认通知模式（&quot;important&quot;）下，纯文本的审批兜底消息只标了 is_approval_prompt，而没有任何通知决策会读这个标记，于是 _notification_kwargs 带着 disable_notification=True 把它发出去：手机不推送，用户根本不知道有一条危险命令在等，工具硬等满 approvals.timeout（默认 300 秒）才失败关闭（#132516）。澄清（clarify）的原生卡片彻底失败后重试的基础文本走的是同一条路，用户同样收不到推送，等待超时无人作答。修复：在 _approval_notify_sync 的两次审批发送（按钮卡片和文本兜底）上都按 cron 投递的约定加 notify=True，并让 _notification_kwargs 自己感知审批（is_approval_prompt 直接压过 disable_notification），这样所有标记了审批的界面一次性覆盖；澄清兜底同样打上这个标记，且只有原生实现了 send_clarify 的适配器（Telegram、Discord、Slack 等）会走这条兜底。没有放松任何守卫、也不会自动批准任何东西。效果：审批和澄清在手机上会正常推送，不会再静默等超时。</p>
+<p>安全 · 邮件发件人认证要求精确的 authserv_id</p>
+<p>4f39bd4f35 fix(email): require exact authserv-id before trusting results</p>
+<p>8b66a51036 fix(email): warn about a missing authserv_id once per account, even via reconnect</p>
+<p>390c49ee78 docs(email): say an absent authserv_id pin fails closed for every sender</p>
+<p>4b4362520b docs(email): authserv_id is required for authenticated-sender mode</p>
+<p>问题：认证发件人模式读 Authentication-Results 头部时，注入的或者位置更低的同类头部可以顶替真正的结果，从而把一个发件人「认证」进白名单。修复：只信任显式配置的那个接收 MTA 写的最上面一条 Authentication-Results，头部必须精确匹配配置的 authserv-id；没有配置精确 pin 时，对白名单发件人一律失败关闭（fail closed）。配套还修了告警时机：解析 pin 缺失的提示过去被 not is_reconnect 挡住，账户的第一次启动连接如果因为瞬时 IMAP/SMTP 错误失败、之后由重连看护拉起来（is_reconnect=True），就永远不会告警，同时在静默丢弃所有发件人的邮件；现在按地址去重（类级 _missing_pin_warned 集合），在 IMAP 与 SMTP 探测都成功之后检查，每个账户只告警一次。效果：注入的认证头部不能授权发件人，缺 pin 的账户在重连路径上也会被明确告知。</p>
+<p>安全 · profile 导出与 @file 展开新增一批凭证目录排除</p>
+<p>404b1fec55 fix(profiles): keep .docker/.azure/.config/gh/.config/gcloud out of profile exports</p>
+<p>625fab3fde fix(context-refs): derive the @file credential-dir block from HOME_CREDENTIAL_DIRS</p>
+<p>问题：#132201 已经让 profile 导出不再打包 .ssh/.aws/.gnupg/.kube/.envrc，但其它文件工具本来就拒绝写入的凭证目录仍然照发：从某个 home 拷过来的技能目录里会带 .docker/config.json（registry 认证）、.azure/accessTokens.json、.config/gh/hosts.yml（GitHub token）和 .config/gcloud/（ADC / credentials.db），默认 profile 导出和具名导出都会原样归档它们（二进制数据库还跳过脱敏）。@file 展开里另有一份手抄的敏感目录清单 _SENSITIVE_HOME_DIRS，漏了 .config/gcloud——`@file:~/.config/gcloud/application_default_credentials.json` 会把 gcloud 刷新令牌展开进上下文，而网关会把不受信任的远端文本喂进这个展开，属同一类泄漏。修复：home 相对的凭证目录统一收到 agent.file_safety.HOME_CREDENTIAL_DIRS 这一个列表，写入拒绝前缀和 profile 导出（_OS_CREDENTIAL_STORES）都从它派生，两边不会再漂移；嵌套位置（.config/gh）按路径尾部组件匹配，所以只丢 .config/gh 和 .config/gcloud，.config 下其它内容照常打包；@file 的敏感目录改用同一张表。效果：profile 导出和 @file 展开都不会再漏出这些凭证。</p>
+<p>MCP · 裸写的 stdio 命令走用户自己的 PATH</p>
+<p>4227e36a09 fix(mcp): keep a bare stdio command on the user&#x27;s PATH semantics</p>
+<p>36592bb75c fix(mcp): drive user-hit candidates from the child env&#x27;s PATHEXT</p>
+<p>问题：bootstrap 会把托管运行时的 bin 目录前置到本进程 PATH 上（pm/environments.py 的激活逻辑），而 stdio 解析器停在第一个 PATH 命中，于是一个裸写的 python3 MCP 服务器会被解析成自带的解释器——那里没有用户装的包，import 就死，agent 日志只有一句 &quot;Connection closed&quot;（#125300）。修复：_resolve_stdio_command 对裸命令跳过 Hermes 托管的 bin 目录、用用户自己的命中；显式启动器家族（npx/npm/node/uv/uvx）保留托管优先的解析；PATH 上只有托管目录时仍用托管命中而不是失败。连接失败的日志行现在会引用共享 mcp-stderr.log 里子进程最后的 stderr，真实的 import 错误在报错的地方就能看到。评审跟进（#125318）：用户命中的候选后缀改从子进程环境的 PATHEXT 推导（先子进程、再父进程、最后系统默认），Windows 上只发 .bat/.py 包装的安装也能被找到。效果：裸命令的 MCP 服务器跑在用户自己的解释器上，失败时不再只有一句 Connection closed。</p>
+<p>其他值得一说的修复</p>
+<p>242244bf68 fix(kanban): stop goal loop on worker/judge failures (#91264)</p>
+<p>c52f8262b1 fix(kanban): use unknown fallback for worker failure_reason and add test</p>
+<p>4149b1cf57 fix(cli): keep batch clarify choices inside the viewport</p>
+<p>cf6dca8d68 fix(clarify): drop maxLength from the choices schema so llama.cpp can parse the grammar (#131286)</p>
+<p>59608b5e0d fix(google-workspace): emit [] for empty Python-backend Gmail searches</p>
+<p>41c6729421 fix(compression): split oversized turns whose request is long</p>
+<p>fdcae6deba fix(cli): stop _apply_featured() shortlisting user-defined providers</p>
+<p>48de727da5 fix(plugins): --install-deps probe imports from the synced environment</p>
+<p>9cf7960f27 fix(process_registry): stop systemd-run expanding scoped commands (#132385)</p>
+<p>b97545ba4b fix(tui): never persist an ssh session&#x27;s launch directory as its workspace</p>
+<p>说明：Kanban 的目标循环在 worker/judge 失败时会停下来（此前会继续跑），worker 的 failure_reason 多了 unknown 兜底；批量澄清面板在矮终端上不再把当前问题的选项裁到屏幕外，澄清选项 schema 去掉 maxLength 后 llama.cpp 也能解析出语法；Gmail 的空搜索在 Python 后端下返回空数组而不是报错；请求过长的超大轮次会被拆开压缩；用户自定义的 provider 不再被 _apply_featured() 的短名单挤掉；插件 --install-deps 的能力探针改用同步后的环境解释器（此前用同步前的 sys.executable，加载期导入非核心包的插件会以被掩盖的 ImportError 挂掉目录门禁）；systemd 254 起 systemd-run --scope 会自己展开命令里的 $VAR/$$，后台命令会被改写（$$ 变成字面 $、${arr[@]} 变成空），现在在共享的 argv 咽喉点关掉这个行为；TUI 里的 ssh 会话不再把启动目录持久化成它的工作区。</p>
+<p>另外还有一批状态与网关侧的修复未在上文展开：WhatsApp 会话归属（桥接端口记录、只采用服务本 profile 会话的桥、/health 与会话所有权，7 条）、gateway 自身探测的超时判定与告警节流（b8027e195c、e48aa5e2f4、d11d411f33、1c88e4e31a、91995df83d）、tui_gateway 的队列行重开与回收（d62fbea7e1、dfdf602642、f963a86b4a、653667e430）、目录条目的一批准入与重钉（13 条 fix(catalog)）、邮件 sender-auth 提示语统一与 pin 必填化（c1ae640464、c495ab684b）、compression 测试助手收敛（81e1ce7867）。</p>
+    </section>
+    
     <section id="2026-10-04" class="day">
       <h2>Hermes 日报 2026-10-04：桌面端精确订阅速度档位，插件新增按 profile 隔离的宿主进程</h2>
       <p><strong>本期覆盖北京时间 10 月 3 日 06:30 ~ 10 月 4 日 06:30 进入 main 的提交，共 864 个 commit（不含 merge），另有 1 个合并提交。新增 80 个功能、330 个修复、6 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
