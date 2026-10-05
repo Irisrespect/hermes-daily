@@ -22,9 +22,100 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 69 期 · 27957 个提交 · 每日自动更新 ·
+<p class="meta">共 70 期 · 28384 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-06" class="day">
+      <h2>Hermes 日报 2026-10-06：桌面端插件设置有了统一入口，模型选择器会显示用量与限流</h2>
+      <p><strong>本期覆盖北京时间 10 月 5 日 06:30 ~ 10 月 6 日 06:30 进入 main 的提交，共 427 个 commit（不含 merge），另有 2 个合并提交。新增 43 个功能、215 个修复、2 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端设置新增「插件」栏：每个带设置的插件都有自己的设置页，形成三级侧栏，能力页的齿轮直接深链过去</p>
+<p>模型选择器会显示用量与限流：订阅额度进度条、整池限流的解除时间、凭证池按账号上报用量</p>
+<p>插件新增三组能力：人工输入请求观察钩子、cron 执行上下文、网关执行后消费钩子（fail-open）</p>
+<p>hermes update 每次顺手清理 partial clone 的 pack，大仓库几次更新里逐步收敛，不再单次卡 20 分钟</p>
+<p>上下文文件被截断时会列出被丢掉的小节；桌面端修了存档分页、侧边栏置顶、Windows SSH 探测等一批体验问题</p>
+<p>插件目录本期继续上新：Cloudflare Web Search 搜索后端、redaction-pack、aux-ledger、quotum 模型提供方等</p>
+<p>重点条目：</p>
+<p>桌面端 · 插件设置有了统一入口</p>
+<p>ea0e4299ec feat(desktop): Settings ▸ Plugins, one home for every plugin&#x27;s settings pages</p>
+<p>d8b44813b1 fix(desktop): plugin settings pages keep their profile and identity</p>
+<p>a731ffcc49 fix(desktop): plugin settings pages use native Settings rows</p>
+<p>问题：插件一直没有一个属于自己的设置界面。manifest 里的 config_schema 只能渲染成「能力 ▸ 插件」那一行下面的内联展开器，桌面端插件要做偏好设置就得自己造一个面板或对话框。修复：设置里新增「插件」一栏，布局参考 WoW 的插件选项——每个带设置的插件都是设置侧栏里的一个子项，选中后展开它自己的子页（第三级侧栏，配面包屑）。插件通过 ctx.registerSettingsPage({ id, title, icon?, order?, render, children? }) 注册到 settings.plugins 区域，是一个普通的带作用域贡献，因此带插件来源信息、禁用或卸载时会一起离开；每个带 config_schema 的 agent 插件会自动获得一个渲染该表单的页面，保存走 Settings profile 作用域的 plugins.manage 设置，统一包（桌面半边也注册了页面）里这个表单会变成该条目的「Agent settings」子页。能力 ▸ 插件旁的齿轮现在深链到插件页面（/settings?tab=plugins&amp;plugin=…&amp;ppage=…），注册了页面的桌面端插件也有齿轮；设置面板的搜索也会列出这个新页面。随后的两个修复把细节补齐：schema 表单绑定到单一 profile（按 (profile, plugin) 建键、只渲染该 profile 加载的行、保存写到该 profile 或直接拒绝，切换作用域会丢弃草稿），能力页的齿轮带上选中 profile，桌面端页面和自动生成的 agent 页面用互不相干的身份（kind 标记的 uid，?plugin= 与 ?agent= 两条路由）；表单渲染改用原生 Settings 行（每字段一个 ListRow，标签左辅助右控件右、JSON 占满整行），标签优先用 manifest 的 label/title、否则把键名转成句首大写并保留缩略语（maps_api_key → Maps API key），描述句之间补标点，Save 挪到页面标题行、未改动时禁用、保存时转圈，只有必填字段标 required。效果：插件设置有了统一、原生观感的入口，不再是每个插件各造一套。</p>
+<p>桌面端 · 模型选择器显示用量与限流</p>
+<p>d0e40fff3c feat(usage): report credential-pool usage per account</p>
+<p>38d19b92e8 feat(desktop): a progress chip warns before a subscription hits its usage wall</p>
+<p>8ab6d64043 feat(desktop): a rate-limited provider says why and until when in the model pickers</p>
+<p>9244275491 fix(desktop): distinguish account limits from pool exhaustion</p>
+<p>问题：用户看不出自己离订阅额度上限还有多远，也看不出某个 provider 是被限流了还是出问题了。修复：usage 现在按账号报告凭证池（credential pool）的用量，新增按 profile 的账号用量缓存（agent/account_usage_cache.py），model.options 会把用户窗口一起下发给选择器。桌面上 provider 标题的状态槽变成一条「油量计」，显示最紧的那个用量窗口：还有余量时隐藏，降到 20% 或以下显示还剩多少、什么时候重置（commit body 里的示例文案是「17% left · resets 3:00 PM」），10% 起转琥珀色，底边有一条表示剩余量的进度条；悬停会列出每一个窗口（5 小时、每周、按模型族）。登录额度用完则沿用原来的「Limited until」。数据来自后台刷新的缓存（每一发 fetch_account_usage 都落进缓存，包括每轮之后的 session.usage），所以选择器不会等用量 API，最多落后一两分钟或一两轮；覆盖内置的 Anthropic、Codex、OpenRouter 以及任何 provider 插件的 usage 钩子。同时 provider 的凭证池被限流时，model.options 会给那一行带上 limit 信息，选择器用琥珀色的「Limited until 4:30 PM」徽章标出来：整账号被限流（例如 Claude Pro/Max 的 5 小时窗口）时把该 provider 的模型变暗但仍可选，只有部分模型在冷却时只在冷却的那一行标「resets 4:30 PM」，同伴模型看起来就是继续干活的出路；解除时间过了徽章自动消失。两个选择器现在都用同一个 ProviderStatusChip，不再各画一套限流徽章。另外修了「账号本身到额度」和「凭证池用尽」被混为一谈的显示问题。效果：额度、剩余量和限流原因都在选择器里可见，不用再猜。</p>
+<p>插件系统 · 人工输入请求观察钩子</p>
+<p>c958e1a7b9 feat(plugins): on_human_input_request / on_human_input_resolved hooks</p>
+<p>问题：插件想知道 agent 什么时候在等人回答，得给每种提示各写一个钩子，或者拿一条 sudo 正则去扫终端命令。修复：新增 on_human_input_request / on_human_input_resolved 一对观察者钩子，agent 每次阻塞等待人输入时都会触发，触发点是各入口本就收敛的咽喉点——sudo 密码提示（CLI 回调、Ink TUI/桌面端 sudo.request 卡片、/dev/tty 回退）、clarify 提问（CLI、TUI/桌面端、网关）、dangerous 审批（CLI/TUI/ACP 回调与 input() 路径、插件传输、网关平台等待）。载荷含 kind、request_id（一对钩子共用）、session_id、session_key、platform、prompt，resolved 额外带 outcome；prompt 一律强制脱敏，用户输入的密码与 clarify 回答永远不会传出去。智能（aux-LLM）审批和被合并的网关跟随者不触发，因为它们没有新的人工提示。效果：通知类插件（例如 pushover 插件）一处订阅就能覆盖所有等人回答的场景。</p>
+<p>插件系统 · 插件能看到自己在哪次 cron 运行里</p>
+<p>61f8365da7 feat(plugins): ctx.current_cron_execution() tells a plugin which cron run it is in</p>
+<p>问题：插件过去只能把一次 cron 运行看成一个 task_id 字符串 cron:&lt;job&gt;:&lt;execution&gt;，分不清是定时触发还是手动 hermes cron run；一个只允许在真正定时运行里动作的安全插件没有东西可判断。修复：调度器现在在任务赢得 claimed→running 的 CAS 之后（或重启安全的 worker 认领了该行之后），把一个冻结的 CronExecution 绑进 ContextVar——含 job id/name、execution id、来源、预定时刻、开始时间、profile，运行结束时重置。ContextVar 的作用域把并发任务和不同 profile 隔开，也会跟着调度器已有的上下文拷贝带到线程上；被委派的子 agent 读到 None。效果：插件可以准确区分定时触发与手动触发。</p>
+<p>插件系统 · 网关执行后消费钩子（fail-open）</p>
+<p>b63305f379 feat(gateway): profile-scoped post-admission consuming gateway plugin extension (#129958)</p>
+<p>be5481690d feat(gateway): reshape post_gateway_admission into a fail-open consume hook</p>
+<p>问题：网关层缺一个「入站消息在准入之后、交给 agent 之前」的插件介入点，且早期实现是 fail-closed 的——任何一个已注册回调返回畸形值或抛异常，整条入站消息就被黑洞掉。修复：新增 profile 作用域的执行后消费型网关插件扩展，并把 post_gateway_admission 重塑为一个 fail-open 的单一接缝：只有 {&quot;action&quot;: &quot;handled&quot;, &quot;reply&quot;: str|None} 是唯一决定性的返回值，返回 None、其它值、抛异常或超时都照常走普通 agent 轮次；钩子在消息被路由到的 profile 作用域下触发（过去收信 bot 的处理器绑定的是传输 home，当一个 bot 服务另一个 profile 的聊天时，钩子处的环境作用域是错的 profile，那个 profile 的消费者根本不会跑）；载荷是纯快照（session_key、platform、source dict、message_id、text），不含活的网关 runner 或 session store 句柄；超时由 plugins.hook_callback_timeout 限定（fail-open），不再挂在 fail-closed 的策略钩子集合上。效果：一个有 bug 的插件不会让某个 profile 的来信全部消失。</p>
+<p>更新 · hermes update 每次顺手清理 partial clone 的 pack</p>
+<p>a0f47657b9 feat(update): clean up a partial clone&#x27;s packs a little on every update</p>
+<p>1fd75357e9 fix(update): stop folding lazy-fetch packs during hermes update</p>
+<p>2fa8090568 fix(update): pack tidy erases only provably redundant packs</p>
+<p>8830564a98 fix(update): a killed merge leaves no orphan pack, and a stale lock has one taker</p>
+<p>7157422022 fix(update): pack tidy never caches a partial comparison, and clears MIDX layers on Windows</p>
+<p>dab9af6204 fix(update): a pack that will not unlink stays whole; leftovers are finished later</p>
+<p>e1fdf003a6 fix(update): a clashing local tag or old git no longer leaves the conversion retrying forever</p>
+<p>0b570cb34c fix(update): conversion covers the checked-out history and starts no repack</p>
+<p>问题：partial clone 会不断累积按需拉取的 promisor pack，而之前加的折叠步骤会跑 git gc --auto——在大型 partial clone 上等于一次全量 repack：实测一个 9.6 GB、463 个 pack 的 checkout 每次更新卡 20 分钟、到上限被杀、下次更新从头再来，还从不释放磁盘。修复：改成每次 hermes update 最多花 60 秒做有界、渐进的 pack 整理，每个完成的单元都保留，所以大仓库会在几次更新里逐步收敛而不是卡死某一次。具体两步：一是删掉不含 commit 的空 promisor pack（其对象都是 promisor 远端提供的副本，需要时 git 再拉，这才能释放磁盘，旧的 gc 折叠从不释放）；二是当 promisor pack 还多于 50 个时，用 git pack-objects --stdin-packs 合并最小的几个（开销与这些 pack 成正比，不做可达性遍历），先写 marker 后写索引，保证 git 看到它的那一刻它就是 promisor pack。判定结果和合并批量大小（合并超时后减半）记在 .git/hermes-pack-tidy.json，后续更新不会重复做前面做不完的事。同时关掉原先那次 git gc --auto 折叠。随后一批独立评审的安全修复把删除规则收紧到「只删可证明冗余的 pack」：一个 promisor pack 只有当它里面每个对象都在另一个 promisor pack 里也有时才删（靠 .idx 文件二分查找判定，不为某个 pack 起一次 git 进程），因此本地不会丢任何东西、也不依赖远端仍然提供；合并后的 pack 最后一个发布（中途被杀只留元数据，会被残片清扫清掉，旧顺序留下的孤立 .pack 谁也清不掉）；取走过期锁前重新核对它真正重命名过的那个文件的年龄，新锁是竞争者的活锁、会还回去；比较时只读了一部分索引的 pack 不再被记成「唯一」（否则一次瞬时映射失败会把一个副本永久搁置），状态文件带版本号、旧判定丢弃；删除顺序改成先删 .pack 再删 .idx，被占用删不掉的 pack 保持完整、残余留给后续运行收尾；Windows 上增量 multi-pack-index 层过去用 rmtree(ignore_errors=True) 会静默留下只读层文件，现在逐个改可写再删。另外修了 treeless checkout 转换：本地 tag 冲突或 git 低于 2.36（没有 --refetch）时，过去每次更新都会告警并停在 tree:0，现在以离线历史完整性检查（rev-list --missing=print）为准而不是 fetch 的退出码，refetch 会带上 tags、并在仍缺 tree 时按 commit 补齐 HEAD 历史，转换的 fetch 还带 per-command gc.auto=0 与 maintenance.auto=false，不碰用户自己的设置。效果：更新时的磁盘清理真正释放空间、不会丢数据、也不会再卡死单次更新。</p>
+<p>上下文 · 截断会列出丢了哪些小节</p>
+<p>35f8786971 feat(agent): truncated context files name the sections that were dropped</p>
+<p>5af47ddcd2 fix(compaction): retain oversized typed user text at checkpoint boundary</p>
+<p>4d1b2dcf65 fix(compaction): tolerate content-less user item at over-budget boundary</p>
+<p>问题：上下文文件在预算不够时（小窗口、其它仓库）仍会被截断，而截断标记过去只列字符数，agent 无从判断丢掉的那部分重不重要。修复：标记现在会列出被省略中间部分的 markdown 标题（围栏代码块里的 # 注释忽略）。同时修了压缩边界的两个问题：超出预算的用户文本在 checkpoint 边界过去会被当作不可截断而整块丢掉，现在会保留；只有 output_text、没有 content 键的用户消息走到超预算分支时，过去会因为无保护的 item[&quot;content&quot;] 抛 KeyError 中断整个剪枝，现在用 item.get(&quot;content&quot;) 让它回落到原有的不可截断路径。效果：截断和压缩的行为更可预期，agent 和被压缩掉的用户输入都能被更准确地对待。</p>
+<p>桌面端 · 体验修复一批</p>
+<p>1205863164 fix(desktop): sync the live composer draft on press so a stalled flush can&#x27;t disable Send (#52950)</p>
+<p>2cc27f99e0 fix(desktop): paginate archived sessions</p>
+<p>b7a5f04327 fix(desktop): wire archive pagination through sessions API</p>
+<p>33687b0725 fix(desktop): advance archive pagination by page size, dedupe back-filled pins</p>
+<p>4da9edd79f fix(sessions): page aggregate lists past 500 rows</p>
+<p>6891c65702 fix(desktop): keep sidebar pin toggles from reverting after the write guard</p>
+<p>2953ead658 fix(desktop): stamp optimistic pin rows so value copies can&#x27;t confirm the guard</p>
+<p>7f2271dee3 fix(desktop): harden every Windows SSH stdout parser against CLIXML pollution</p>
+<p>dd479b3776 fix(desktop): keep SSH Windows probe stable against CLIXML progress-stream pollution</p>
+<p>6086a87cc9 fix(desktop): keep completion notification body off the session title</p>
+<p>2801f72c25 desktop: distinguish backend connection from messaging-gateway health</p>
+<p>发送键不再因为草稿刷新卡住而变灰：Send 按钮的禁用状态取自 AUI 的 composer 状态，它比 contentEditable 慢一帧合并刷新，刷新卡住时按钮看起来是死的（Chromium 里 disabled 按钮会吞掉整个按压、不给任何反馈），但回车其实还能发。修复是在按下时（pointerdown 捕获阶段、命中测试解析之前）先把实时编辑器内容同步进 composer 状态，跳过中文输入法合成中，HUD 拖拽接线保留。</p>
+<p>存档会话可以翻过 500 行了：归档列表过去只返回前 500 行，现在桌面端走 sessions API 分页，会话聚合列表也支持分页；游标按页大小推进（过去用 sessions.length 当偏移，而页里会回填置顶行、游标会跳行），回填的置顶行按 id 去重，翻到 page.total 或空页结束，不会因为置顶行把计数撑大而提前结束分页。</p>
+<p>侧边栏置顶切换不再回弹：本地切换置顶后缓存行还留着切换前的 pinned 标记，10 秒写入保护期一过，下一次 reconcile 会把旧行重新采纳并 PATCH 回去；现在写入时就把新值画到已加载的行上，并用可枚举 symbol 给乐观行打标（过去用 WeakSet 按对象身份跟踪，而 SessionInfo 行在普通路径上会按值重新展开，副本带走 pinned 却丢掉 WeakSet 成员资格，于是下一次 reconcile 把它当成与我们写入一致、提前释放保护期）。</p>
+<p>Windows SSH 探测不再被 CLIXML 污染：远程 Windows 的 PowerShell 会把进度流序列化成 CLIXML 混进 stdout，过去只有 Windows 探针做了清理，而同一连接上另外四个 PowerShell builder 同样解析 stdout——其中一个把最后一行 .pop() 当判定，被进度记录抢占后会误报「更新进行中」而拒绝 SSH 启动（一个会误导人的安全判定）。修复抽出共用的 stripPowerShellNoise（去 BOM + 去 CLIXML 块 + 取最后一行有意义输出）给四个解析器共用，并在三个解析型 builder 前置 $ProgressPreference。</p>
+<p>完成通知不再拿会话标题当正文：助手回复缺失时回退到一句通用文案，而不是空白正文或会话标题。</p>
+<p>状态栏区分后端连接与消息网关健康：那个叫「Gateway ready」的 pill 其实指的是 serve 后端 socket 连通，用户会读成 Discord/Telegram 在线；现在改名为 Backend，消息进程停止或某平台不健康时把消息存活状态折进详情。</p>
+<p>插件目录 · 本期新增与升级</p>
+<p>ef99177451 feat(plugin-catalog): add Cloudflare Web Search provider</p>
+<p>07fc615fbb feat(catalog): bump pushary to 0.5.9</p>
+<p>6e0d72b8b9 feat(plugin-catalog): bump redaction-pack to 1.2.0</p>
+<p>82870acb37 feat(plugin-catalog): add redaction-pack</p>
+<p>c911047a0b feat(plugin-catalog): add aux-ledger</p>
+<p>fdea7fec78 feat(plugin-catalog): add quotum model provider</p>
+<p>2e971e5011 feat(plugin-catalog): add darkmoon plugin</p>
+<p>2f278501ea feat(plugin-catalog): add jp-chatwork</p>
+<p>cd06384acc feat(plugin-catalog): add hermes-lang-vi and hermes-plugin-zalo</p>
+<p>46e7a87a5a feat(catalog): add Hermes Slash Router</p>
+<p>7bdbe0e939 feat(catalog): add echarts-in-chat</p>
+<p>1381760b2f feat(plugin-catalog): add stream-speed</p>
+<p>f1c9fba3df feat(plugin-catalog): add progress-squash</p>
+<p>e4566bbe79 feat(plugin-catalog): add crew</p>
+<p>92976bc206 feat(plugin-catalog): add ja-writing-guard</p>
+<p>5cf2a9309d feat(catalog): add pass-secrets entry</p>
+<p>57ced3ebac feat(plugin-catalog): add brethof-brain</p>
+<p>f2555a8dfc feat(plugin-catalog): pin listing banners for the PIR8 plugins</p>
+<p>6855de2e92 feat(catalog): add standalone Antigravity OAuth Plus</p>
+<p>32222059c2 feat(plugin-catalog): bump redaction-pack to 1.1.0</p>
+<p>5a88649f7c feat(plugin-catalog): show a card image for progress-squash</p>
+<p>61bf68aced feat(plugin-catalog): add the aux-ledger catalog card</p>
+<p>最值得注意的是 Cloudflare Web Search provider：一个社区插件，给已有的 web_search 工具加上 Cloudflare Web Search 后端，可以在插件设置里选 Ceramic / Exa / Linkup；只做搜索，extract 仍用单独后端，需要 CLOUDFLARE_WEB_SEARCH_API_TOKEN，查询会经 api.cloudflare.com 转发并记录在 AI Gateway 日志里。其余本期上新的条目包括：redaction-pack（并升级到 1.2.0）、aux-ledger、quotum 模型提供方、darkmoon、jp-chatwork、hermes-lang-vi 与 hermes-plugin-zalo、Hermes Slash Router（Desktop 限定 0.3.0）、echarts-in-chat、stream-speed、progress-squash、crew、ja-writing-guard、pass-secrets、brethof-brain、PIR8 系列（带列表横幅图）、Antigravity OAuth Plus 等；Index 升到 0.48.3、pushary 升到 0.5.9，多个条目补上了卡片图。</p>
+    </section>
+    
     <section id="2026-10-05" class="day">
       <h2>Hermes 日报 2026-10-05：Home Assistant 搬出内核成官方插件，命令行可管本地模型</h2>
       <p><strong>本期覆盖北京时间 10 月 4 日 06:30 ~ 10 月 5 日 06:30 进入 main 的提交，共 293 个 commit（不含 merge），另有 3 个合并提交。新增 27 个功能、115 个修复、1 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
