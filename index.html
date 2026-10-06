@@ -22,9 +22,132 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 70 期 · 28384 个提交 · 每日自动更新 ·
+<p class="meta">共 71 期 · 29428 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-07" class="day">
+      <h2>Hermes 日报 2026-10-07：更新器加固 350+ 条提交，桌面端新增全局通知条与实时语音转写</h2>
+      <p><strong>本期覆盖北京时间 10 月 6 日 06:30 ~ 10 月 7 日 06:30 进入 main 的提交，共 1044 个 commit（不含 merge），另有 3 个合并提交。新增 50 个功能、615 个修复、0 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期是典型的修复季：标题里含 update 的提交就有 372 条，其中 fix(update) 210 条。</strong></p>
+<p>📌 今日要点：</p>
+<p>更新器加固是本期主线：标题含 update 的提交 372 条（其中 fix(update) 210 条），marker v2 改按创建时间判定存活并做原子认领，被占用的更新挡在可恢复界面而不是等计时器</p>
+<p>桌面端新增状态栏上方的全局通知条 butterbar，并且任意聊天都能安装插件市场的插件</p>
+<p>语音输入改为边说边出字：stt.streaming 让 openai / xAI / elevenlabs 实时推送部分转写，插件 TTS 也能走流式</p>
+<p>内置的 tirith 命令扫描器从核心移除，审批检测器吸收了它最值钱的两项（凭据上传、不可见 Unicode）</p>
+<p>本地模型目录更新：Qwen3.8 Flash Next 换 UD-IQ4_XS 并带 MTP head，RTX Spark 默认 27B</p>
+<p>QQ Bot 的 send_message 支持主动媒体推送；插件可以注册自动化蓝图；插件目录本期新增/升级 21 项</p>
+<p>重点条目：</p>
+<p>桌面端 · 全局通知条 butterbar</p>
+<p>3f62bc5342 feat(desktop): full-width butterbar above the statusbar</p>
+<p>a10faf9e5a feat(desktop): butterbar store — register notices from anywhere</p>
+<p>问题：桌面端的全局提示过去是零散各个 toast，状态栏上方没有一条统一的通栏位置。修复：状态栏上方新增一条通栏通知条（full-width butterbar），同时加了 butterbar 通知仓库（store），任意代码路径都能登记一条全局提示，不用各自找地方弹窗。效果：面向全应用的提示有了统一的展示位和统一的注册入口。</p>
+<p>桌面端 · 任意聊天都能安装插件市场的插件</p>
+<p>c2b13dc3d8 feat(desktop): every desktop chat can install catalog plugins; tools gated by session platform</p>
+<p>问题：插件安装卡片过去只在 setup 聊天里可用。修复：工具集按会话平台门控——只属于某一类会话的工具集现在在自己的 spec 上声明 `platforms=frozenset({&quot;desktop&quot;})`，`TOOLSET_SESSION_PLATFORMS` 从这些 spec 推导，`all` / `*` / 不选都会跳过它们，`toolsets.agent_tool_drops(agent)` 把会话平台不在列表里的工具从该 agent 上摘掉。`manage_catalog` 移入新的 catalog 工具集，桌面端把它像 project、desktop_ui 一样折进每一个桌面聊天，默认走 tool_search 延迟加载。安装卡片因此在 setup 聊天之外也能工作（#129650 含审核修复）：并行安装由 `_set_plugin_enabled` 的按 home 锁保护读-判-准入段，同时启用的两行不再互相拒绝；已在磁盘但未启用的目录插件被就地启用。效果：任何桌面聊天里都能装插件市场插件。</p>
+<p>桌面端 · 一批体验修复</p>
+<p>f634b08a2c fix(desktop): keep Dark mode across Bot Mode new chat</p>
+<p>609affef45 fix(desktop): multi-select folders when adding to an existing project (#68741)</p>
+<p>19c862020b fix(desktop): Simple mode keeps the statusbar up for a signed-out free-tier user</p>
+<p>ee320cb6c1 fix(desktop): a profile switch no longer keeps the previous profile&#x27;s Sign in (review)</p>
+<p>96c64b4526 fix(desktop): key Webhooks state and REST to the active backend profile</p>
+<p>问题：几处用户能直接撞上的交互问题。修复：命名 profile 的外观选择现在镜像进全局回退，一个历史遗留的全体一致 per-profile 模式会被提升进空的全局槽，Bot Mode 跳到从未设过主题的 bot 上会继承用户模式而不是解析成系统主题（#101216）；给已有项目添加文件夹时，过去 add-folder 对话框硬编码 `multiple: false`，一次只能选一个文件夹，现在新增复数版 pickProjectFolders 打开原生多选，一次提交写入所有选中的文件夹（排除项目已有和本次重复的），创建流程复用同一多选累积文件夹列表；Simple 布局过去把整个状态栏收起隐藏，而状态栏上的 Sign in 芯片是免费额度用户唯一的常驻登录入口，现在状态栏可见性绑定到 `$freeTierSignInOpen`（免费额度可用＝未登录且没有引导流程在跑）这一条条件，已登录的 Simple 用户仍然隐藏状态栏；切换 profile 时丢弃缓存的免费额度状态，同一作用域内的抖动则保留；Webhooks 的状态和 REST 调用按当前后端 profile 区分。效果：外观、文件夹选择、登录入口、Webhooks 作用域都不再串号。</p>
+<p>语音 · 实时转写 stt.streaming</p>
+<p>00adf69d92 feat(stt): live transcription while you speak on CLI, TUI and Desktop (stt.streaming)</p>
+<p>问题：语音输入在所有界面都是「先录完再上传」，用户说话时屏幕上什么都没有，转写要等整段上传完才到。修复：开启 `stt.streaming: true` 后，openai、xAI、elevenlabs 三个提供方把麦克风 PCM 边说话边推给各自的 realtime 端点，部分文字实时渲染、语音结束时最终转写已就绪。tools/transcription_streaming.py 提供一套会话 API（push_audio / end_audio / finalize / cancel、on_partial 回调、持有 socket 的工作线程），对应三条线路，均已实测：OpenAI Realtime 的 `type: transcription` 会话（gpt-live-transcribe，因为端点拒绝低于 24 kHz，从 16 kHz 重采样到 24 kHz）、xAI 的 wss /v1/stt（带 interim results）、ElevenLabs Scribe v2 realtime；插件提供方通过 TranscriptionProvider.streaming_capable / open_stream_session 加入。tools/voice_mode.py 让 AudioRecorder 把采集回调接入会话并同时挂在 WAV 路径下，transcribe_recording 优先用实时转写、失败或结果为空时回落到文件，所以 CLI 的按住说话、连续 VAD 循环和 TUI 网关无需改调用点就获得流式。经典 CLI 和 Ink TUI 在录音时把部分文字显示在输入占位符里（新增 voice.partial 网关事件），桌面端把 PCM 推到新的 /api/audio/transcribe-stream 套接字（提供方密钥留在宿主机，重采样也在宿主机做），在听写气泡里显示部分文字。效果：说话时就能看到字，说完立刻拿到结果。</p>
+<p>语音 · xAI 转写默认升到 grok-voice-transcribe-2.0</p>
+<p>56b0f3cb55 feat(stt): pin xAI transcription to grok-voice-transcribe-2.0</p>
+<p>问题：POST /v1/stt 在省略 model 时默认还是 grok-voice-transcribe-1.0，而 Hermes 过去只记录「grok-stt」、从不发送这个字段，语音消息一直停在 1.0。修复：在网关和桌面端直连路径上都发送 `stt.xai.model`，默认 2.0，可通过 STT_XAI_MODEL 覆盖。效果：xAI 语音转写默认用上 2.0。</p>
+<p>语音 · 插件 TTS 也能走流式</p>
+<p>65ea2324af feat(tts): let PCM-streaming plugin TTS providers join the streaming path</p>
+<p>问题：插件注册的 TTS 提供方只能走同步分发器，本地引擎（Piper、KittenTTS、自托管服务）即使按句吐音频也要等整段合完才出声，因为 tts_streaming 的解析器只查自己的内置注册表。修复：注册的 TTSProvider 只要用 `streams_pcm = True`、`stream_channels = 1`、`stream_sample_width = 2` 和 `stream_sample_rate` 属性声明自己是原始 int16 单声道 PCM，就会被 `_plugin_streamer()` 适配成 StreamingTTSProvider，和内置的分块提供方一样喂给 CLI/TUI 播放管线、网关的 StreamingTTSConsumer 和桌面端 speak-stream WebSocket。效果：本地引擎插件也能边合成边播放。</p>
+<p>本地模型 · Qwen3.8 Flash Next 换 UD-IQ4_XS 并带 MTP head</p>
+<p>feaa55d9bb feat(local-models): run Qwen3.8 Flash Next as UD-IQ4_XS with its MTP head</p>
+<p>问题：Flash Next 的目录构建是 UD-Q4_K_XL，103.6 GiB，128 GB 统一内存机器装不下。修复：换成 UD-IQ4_XS——磁盘 91.9 GiB，逐层 embedding 表留在磁盘后实际加载约 60 GiB。该模型没有 MTP 层，unsloth 把 head 作为单独文件发布，目录因此新增 mtp_head 伴随项，随模型一起下载、下载前后都计价，只有落盘后预设才加上 `--spec-type draft-mtp` 并把 head 作为 `--model-draft`（深度 3，取自厂商配方）；min_engine 提到 b11370，即第一个带 Qwen4Exp MTP 的固定构建。加上投影器和 head，原生 256K 窗口下需要约 74 GiB，推导推荐因此把它选在 96 GB 独显以及 96 / 128 GB 统一内存上；目录测试接受 4-bit IQ4 构建为 Q4 级，面板的 MTP 标记覆盖随附 head，Hugging Face 浏览器不再把 mtp-*.gguf 头文件列为模型。效果：统一内存机器能真正跑起来，且带投机解码。</p>
+<p>本地模型 · RTX Spark 默认 27B</p>
+<p>c71ff7ebdd feat(local-models): the RTX Spark defaults to the 27B</p>
+<p>问题：需要按机型给默认模型。修复：RTX Spark 出厂默认就是 27B；Flash Next 仍可用，但 Windows 用 commit 给 GPU 显存背书、要落在 carve-out 之外，所以只有 carve-out 给 Windows 留够内存时 Flash Next 才能加载（没有页面文件时 8 GB carve-out 可以，64 或 96 GB 不行）。推荐逻辑现在先查按平台、有效后端和已识别 GPU 建键的产品默认表，再走推导规则；默认项不合格或无法常驻（Vulkan / CPU 引擎、DGX Spark）时仍由推导规则决定。Recommended 徽章文案是「The default model for this machine, chosen by its manufacturer.」。效果：出厂默认与厂商一致。</p>
+<p>本地模型 · 下载固定到目录描述的 revision</p>
+<p>93fb5efc61 feat(local-models): pin Flash Next&#x27;s downloads to the revisions the catalog describes</p>
+<p>本地模型 · 懒加载张量不再算进已加载内存</p>
+<p>a6d292d3bb feat(local-runtime): price tensors the engine reads from disk as not loaded</p>
+<p>问题：llama.cpp 对架构标了 TENSOR_READ_LAZY 的张量只把它留在文件里、按需读行（默认 --lazy-mode auto 下对超过 4 GiB 的标记张量生效，b11370 里是 qwen4exp 和 gemma4 的 per_layer_token_embd），而 Hermes 把它当成已加载权重，于是 Qwen3.8 Flash Next 那个 26.8 GiB 的逐层 embedding 表被算进了它根本不会占用的内存。修复：读取器按部件记录候选张量并套用部件 1 的架构（所以后一个分片里的表也能被找到），profile_from_gguf 在计价时不把它们计入，目录构建也带上 lazy_bytes，因此下载前也同样成立。效果：内存占用估算更贴近实际。</p>
+<p>更新器加固 · 更新 marker v2（root home、按创建时间判定存活、原子认领）</p>
+<p>e267537a75 fix(bootstrap-installer): update marker v2 — root home, creation-time liveness, atomic claim</p>
+<p>问题：更新标记（marker）有三个真实故障：20 分钟年龄上限会在更新进行中把存活的所有者回收掉；Windows 的 pid 复用会一直占着门控；先读后写的认领让两个更新器同时跑。修复：UpdateMarkerGuard 实现 marker 契约 C1——marker 放在 profile 树根（paths::hermes_root），不再放 profiles/&lt;p&gt; 下；body 写 pid / started_at / 创建时间（Windows 用 GetProcessTimes，Linux 读 /proc stat，macOS 用 proc_pidinfo）；所有者存活＝pid 活着且创建时间对上（2.0 秒容差）；v2 marker 不再有年龄上限，20 分钟上限只用来清理 v1 marker；认领用 create_new + sync_all，对已死所有者做一次比较删除后重试；每次删除都是比较删除；第 4 行还有存活的 delegate 时 marker 保持存活。效果：正在进行的更新不会被自己人回收，pid 复用不再卡门控，两个更新器不会同时跑。</p>
+<p>更新器加固 · 被占用的更新挡在可恢复界面，而不是等到计时器</p>
+<p>74b5854ebd fix(desktop): a held update blocks boot behind a recoverable screen, never a timer</p>
+<p>问题：一个已确认的 held 判定（更新已退出，但它启动的进程还握着 checkout 锁）过去超过 7200 秒就不再阻塞，本地后端会在这个进程仍可能写安装目录的时候启动。修复：更新持有期间门控绝不自行打开。每个阻塞状态带一个稳定的 hold id（marker body 的 sha256）和 blocking 标记（held/busy/error，不是「有存活 pid」）；持有期间唯一的放行是 `allowStartOverHold(id)`，且限定在同一个 marker body、进程级生效（pool 等待遵守它，新的 body 会重新阻塞）；`requestHoldRecheck()` 让每次探测在下一轮轮询时重新问脚本助手；marker 本身从不被改动。main.ts 里过了 5 秒宽限后启动界面显示 blocked 屏（启动进度 updateHold）：谁握着安装、从什么时候开始、上次检查时间；IPC 只接受主窗口，提供重新检查、退出和「仍然启动」，其中「仍然启动」需要 `confirmed: true` 和屏幕上那个 hold id，会记一条 USER OVERRIDE 日志。效果：不会在还有进程写安装目录时放本地后端起来。</p>
+<p>更新器加固 · Windows hand-off 先认领 marker，绝不把已提交的更新判失败</p>
+<p>cb8451baa5 fix: windows hand-off claims the update marker first and never fails a committed update</p>
+<p>问题：桌面端 hand-off 的 marker 认领时机和判定不够硬。修复：windows.ps1 在 Windows 桌面端 hand-off 上实现 marker 契约 C1 v2 和 C3 结果词表——认领是脚本的第一个动作（在任何 Add-Type、UI 或探测之前），用 tmp + File.Move 独占创建、从不覆盖，body 是 `&lt;pid&gt;\n&lt;started_at&gt;\nct:&lt;creation time&gt;\n`；由恰好 -DesktopPid 拥有的存活 marker 用比较交换接管并保留 started_at；其它任一存活所有者直接拒绝本次运行（退出码 2、marker 不动、「Nothing was changed」）；已死所有者（pid 消失、创建时间不匹配＝pid 复用、v1 超过 20 分钟）走比较删除后重试认领。释放是对第 1~3 行做比较删除，第 4 行有存活 delegate 时保留 marker；一棵卡住的树无法静默时（退出码 7）marker 会加上一行 delegate 指明存活的 job 成员，从而与它同生共死。效果：已提交的更新不会被 hand-off 误判失败。</p>
+<p>更新器加固 · 桌面端直接构建会持有更新器要拿的 checkout 锁</p>
+<p>fa69864013 fix(desktop): a direct desktop build holds the checkout lock an updater takes, then its own</p>
+<p>问题：直接跑桌面端构建和更新器可能同时改写同一份检出。修复：一次直接的桌面端构建先持有更新器会拿的那个 checkout 锁，再持有它自己的锁。效果：构建与更新在同一份检出上互斥。</p>
+<p>安全 · 内置 tirith 扫描器从核心移除</p>
+<p>911da42e9e refactor(security): remove the bundled tirith scanner from core</p>
+<p>1070b91da6 Revert &quot;plugin-catalog: add tirith (opt-in pre-exec scanning, moved out of core)&quot;</p>
+<p>问题：tirith 过去对每条终端命令跑 `tirith check`，默认开启、fail-open，靠启动时自动下载的固定版本二进制。按随附的 0.4.2 二进制测量，它拦下 14/16 条攻击命令，但同时误报了 12/24 条日常 agent 命令（`echo $((6*7))`、`&quot;$VAR/x.sh&quot;`、`gh api | python3`、局域网 curl、`.dev` 域名、pip install 因 analysis_incomplete 等），在 cron / `-q` deny 模式下这些每一条都是硬阻断。它只看得见终端字符串（execute_code、文件写入和浏览器都绕开它）；fail-open 意味着二进制装不上的地方（Windows、Termux、x64 musl）没有保护；还持续产生 issue/PR 流（fail_open 语义四次、安装循环填满磁盘、一次 SIGSEGV 挂起、会话审批作用域、审批卡片上的第三方推广文字）。修复：移除 tools/tirith_security.py、命令守卫里的 tirith 分支（is_tirith 元组、仅会话的「always」降级、导入失败/fail-open 路径、无人值守的 tirith 环节）、CLI 和网关的启动安装器、PM 包与锁文件 pin、nix 运行时依赖、security.tirith_* 默认值、CLI 警告串和三条 tirith 提示（空缺从尾部回填以保留翻译），以及网关那条只为指向 tirith 而存在的「没有自动评估器」警告。配置 v50 删掉 security.tirith_*，没有用别的东西顶上。Hermes 不维护 tirith 插件；上游若发布，则走正常目录准入、用它们自己的名字。（14/16、12/24 等量化数据出自 commit body 里对随附 0.4.2 二进制、以及 40 条命令样本的测量记录。）效果：核心少了一块默认开启、只覆盖终端字符串、在部分平台根本装不上、还持续误报的组件。</p>
+<p>安全 · 审批检测器吸收了 tirith 最值钱的两项</p>
+<p>68dd992769 feat(approvals): flag credential uploads and invisible Unicode in terminal commands</p>
+<p>问题：危险命令检测器漏掉两类内容级形态，过去只有内置 tirith 扫描器能抓。修复：补齐这两类——一是携带秘密名变量或凭据文件的 curl/wget 请求体（`-d &quot;k=$OPENAI_API_KEY&quot;`、`-F file=@.env`、`-T ~/.ssh/id_rsa`、`--post-file=/etc/passwd`），或把凭据文件管进上传的 curl/wget；Authorization 头属于正常 API 用法，不标记，标记字母大小写敏感（-D/-f 不上传）；二是零宽 / 双向 Unicode 控制符，它们让被批准的命令和实际执行的命令不是同一条，emoji ZWJ 序列不标记。在 40 条命令样本上，核心现在拦下 13/16 条攻击（此前 9/16，tirith 0.4.2 为 14/16），同时误报 5/24 条正常命令（tirith 为 12/24）。效果：核心自身的安全覆盖提升，误报下降。</p>
+<p>平台与生态 · QQ Bot 支持主动媒体推送</p>
+<p>e167fc33b7 feat(qqbot): add support for proactive media delivery via send_message</p>
+<p>ebadb5462e fix(qqbot): degrade media send failure to text + warning instead of dropping it</p>
+<p>问题：QQ Bot 缺少通过 send_message 主动发媒体的能力。修复：新增一套 QQ Bot 媒体处理测试（文件类型识别与媒体路由），增强 send_message_tool 以支持 QQ Bot 的媒体上传，既能发独立的媒体消息，也能发带媒体附件的文字消息，并覆盖 C2C 单聊和群聊；同批还有一条边界修复，媒体发送失败时会降级为文本并给出警告，而不是把这条消息整个丢掉。效果：可以主动给 QQ 会话推送图片等媒体，发送失败也不会静默丢消息。</p>
+<p>平台与生态 · 插件可以注册自动化蓝图</p>
+<p>a928a959e3 feat(plugins): let plugins register Automation Blueprints via ctx</p>
+<p>问题：自动化蓝图只有内置的，插件没法贡献自己的。修复：插件调用 `ctx.register_automation_blueprint(key, *, title, description, schedule_template, prompt_template, category, slots, deliver_default, skills, tags)`，字段与内置 AutomationBlueprint 对齐，slots 是 BlueprintSlot 字段字典，因此这个调用也能跨插件宿主边界。查找统一走 `cron.blueprint_catalog.list_blueprints()` / `get_blueprint()`，在调用时把内置和当前 profile 的插件蓝图合并；/blueprint（CLI/TUI/消息平台）、/api/cron/blueprints 和实例化路由都用它，dashboard 各路由在 ?profile= 作用域内解析、不占事件循环。键以 `&lt;plugin&gt;:&lt;key&gt;` 命名空间化，插件无法遮蔽内置项；键里带冒号、键重复、占位符未知、slot 类型不对或计划解析不了，都会在注册时告警并忽略。桌面端按 profile 拉取它创建任务的那个 profile 的目录，在蓝图行和「Start from」选择里显示插件名。效果：插件能贡献定时任务模板。</p>
+<p>平台与生态 · computer-use 变成可插拔的单选提供方</p>
+<p>63f5e0ea45 feat(computer-use): pluggable single-select computer-use providers</p>
+<p>问题：第三方驱动（例如仿 Codex 的 computer-use 实现）过去只能改核心来替换 cua-driver。修复：computer_use 现在和 memory 提供方、上下文引擎、cron 调度器一样走单选提供方模型——先发现 bundled 的 plugins/computer_use/&lt;name&gt;/，再发现用户的 $HERMES_HOME/plugins/&lt;name&gt;/（标记是 register_computer_use_provider / ComputerUseProvider），只加载 computer_use.backend 指定的那个（默认 cua），每次调用时读取所以每个 profile 各用各的；未选中的提供方根本不会被 import，列表只读 plugin.yaml；名字未知或加载不了会返回错误并列出名字和已安装提供方，不做回退。内置的 cua-driver 变成 plugins/computer_use/cua/ 下的普通 bundled 提供方（驱动实现仍在 tools/computer_use）。效果：替换 computer-use 驱动不再需要改核心。</p>
+<p>平台与生态 · 新增 Solstice 推理提供方</p>
+<p>8e015f483f feat(providers): add Solstice as a secret-launch OAuth inference provider</p>
+<p>问题：需要一个按用户配额的 OAuth 推理提供方，且在公开发布前不露脸。修复：Solstice——按用户配额的 OAuth 推理，默认隐藏直到公开发布放行。认证（OAuth2 + PKCE，用用户自己的账号）由 nous-account-service 代理，服务端保管机密客户端密钥；推理直连按用户配额的端点。提供方侧新增 plugins/model-providers/solstice/（profile + 隐藏启用门控）、hermes_cli/solstice.py（PKCE 回环登录、NAS 代理的 config/exchange/refresh、令牌存储、隔离区）、agent/solstice_adapter.py（在原生适配器的 OpenAI 兼容外壳上做按用户配额传输），并在 list_providers 里加隐藏过滤，保持不出现在选择器/注册表/doctor 里直到启用。效果：提供方就位但默认不可见。</p>
+<p>平台与生态 · 看板面板把磁盘上的 profile 直接显示成泳道</p>
+<p>fd4dc86146 feat(kanban-dashboard): show profiles on disk as lanes even when idle</p>
+<p>问题：看板面板运行列里按 profile 分组的泳道，过去来自 `SELECT DISTINCT assignee FROM tasks WHERE ... status != &#x27;archived&#x27;`，所以一个新加的 profile 要等被分到第一个非归档任务之后才会有自己的泳道。修复：改用 kanban_db.known_assignees()，即已经支撑 /assignees 选择器端点的同一个助手，它把磁盘上配置的 profile 和当前持有非归档任务的 profile 取并集。效果：新 profile 立刻出现在泳道集合里，两个端点也不再各说各话。</p>
+<p>平台与生态 · gui_tour 无步骤启动会跑应用自带引导</p>
+<p>890976c224 feat(tour): gui_tour start with no steps runs the app&#x27;s built-in tour</p>
+<p>问题：gui_tour 不带步骤时需要有个明确行为。修复：`gui_tour` 以无步骤方式启动时，直接运行应用内置的 tour。效果：行为明确、可预期。</p>
+<p>插件目录 · 本期新增与升级</p>
+<p>5e0048115b feat(plugin-catalog): add hermes-tenuo</p>
+<p>2fdd886b96 feat(plugin-catalog): add session-lens</p>
+<p>d43c3a226d feat(plugin-catalog): add openclawcash-agentwallet</p>
+<p>7642700e9a feat(plugin-catalog): add banner image for openclawcash-agentwallet</p>
+<p>b1e06da3d1 feat(plugin-catalog): add stt-vocab</p>
+<p>50b40b40fc feat(plugin-catalog): show a card image for stt-vocab</p>
+<p>f34d582873 feat(catalog): add Tabro local browser automation plugin</p>
+<p>07405b8330 feat(plugin-catalog): add bento plugin</p>
+<p>4153fe1eed feat(plugin-catalog): add stalkchain</p>
+<p>4f36567571 feat(plugin-catalog): add error-ledger</p>
+<p>de0773a424 feat(plugin-catalog): add the error-ledger catalog card</p>
+<p>25f0b1f7aa feat(plugin-catalog): add hermes-teammates plugin</p>
+<p>84718da668 feat(plugin-catalog): add fxmacrodata</p>
+<p>2fdc8c619f feat(catalog): add limbic entry</p>
+<p>aa15123dd6 feat(catalog): add hermes-gemini-live</p>
+<p>ccf1a72dc0 feat(plugin-catalog): add cursor-provider v0.3.5</p>
+<p>79803ece12 feat(plugin-catalog): bump pushover-hermes-plugin to 1.2.0</p>
+<p>87bf6ec91e feat(plugin-catalog): bump plan-mode to 0.3.3</p>
+<p>2821126779 feat(plugin-catalog): bump redaction-pack to 1.4.0</p>
+<p>05d188d1b9 feat(plugin-catalog): bump redaction-pack to 1.3.0</p>
+<p>f05eae08f5 feat(plugin-catalog): add the stream-speed catalog card</p>
+<p>e5ff3cc1cd Add plugin-catalog entry: usage-flame</p>
+<p>d68874093a Add pdf-surgeon to the plugin catalog</p>
+<p>4e1a9e8173 plugin-catalog: add Stack Markdown memory provider</p>
+<p>9d4dfde817 plugin-catalog: add mem0 and openviking (vendor-maintained memory providers)</p>
+<p>63cca5f39f catalog: add kimchi-provider (Kimchi models via OpenAI-compatible API)</p>
+<p>14414baf28 plugin-catalog: add session-token-counter</p>
+<p>3b3cdbbe71 plugin-catalog: add hydradb memory provider</p>
+<p>本期插件目录继续上新，合计 21 项（新增 12 个插件条目、5 次版本升级、4 张目录卡片/横幅）：新增 hermes-tenuo、session-lens、openclawcash-agentwallet（含横幅图）、stt-vocab（含卡片图）、Tabro 本地浏览器自动化、bento、stalkchain、error-ledger（含卡片图）、hermes-teammates、fxmacrodata、limbic、hermes-gemini-live；升级 cursor-provider 到 0.3.5、pushover-hermes-plugin 到 1.2.0、plan-mode 到 0.3.3、redaction-pack 到 1.4.0（含 1.3.0 一档），并加了 stream-speed 的目录卡片。效果：目录条目和卡片继续扩充。</p>
+<p>另外还有一批不带 feat 前缀的目录提交也在本期进入 main：mem0 与 openviking（厂商维护的记忆提供方）、Stack Markdown 记忆提供方、usage-flame、hydradb 记忆提供方、kimchi-provider（Kimchi 模型走 OpenAI 兼容接口）、pdf-surgeon、session-token-counter；以及一批版本升级与 re-pin——evalroute 0.6.4、hermes-monitor 0.3.5、hermes-memory-ui 0.6.3、hermes-slash-router 0.3.1、Gmail 1.0.15、pinned-folders 0.1.3、honcho，加上 limbic / stack / hydradb / hermes-gemini-live / openclawcash-agentwallet 的多次 re-pin。所以上面 21 项是按带 feat 前缀的目录提交统计的口径，不是本期目录改动的全部。</p>
+<p>其他值得一提的修复：</p>
+<ul>
+<li>面板（dashboard）：反向代理前缀修复一串——登录后落地页、logout 重定向、服务端渲染的登录页都尊重 X-Forwarded-Prefix，CORSMiddleware 移到最外层让 OPTIONS 预检绕过鉴权，SPA 资源带明确的 MIME 类型（liuhao1024 / Austin Pickett）。</li>
+<li>面板用量归属：按 API 调用从 session_model_usage 归属模型用量、把辅助用量折进它所属的模型卡、按合并后的行集去重计模型数。</li>
+<li>网关 transcript spool 恢复加固：一列畸形的 spool 行不再卡住它的会话、只隔离 sqlite 绑不上的行、恢复期间的内存有界、重启时按丢弃顺序重放被上限丢掉的 spool 文件、保留结构化字段。</li>
+<li>技能 hub：被吊销的 GITHUB_TOKEN 不再阻塞 hub 安装（回落到 gh auth / 匿名并说明）、按 identifier slug 解析 hub 安装并大声失败、按名字安装内置技能会真正可用而不是失败。</li>
+</ul>
+    </section>
+    
     <section id="2026-10-06" class="day">
       <h2>Hermes 日报 2026-10-06：桌面端插件设置有了统一入口，模型选择器会显示用量与限流</h2>
       <p><strong>本期覆盖北京时间 10 月 5 日 06:30 ~ 10 月 6 日 06:30 进入 main 的提交，共 427 个 commit（不含 merge），另有 2 个合并提交。新增 43 个功能、215 个修复、2 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。</strong></p>
