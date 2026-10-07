@@ -5,8 +5,148 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 07 Oct 2026 06:49:44 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 08 Oct 2026 06:50:22 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-08：更新器回收被杀 git 的锁、语音回合独立路由，插件目录上新 30 余项</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-08</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-08</guid>
+      <pubDate>Thu, 08 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖北京时间 10 月 7 日 06:30 ~ 10 月 8 日 06:30 进入 main 的提交，共 426 个 commit（不含 merge），本期没有合入 merge 提交。新增 35 个功能、199 个修复、2 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期延续修复季的节奏：插件目录相关提交 60 余条（涉及 30 多个插件条目的新增和推进），更新器围绕 git 锁和网关暂停又做了一轮加固，桌面端则是一批用户能直接撞上的交互修复。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端：主题排版开放 baseSize/lineHeight/letterSpacing 三个可调项，自动项目「从侧边栏隐藏」可以撤销，Windows 上盖住聊天的链接标题窗口被彻底按住</p>
+<p>模型目录：claude-haiku-5.5 进入 OpenRouter 和 Nous Portal 两个目录，Bedrock 上的 Claude Opus 5 / 5.5 补上按快照定价</p>
+<p>插件市场：涉及 30 多个插件条目的新增和推进（目录相关提交 60 余条，新上架 15 项、另有 30 多次版本升级和重钉），包括桌面伙伴 Hermes Pokemon、Jot 笔记、SwitchBot 家居控制、Klipper 打印监控、fish-audio 与三个记忆提供方</p>
+<p>更新器：被杀死的 git 留下的 index.lock 不再挡住下一次更新；POSIX 上更新前先把网关在飞的回合排空，再换代码</p>
+<p>语音与运维：语音回合有了自己的辅助模型槽位 voice_chat，默认关闭推理；cron 存储不可写会在 cron status / doctor / 监控 / home 频道四处同时暴露</p>
+<p>重点条目：</p>
+<p>桌面端 · 主题排版新增三个可调项</p>
+<p>7951ddd729 feat(desktop): theme typography baseSize/lineHeight/letterSpacing</p>
+<p>问题：仪表盘的主题系统带 baseSize / lineHeight / letterSpacing，但桌面端的 DesktopThemeTypography 只到字体栈就停了，想把字调大只能去手改打包在 ASAR 里的 styles.css，而每次更新都会把它覆盖掉（issue #41766）。修复：把这三个可选旋钮加进主题模型，在 applyTheme() 里写成 --dt-base-size / --dt-line-height / --dt-letter-spacing，对齐仪表盘的 typographyVars。applyTheme 对其它变量是无条件写入的，但这三个在 styles.css 里有 :root 兜底，所以主题没设某一项时必须把内联值移除，否则切换主题后上一个皮肤的字号会粘住。VS Code 主题和 CLI 皮肤本身不带排版意见，内置和导入的行为不变。效果：桌面端可以在主题里直接控制基础字号、行高和字距，不用再手改打包文件。</p>
+<p>桌面端 · 自动项目「从侧边栏隐藏」可以撤销</p>
+<p>3b2a6b6e1a fix(desktop): make auto-project Hide from sidebar reversible via an Undo toast (#73091)</p>
+<p>734c35bbc7 fix(desktop): translate the undo-hide toast strings (de/es/fr/ru) for #73091</p>
+<p>问题：隐藏一个自动派生的项目过去只是把 id 追加进持久化的 $dismissedAutoProjectIds，没有任何恢复路径——提示里没有 Undo，撤销快捷键没接，也没有别的地方能把这一行找回来，误点一次就是永久消失。修复：新增 restoreAutoProject(id)（与 restoreWorktree 对应），removeAuto 会弹一个带 8 秒 Undo 的成功提示；id 在隐藏之前就捕获下来，所以侧边栏那一行卸载、作用域退出之后 Undo 依然有效。提示文案还补了 de/es/fr/ru 四语翻译。效果：误点隐藏可以一键恢复。</p>
+<p>桌面端 · 链接标题窗口不再盖住聊天</p>
+<p>6869d009c9 fix(desktop): the link-title window cannot become visible</p>
+<p>问题：Windows 桌面端在浏览器工具跑的回合里，隐藏的二级链接标题 BrowserWindow 仍然会在聊天上方画出一块空白的顶层框（#64867）。修复：把不可见契约直接写进启动参数——屏幕外边界、skipTaskbar、focusable: false——再用 setOpacity(0) 和 hide() 双保险，和音频静音一样按尽力而为处理。效果：浏览器工具运行时不会再有一块空白窗口压在聊天上。</p>
+<p>桌面端 · 界面缩放默认 100%</p>
+<p>75dfe26cea fix(desktop): default UI Scale to 100% and keep chat text at 110%</p>
+<p>问题：全新安装打开时窗口缩放是 90%，视图菜单里的 Actual Size（Ctrl+0）也会重置回 90% 而不是实际大小。修复：把 100% 作为默认的 UI Scale，聊天文字大小保持 110% 的默认值。效果：新装的界面尺寸就是标准大小。</p>
+<p>桌面端 · 分支聊天不再卡在加载转圈</p>
+<p>3824188376 fix(desktop): a branched chat no longer gets stuck on a loading spinner</p>
+<p>问题：分支当前聊天时，代码在同一个 tick 里先 navigate(child) 再 resumeSession(child)。resumeSession 在入口处捕获路由令牌，但路由要到下一次渲染才发布新路径，于是它捕获到的令牌仍然指向父聊天；那次渲染落地时 resume 还在等 resolveStoredSession / 网关，isCurrentResume() 看到令牌变了就直接返回，把这次恢复丢掉——子聊天被选中、却没有活动运行时、正文为空，还挂着一个转圈。侧边栏的 use-route-resume 也无从补救（选中项已和路由一致，路径变化边沿被压掉了），用户得切走再切回来才能出来。修复：isCurrentResume 现在把「路由正落在被恢复的那个会话上」视为仍然有效（session-context-drift.ts 的 resumeRouteStillCurrent），指向别的聊天的路由照旧取代恢复。这个 bug 顺带让 Desktop 的 lineage-sidebar E2E 大约每 10 次失败 2 次，修完也不再抖。效果：分支出来的聊天能正常绑定并显示历史。</p>
+<p>桌面端 · 一批零碎修复</p>
+<p>53aec0e289 / 59a3866ea5 fix(desktop): persist project cwd for new sessions</p>
+<p>7b9ce36a21 fix(desktop): widen the inline image preview envelope so stacked image sets stay viewable</p>
+<p>071842a869 fix(desktop): explain missing remote profiles</p>
+<p>1fac4e4d63 fix(desktop): hide unknown cloud agent status</p>
+<p>44c1ad7f84 fix(desktop): show a queued cron run row immediately after trigger</p>
+<p>d8dc96784b / db48af245a fix(desktop): give fresh group threads room context</p>
+<p>问题：一批用户能直接撞上的细节。修复：给项目里新开的会话保留项目工作目录；堆叠图片的预览框加宽，一组图片能完整看到；缺失的远程 profile 给出说明而不是空白；未知的云 agent 状态不再显示；手动触发 cron 之后排队中的那一行立刻出现；新建的分组会话带上房间上下文，且原文照搬不做改写。</p>
+<p>模型目录 · claude-haiku-5.5 进入目录</p>
+<p>3cabfad57e feat(models): add anthropic/claude-haiku-5.5 to OpenRouter and Nous Portal catalogs (#134759)</p>
+<p>dd6ab89cb8 fix(pricing): price Bedrock Claude Opus 5 and 5.5 from the snapshot</p>
+<p>dd7ee86004 fix(models): TokenHub&#x27;s saved endpoint is not a relay, so /model keeps the curated Hy list</p>
+<p>问题：新模型要两个目录都登记才能在选择器里出现，价格也要单独跟上。修复：anthropic/claude-haiku-5.5 加进 OpenRouter 和 Nous Portal 两个目录；订阅直连插件同步 pin 到带 Haiku 5.5 的提交；Bedrock 上的 Claude Opus 5 和 5.5 按快照补齐定价；TokenHub 保存的端点不是中转，所以 /model 保留整理过的 Hy 列表而不是被覆盖。效果：Haiku 5.5 和 Bedrock 上的 Opus 5 / 5.5 能正常选中并正确计价。</p>
+<p>插件市场 · 目录条目 30 多项的新增与推进</p>
+<p>59d4905d49 feat(catalog): add Hermes Pokemon desktop companion（另有 925846135f / 21b00d554f / 8dee2ca338 / b0ae217f59 四次版本更新，从 v0.5.0 到 v0.6.2）</p>
+<p>136a188677 / fbeb7440e1 feat(catalog): add Jot notes for Hermes Desktop / pin Jot 0.2.0 with current screenshots</p>
+<p>e78dccdd46 feat(plugin-catalog): add switchbot-control</p>
+<p>8687a45c65 feat(plugin-catalog): add klipper-print-watch</p>
+<p>6050954aa2 feat(plugin-catalog): add fish-audio plugin</p>
+<p>cf236eca35 feat(plugin-catalog): add alice-voice plugin</p>
+<p>550061d578 feat(plugin-catalog): add Ace Data Cloud model provider</p>
+<p>bce40f3011 feat(plugin-catalog): add hermes-field-notes — pitfalls and local core patches</p>
+<p>9d87ae22ae feat(catalog): add nexus-memory memory provider</p>
+<p>81cf57cefd feat(plugin-catalog): add pastdotdev memory provider</p>
+<p>0532fbfb96 feat(plugin-catalog): add gbrain-pointer (community GBrain memory provider)</p>
+<p>9fec93f7be feat(plugin-catalog): add maqami-travel plugin</p>
+<p>8382d8dac1 feat(catalog): add Kinprove genealogy research recipes</p>
+<p>1e7ac985f5 / 61ee2bad04 / a8f63f04aa feat(plugin-catalog): bump stream-speed / aux-ledger / stt-vocab to 1.1.0</p>
+<p>问题：插件目录靠社区提交维持更新，本期积压了一批新上架和版本推进——目录相关提交 60 余条，新上架 15 项，另有 30 多次版本升级和重钉。修复/变化：新上架 Hermes Pokemon 桌面伙伴（随后连续更到 0.6.2）、Jot 笔记、SwitchBot 智能家居控制、Klipper 3D 打印监控、fish-audio、alice-voice、Ace Data Cloud 模型提供方、hermes-field-notes（收录常见坑与本地核心补丁），以及 nexus-memory / pastdotdev / gbrain-pointer 三个记忆提供方、旅行插件 maqami-travel、家谱研究配方 Kinprove；stream-speed、aux-ledger、stt-vocab 都推到 1.1.0，plan-mode 推到 0.3.5。效果：桌面端插件市场里可装的东西明显变多。</p>
+<p>插件市场 · 插件包可以请求门控自己的 MCP server</p>
+<p>1e347ccf2a feat(plugins): a portable package can ask Hermes to gate its MCP server</p>
+<p>问题：Agent Plugins v1 没有信任字段，Hermes 的可移植 mcp.json 读取器只认 type/url/headers，所以包里的 server 一律按默认的 full 信任级运行。一个会交易、花钱或对外发消息的包（例如替用户在 Hyperliquid 账户上处理交易审批的 senpi）只能靠提示模型自己去问用户，Hermes 本身不会拦。修复：plugin.json 的 Hermes 扩展现在接受 extensions.com.nousresearch.hermes.servers.&lt;名字&gt;.trust: untrusted，效果与 config.yaml 里的 trust: untrusted 完全一致——每个有写能力的调用都会先问、无人值守时失败关闭；写 full（默认）不做任何改变，其它值直接拒绝这个包，所以包只能收窄权限、永远不能放宽；同名的 config.yaml server 仍然覆盖包里的条目。`hermes plugins validate` 会列出被门控的 server。效果：可移植插件可以请求更小的信任面。</p>
+<p>更新器 · 被杀死的 git 留下的 index.lock 不再挡住下一次更新</p>
+<p>a81d3408bc fix(update): a killed git&#x27;s index.lock no longer blocks the next update</p>
+<p>f5f912efba fix(update): only a killed update&#x27;s index.lock is reclaimed at once</p>
+<p>aa4507388e fix(update): the start-of-update index.lock reclaim never takes a live git&#x27;s lock</p>
+<p>b773ba044e fix(update): on Windows a killed git&#x27;s index.lock waits only for gits working in this checkout</p>
+<p>3f7a34921c fix(update): on macOS only a git working in this checkout keeps a dead index.lock</p>
+<p>d3245fa166 fix(update): the macOS lock scan finds ps when the launcher&#x27;s PATH has none</p>
+<p>3569fba6a6 fix(update): review the macOS lock scan&#x27;s lsof/ps lookups; keep it stdlib-only</p>
+<p>9c6ff602d6 fix(update): sweep stale git locks at the start of the run, not only before the fetch</p>
+<p>问题：一个中途被杀掉的 git 会在 .git/index.lock 留下锁，之后每次合并都报 File exists；而陈旧锁清扫会保留 10 分钟以内的锁，于是「更新中途被杀」（Windows mid_fetch 崩溃单元）或「版本探测被自己的 3 秒超时杀掉」（#132089）都会让下一次更新卡在 Pulling updates 直接失败。修复：新增 gitlock.release_dead_index_lock，一旦启动修复的所有权证明（Linux 看 /proc 文件描述符与持有锁的 git，macOS 用 lsof，Windows 用 unlink 本身）显示没有活着的 git 持有它，就立刻释放；_cmd_update_impl 在更新锁之下第一步就调用它；被中断的树移动仍然保留自己的锁判断。版本探测改成 `git --no-optional-locks status`，超时不再留下锁；陈旧锁清扫提前到整个流程开始时，而不是只在 fetch 前。效果：被杀掉的 git 不再能废掉下一次更新，且不会去抢一个真正活着的 git 的锁。</p>
+<p>更新器 · POSIX 上更新前先把网关的回合排空</p>
+<p>92189e2d0a fix: POSIX update pause drains turns first and survives a killed update cleanly</p>
+<p>59b5808bc8 fix(update): pause POSIX gateways before the first checkout move, restart them after deps</p>
+<p>ca0bb48a3d fix(update): a terminal-launched gateway is paused instead of mistaken for a supervised one</p>
+<p>7664cc21ad fix(update): the POSIX gateway pause never blocks an update</p>
+<p>822c15978d fix(update): a replayed gateway gets its own profile&#x27;s environment, not the updater&#x27;s</p>
+<p>a8b3711a8b fix(update): adopt a serving gateway through the canonical identity reader</p>
+<p>ae5b0ef3dd fix(update): adopt a paused gateway&#x27;s home only through its runtime lock, never a process scan</p>
+<p>问题：POSIX 上换代码之前对网关的处理过于粗暴——受监管的网关立刻吃 systemctl stop / bootout（在飞的回合被直接切断），裸进程则是等 70 秒后 SIGKILL。修复：每个网关先收到排空请求（走的是更新后重启用的同一套 request_restart drain），更新在集群的预算内等它把回合做完并打印进度（_gateway_drain_budget，默认 1905 秒）；systemd / launchd 只在这台网关自己退出之后才通过各自的守护进程停掉，从而不会因为 Restart= / KeepAlive= 被中途拉起。暂停记录里存的是规范身份，恢复时能认出还活着的网关；回执写不下来时会把令牌原样还原。受监管的 posix unit 也走和别的条目一样的 drop_never_stopped / split_draining / backoff / hand-back，被杀掉的更新不会再欠一个它从没停过的 unit。效果：更新不再打断正在跑的会话，也不会因为守护进程重启而半途复活。</p>
+<p>更新器 · 没走到应用的更新会说明原因</p>
+<p>d56a48d626 feat(telemetry): updates that stop before applying say why</p>
+<p>e76fb951a1 fix(telemetry): update stage rows count the stage a failed run died in</p>
+<p>问题：hermes update 有一堆在应用之前就退出的路径（更新锁被拒、有 git 操作在进行、受管安装等等），过去只剩一个笼统的 aborted_before_apply，看不出到底卡在哪一步。修复：每次预应用退出都在退出点往回执上记一个固定的 stop_class，再由 shared_metrics_update.update_failure_class 映射成这次的 failure_class；回执打开前就退出的会写一条只含指标的记录；被搁置（parked）的回执副本保留 stop_class、退出码、原因标签和重启/用户操作标志。已经提交、只欠一次中断或用户搁置的改动，读数是 partial 而不是 failed。效果：更新「没装上」的原因现在能在遥测里分类。</p>
+<p>语音 · 语音回合可以走自己的模型</p>
+<p>6cc1efd8f9 feat(voice): auxiliary.voice_chat routes spoken voice turns to their own model</p>
+<p>问题：语音回复必须由会话的主模型产出，用一个重模型时每一句口头回答都很慢（#83894）。修复：新增辅助槽位 auxiliary.voice_chat 来决定语音回合用哪个模型。CLI/TUI 语音模式、桌面端语音对话（prompt.submit voice_turn）和消息里的语音条都会给这一回合打标记，agent/voice_turn_route.py 在提示、数据库行和预压缩都按主模型落定之后绑定路由，并在记忆同步和后台回顾之前换回来——所以下一个打字回合和后台回顾依然跑主模型。比语音模型压缩阈值还大的回合会留在主模型上并提示一次，切到语音永远不会顺手压缩会话。用量单独记在 session_model_usage 的 voice_chat 任务下，不改写会话记录的模型/路由，恢复会话仍保持用户选的模型。槽位出现在桌面端设置 -&gt; 模型、仪表盘和 hermes model 里；GPT-Live 的委托仍用会话模型。效果：常用重模型的人也能让语音回复变快。</p>
+<p>语音 · 语音回合默认关闭推理</p>
+<p>98a6dcf586 feat(voice): voice turns default to reasoning off, the lowest valid level where off is refused</p>
+<p>问题：语音对话要的是低延迟，推理档位在这里没有价值。修复：auxiliary.voice_chat.reasoning_effort 出厂默认是 none，并且即使槽位设成 auto 也生效——会话主模型用关闭推理的档位回答口头回合，打字回合保留自己的档位。不能关闭推理的路由会退到它能接受的最低档（没有 none 的 Responses 阶梯如 gpt-6-astra、gpt-6.1-sol 降到 low；强制思考的 Claude；以及目录或先前 400 标记为强制的路由）。语音模型在运行期拒绝的关闭请求会按路由记住，供下一次语音回合使用，且拒绝标记不会在语音路由和主路由之间串。仪表盘/桌面端里的「继承」会写入显式空串，避免槽位默认值偷偷回来；两处重置都会恢复出厂默认。效果：语音回答默认不思考，响应更快。</p>
+<p>运维 · cron 存储不可写会在四个地方同时暴露</p>
+<p>8e457dfad2 feat(cron): show an unwritable store at the top of `cron status` and in `cron list`</p>
+<p>79f45482ef feat(doctor): warn when the cron store is unwritable or its disk is nearly full</p>
+<p>68e167a717 feat(monitoring): export cron store writability and skipped runs</p>
+<p>91fc7badaf feat(gateway): tell home channels once when a cron store goes unwritable and recovers</p>
+<p>15e6c85e1c perf(cron): skip the skipped-run count in `cron list`</p>
+<p>8cdc2c2b5b perf(cron): let a failed scan save count as the degraded tick&#x27;s probe</p>
+<p>问题：自从 tick 在存储写入失败时不再抛异常，ticker_last_error 在故障期间根本不会被写，于是 `hermes cron status` 一直显示绿色，而实际上每个计划任务都被跳过了；监控能看到的只有心跳和成功时间，看不到存储已经不再接受写入。修复：CLI 自己去探测存储（cron.store_health.probe_report），失败时在 `cron status` 顶部直接给出红色的「存储不可写，计划任务正在被跳过」标题，详情列出路径、系统错误、最后一次成功写入、有多少该跑的没跑以及怎么修；`cron list` 打印一行横幅；doctor 增加同样的写探测（与 state.db 的检查并列），并在 cron 所在文件系统剩余不足 100 MB 时就提前警告；监控通过既有 helper 导出 hermes.cron.store.writable（0/1）和 hermes.cron.store.skipped_runs；home 频道在存储不可用和恢复时各收到一次通知，通知按顺序、用频道主的语言发送，不会因为磁盘在满的边缘反复抖动而刷屏。探测放在读取任务之前，因为加载任务会把目录权限重新收紧一遍。效果：cron 静默跳过的故障现在会主动冒头。另外 cron list 跳过了 skipped-run 的统计（一次失败扫描的保存结果也可以当作降级 tick 的探测结果），这两条是顺带的性能优化。</p>
+<p>运维 · 状态库 FTS 损坏的报错直接给出修复命令</p>
+<p>324850626a fix(state): name the user-facing repair commands in the FTS corruption error</p>
+<p>995da31b27 fix(state): only a malformed-image error gets the FTS offline-repair hint</p>
+<p>a0b14df1bc fix(state): catch corruption-class DatabaseError in optimize_fts() too</p>
+<p>e9a981bb6c fix(state): catch the corruption-class DatabaseError inside rebuild_fts()</p>
+<p>问题：索引损坏时报错指向的是 repair_state_db_schema 这样一个用户根本调不到的内部函数。修复：统一改成 doctor_state / hermes_state_user_copy 对同一类 fts_index 失败已经用的说法——`hermes sessions repair`（或 `hermes doctor --fix`）；只有 malformed-image 这一类错误才会带上 FTS 的离线修复提示，别的损坏不再误导；optimize_fts() 和 rebuild_fts() 也都补上了对 corruption 类 DatabaseError 的捕获。效果：状态库坏了的时候用户能直接照着报错敲命令。</p>
+<p>安全 · 交给记忆提供方前清洗密钥</p>
+<p>88704223d2 fix(memory): scrub secrets on every memory-provider hand-off (#115104)</p>
+<p>问题：内容交给外部记忆提供方时，凭据有可能被一起带过去。修复：每一次交给记忆提供方都过一遍密钥清洗，而不是只在某几条路径上做。效果：凭据不会跟着记忆内容流到第三方服务。</p>
+<p>kanban · 工作流定义统一</p>
+<p>96db175da7 feat(kanban): one workflow definition for columns, traits and transitions</p>
+<p>1a85226e22 fix(kanban): dashboard rejects stale archived/deleted board slugs</p>
+<p>cae57adfa0 fix(kanban): connect()/init_db() refuse to recreate dead boards</p>
+<p>63e5656409 fix(kanban): board identity requires board.json; archive leaves a tombstone</p>
+<p>问题：看板的列顺序、trait、默认事件边和手动移动白名单散落在几处，逐渐漂移——工具的状态枚举缺 scheduled/review，CLI 的状态图标缺 triage/review。而且已归档/已删除的看板可能被重新创建出来，或者仪表盘拿着过期的 slug 去访问。修复（#54818 的地基）：新增 hermes_cli/kanban_workflow.py，用 Column/Workflow 加一份 DEFAULT_WORKFLOW 把今天的看板原样写成数据；VALID_STATUSES、仪表盘的 BOARD_COLUMNS、kanban_list 的状态枚举和 CLI 图标全部改从它推导；仪表盘插件 API 增加 GET /workflow；测试把 DEFAULT_WORKFLOW 钉在真实行为上（每条默认事件边对着内核动词，64 个 PATCH 移动对 can_move）。看板身份改为必须有 board.json，归档留下墓碑，connect()/init_db() 拒绝复活已死的看板，仪表盘拒绝过期的归档/已删除 slug。内核暂时还不读这份定义，这是用户自定义列和工作流的地基。效果：状态词汇不再漂移，死看板不会被误复活。</p>
+<p>其他 · 认证、平台与构建</p>
+<p>3126389d98 / 865ba906c1 / 6db85489b2 fix(auth): discover external CLIs in user-local bin / return the user-local external CLI as one native path on Windows / keep relative external CLI command paths resolving from the launch cwd</p>
+<p>同一批还修了 profile 的 OAuth 凭据落盘：root 存储为空时首个单次登录也要持久化，不会再出现回执写着 Added 但其实没存进去的情况。</p>
+<p>d95d5bca1f / 5419d869bb / 3e5b43e0bb fix(desktop-update) / fix(browser) / fix(cli): Windows 11 25H2 的默认浏览器探测——桌面端更新窗口、browser 工具的 real-profile、CLI 三个入口都改走正确的系统查询（CLI 用 Shell API），25H2 上不会再打开错的浏览器。</p>
+<p>6da034a60d fix(mcp): a vision model sees MCP ImageContent instead of only its MEDIA: path</p>
+<p>问题→修复→效果：MCP 返回的 ImageContent 过去对视觉模型只以一个 MEDIA: 路径呈现。现在按配置的图片输入模式和视觉池处理，跳过或超预算的图片会释放名额，无法解码的图片不会被挂上去，内嵌时的坐标映射也会保留。</p>
+<p>855997b7d7 fix(pm): give Store a long-path root on Windows</p>
+<p>98900360e7 fix(browser): pin local Chromium headless on Windows</p>
+<p>问题→修复→效果：PM 的 Store 在 Windows 上拿到长路径根，离开 PM 的文本改用普通写法的存储路径；本地 Chromium 的无头模式在 Windows 上固定到指定版本。</p>
+<p>9d7a4ab718 fix(dashboard): hide AuthWidget on 401 via ApiError status</p>
+<p>0f56e56a24 fix(dashboard): repair loopback auth identity frontend integration (#66295)</p>
+<p>af9c7137c8 fix(web): bound the dashboard build&#x27;s CPU and heap (#63338)</p>
+<p>问题→修复→效果：401 时通过 ApiError 状态隐藏 AuthWidget，而不是靠字符串判断；修复 loopback 认证身份的前端集成；给仪表盘构建的 CPU 和堆内存加上上限，避免构建吃满机器。</p>
+<p>其他 · 值得一读的零碎修复</p>
+<p>39a01d069d fix(model-picker): keep custom provider rows and the current model honest across switches —— 切换模型时保留自定义提供方行，当前模型不再显示成别的东西。</p>
+<p>cb6ffe6cdd fix(terminal): foreground heartbeat is dropped, not refused; notify intent still is —— 前台心跳被丢弃而不是被拒，通知意图仍然生效。</p>
+<p>e3d2e57c9e fix(skills): background review can improve every skill, not just curator-managed ones —— 后台回顾可以改进所有技能，不再只限 curator 管理的。</p>
+<p>e91abaf863 fix(compression): announce compaction before the pre-compression credential refresh —— 先宣告压缩再刷新凭据，避免状态看起来自相矛盾。</p>
+<p>8ec668b3cc fix(security): treat whitespace-only HMAC secrets as unset —— 只含空白的 HMAC 密钥按未设置处理，不再拿空白当密钥。同一批还修了 line / whatsapp_cloud / raft 把 null 密钥当成字符串 &quot;None&quot; 参与 HMAC 的问题。</p>
+<p>6dc79b2ad8 fix(gateway): stop _ensure_windows_gateway_venv_imports leaking PYTHONPATH into global environment —— Windows 网关准备 venv 导入时不再把 PYTHONPATH 泄漏进全局环境。</p>
+<p>ee8dd6c886 fix(agent): a credit-limited 402 retries once with the affordable output cap instead of failing as billing —— 额度不足的 402 会用能负担的输出上限重试一次，而不是直接报成计费失败。</p>
+<p>b8788c3cb1 / bae3a01012 / 23cd990268 fix(agent): lease lock 相关三条 —— 租约锁的容差受行的提交到期时间约束；租约刷新撞上 SQLite 锁时不再打断这一回合；锁的寿命用尽后停止刷新。</p>
+<p>348a68bb4e fix(photon): keep the user&#x27;s words when they reply in an iMessage thread (#100663) —— 在 iMessage 线程里回复时保留用户自己的话，重启后线程回复仍然算作「自己的」。</p>
+<p>53fefae5d7 fix(local-runtime): hermes update from v2026.9.24 no longer crashes importing local_runtime —— 从 v2026.9.24 更新不再在导入 local_runtime 时崩溃。</p>
+<p>9de894da21 fix(stt): local turbo model is selectable in every STT picker (#79629) —— 本地 turbo 模型在每个语音转写选择器里都能选到。</p>
+<p>7dab93b06e fix(mcp): reject fabricated DCR for providers without RFC 7591 registration (#78190) —— 没有 RFC 7591 注册能力的提供方不再被伪造的动态客户端注册通过。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-07：更新器加固 350+ 条提交，桌面端新增全局通知条与实时语音转写</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-07</link>
