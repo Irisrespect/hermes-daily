@@ -22,9 +22,137 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 72 期 · 29854 个提交 · 每日自动更新 ·
+<p class="meta">共 73 期 · 30262 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-09" class="day">
+      <h2>Hermes 日报 2026-10-09：全新上手引导与 setup 助手合入，桌面端修输入框折叠与本地后端回收</h2>
+      <p><strong>本期覆盖北京时间 10 月 8 日 06:30 ~ 10 月 9 日 06:30 进入 main 的提交，共 408 个 commit（不含 merge），另有 21 个合并提交。新增 38 个功能、143 个修复、7 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交——本期最大的一批（09-30 提交的 setup / 上手引导）就是这样随分支合入的。本期是功能季叠加加固季：一整套全新的上手引导流程（约 55 条）进入 main，桌面端围绕输入框折叠、本地后端存活和免费层登录引导做了三组用户能直接看到的改动，插件系统又修了一轮启用/卸载/toolset 的老问题，另有 7 条性能优化集中在桌面端构建缓存与安装更新路径。</strong></p>
+<p>📌 今日要点：</p>
+<p>上手引导：全新 setup 助手流程合入——/initiate-setup 成为内置命令、出现在 CLI/TUI/桌面端/网关四个界面，start_chat 让任意桌面 agent 开一个可见新会话，setup 交接会把「它了解到的你」带给任务会话</p>
+<p>桌面端：输入框向上滚折叠变暗后，停手 5 秒、或把鼠标悬停/聚焦到 dock 任意位置就恢复；「本机」本地后端不再被闲置回收（修掉「后端离线」）；免费层完成任务后提示登录，间隔按 1 小时 / 4 小时 / 24 小时逐级退避</p>
+<p>插件系统：一个名称解析器统一所有插件命令，一键启用整个包会连带打开它的桌面半边；插件的 on_session_finalize 返回值现在会显示给用户；开关插件不再把核心工具顶掉（旧逻辑会把工具的 26 个砍到 1 个）</p>
+<p>性能：桌面端构建改用内容化缓存（React Compiler 按内容缓存、只安装戳变化时复用已编译 renderer、原生输入凭据没变就跳过重新暂存）；固定版本安装只 checkout pin，更新尾部信任 PM 刚校验过的 npm 闭包</p>
+<p>其他：Codex 流式集成的 call-id 轮转修复（3 条，其中 2 条来自社区贡献者）、/yolo 在网关重启后不再悄悄失效、hermes model 换 provider 保留同一模型 ID 时也会问推理档位、发布工具新增 changelog 子命令</p>
+<p>重点条目：</p>
+<p>桌面端 · 输入框滚动折叠后的恢复</p>
+<p>08165d5893 feat(desktop): the dimmed composer comes back after 5s without scrolling</p>
+<p>436a6e130e fix(desktop): the scrolled-up composer comes back on hover or focus anywhere in the dock</p>
+<p>问题：聊天输入框（composer）向上滚动时会收起、变暗，但过去收起之后没有可靠的恢复路径——用户得自己找到办法让它回来。修复：停下不滚 5 秒后自动恢复；并且把恢复条件放宽到「鼠标悬停或键盘聚焦在 dock 的任意位置」都立刻恢复，不再要求指针精确落回输入框。效果：翻看历史消息时输入框自动让位，手一回到 dock 就立刻可用，不用再点来点去。</p>
+<p>桌面端 · 本地 profile 后端不再被「闲置回收」</p>
+<p>167e9fdb84 fix(desktop): never idle-reap a local profile backend (#134942)</p>
+<p>问题：当主后端配在远端时，「本机（This device）」这一档的本地 hermes serve 子进程会被连接池的闲置回收器在 60 分钟无数据流后 SIGTERM 杀掉（沿用 #105239 的 pinned-tier TTL），用户聊天还开在屏幕上、界面却显示「本机 · 后端离线」。修复：本地后端还要跑自己 profile 的 cron 任务和机器人会话，没有人在看也不代表闲置，因此闲置回收只回收远端连接（远端路由本来就没有子进程、不占名额），本地子进程仍受 maxBackends 名额上限和前台回收（在飞回合有一票否决）约束；同时删掉已无调用方的 pinned-tier 闲置策略（retireIdle、lastStreamedAt）。设置里「后端闲置超时」的说明也改成只对远端连接生效。效果：本地后端不会被悄悄杀掉，「后端离线」这个假故障消失。</p>
+<p>桌面端 · 免费层登录引导与条款条</p>
+<p>05a7997eec feat(desktop): show the free-tier sign-in offer when the backend says it is due</p>
+<p>995bc1c0e7 feat(free-tier): offer sign-in after finished tasks, backing off</p>
+<p>1176255381 feat(desktop): Terms and Privacy butterbar for free-tier users</p>
+<p>问题：免费层用户缺少在合适时机引导登录的机制，桌面端也不该自己计时。修复：策略放在 hermes_cli/free_tier_offer.py，用一份安装级记录（文件锁 + 原子写）做策略，claim_offer() 是比较并交换，两个窗口不会同时弹；免费层用户首个「完成任务」3 分钟后提示登录，此后每次都要再完成一个任务、且距上次提示至少 1 小时 / 4 小时 / 24 小时逐级退避。「完成任务」定义为免费层 agent 上带回复的正常完成回合，排除崩溃恢复和运行中的 steer/redirect/interrupt；桌面端每回合后重读状态、拿到 nudge_due_in 就设定一个定时器重读，到点且赢得 claim 才弹「登录 / 稍后」，引导流程或其它登录弹窗在屏时会让路。另有免费层用户的条款与隐私条（butterbar）。效果：免费层用户会适时被提醒登录，拒绝后打扰频率递减；「稍后」不计为取消登录，引导漏斗统计也不再漏记。</p>
+<p>桌面端 · 本地测试打包脚本</p>
+<p>57949d6630 feat(desktop): build-bundle scripts for local test bundles</p>
+<p>3d7f1090d4 fix(desktop): build-bundle.ps1 parses the claim timestamp and rejects a missing -Python</p>
+<p>问题：想出一个本地测试包以前要打 tag、走发布流程。修复：新增 scripts/build-bundle.sh（macOS/Linux）和 scripts/build-bundle.ps1（Windows），直接按当前 checkout 的 commit 走 scripts/bundles/desktop.py --commit 构包，不需要 tag 也不需要 push；两个脚本开工前先拒绝脏工作树，构包前先删掉上一次输出；Windows 上暂存产物是只读的，脚本会处理 WinError 5。效果：本地出测试包一条命令搞定。</p>
+<p>上手引导 · /initiate-setup 成为内置命令</p>
+<p>9c4eecb53d feat(onboarding): /initiate-setup built-in on every surface; the first message offers it</p>
+<p>cf351e320c fix(onboarding): the first message offers /initiate-setup only under guest onboarding</p>
+<p>f2cd946a19 fix(onboarding): /initiate-setup names the user&#x27;s profile on every surface</p>
+<p>问题：新用户上手缺少一个统一入口。修复：/initiate-setup 以 /plan 同款形态成为 CLI、TUI、桌面端和消息网关四个界面的内置命令（Telegram 上为 /initiate_setup），它发一个正常用户回合：固定「[/initiate-setup]」头、就地读取可选的 initiate-setup 技能，再附一份带技能键名的事实 JSON（界面、已装工具、主 profile、guest 免费层，以及 host_facts.collect() 的输出）。每个界面在不起 agent 的情况下解析已装工具，和 /tools 一样。首条消息会主动提供这个命令，但只在 guest 上手场景下；命令在各界面都会正确显示用户 profile 名。效果：新用户在任何界面都能一句话进入配置流程。</p>
+<p>上手引导 · start_chat 原生工具与会话交接</p>
+<p>e0e0505989 feat(start_chat): any desktop agent can start a visible chat through a native tool</p>
+<p>b3411f4d8c feat(start_chat): a handoff from the setup profile marks onboarding complete</p>
+<p>51bbf0ec91 feat: the setup handoff carries what setup learned, and the task chat talks first (#129419)</p>
+<p>问题：设置助手把用户交接给新会话，靠的是渲染层约 600 行代码，而且只能开在默认 profile。修复：新增后端工具 start_chat（可选标题 ≤40 字符、可指定已有 profile，默认调用方自己的），从 HERMES_UI_SESSION_ID 找到调用会话，拒绝空消息/过长标题/未知 profile，且从不创建 profile；它在目标 profile 的运行作用域内建会话，调用方的显示配置不会渗进去，然后通过 prompt.submit 提交首条消息。交接时会在模型消息下附一段「关于我了解到的情况」——名字、应用、插件、布局选择，以及扫描出的机器信息（不暴露原始扫描值）。任务会话要主动开口：先复述了解到的情况，再问一个带 2~4 个具体方向的纯文本问题，等用户选了方向或说「开始」才动手。从 setup profile 发起的交接会把该 profile 标记为上手完成。效果：任何桌面 agent 都能开可见会话，新会话一上来就知道用户是谁、要做什么。</p>
+<p>上手引导 · 状态归后端、目录工具集独立</p>
+<p>d8ddf55022 feat(onboarding): the backend owns onboarding state and the setup profile carries only the beat tools</p>
+<p>b5eb5fd5c4 feat(catalog): manage_catalog is a desktop catalog toolset that installs into the chat&#x27;s profile</p>
+<p>f077fbf4f5 feat(setup): the setup chat can connect an app the user asks for now (#129203)</p>
+<p>9d371a96be fix(onboarding): a returning user skips the first-run guide</p>
+<p>问题：上手状态原本散在渲染层，setup profile 与目录安装的归属也不清晰。修复：setup profile 的标记改成由后端持有 intro / failed_starts / completed_at，新增 onboarding.state / record_failed_start / mark_seen 等 RPC 读写，第三次失败即把 intro 标为已见；manage_catalog 从 setup 工具集里拆出成独立的 catalog 工具集，只给桌面会话，安装与「已安装」标记默认落到调用会话自己的 profile。setup 会话还会就地连接用户此刻要求连接的应用。回访用户会跳过首次引导。效果：上手状态只有一份真相、可重置可续接；目录安装不再一律落到 default。</p>
+<p>插件系统 · 一个解析器与一键启用整个包</p>
+<p>8f463316fd feat(plugins): one name resolver for every verb; one switch turns a unified package on</p>
+<p>问题：插件可以用 key、manifest 名、目录名或目录条目名安装，过去各命令各自解析，用目录名装的插件经常找不到（17 个目录条目装下来的 manifest 名与目录名不同）。修复：_find_plugin_entry 成为唯一解析入口，enable/disable/show/capabilities/update/remove、仪表盘和插件设置全部走它；桌面端枢纽按包文件夹（Electron 盖章的那个）而不是 manifest 名把 agent 行和桌面半边合并，自己 clone 的包不再出现两行；桌面端「安装后启用」或 Agent 开关打开统一包时，会连带打开它可选的桌面半边（用户手动关掉的除外）。效果：插件命令与界面不再因为名字来源不同而对不上。</p>
+<p>插件系统 · on_session_finalize 消息会显示给用户</p>
+<p>dacb06ea93 feat(plugins): show on_session_finalize return messages to the user</p>
+<p>问题：插件的会话收尾钩子只能在后台跑，无法在会话边界给用户说一句话。修复：on_session_finalize 现在可以返回字符串或 {&quot;message&quot;: str}，Hermes 会在会话边界展示它，不额外起一个回合、也不改写模型回复——CLI /new 会在新会话前打印、quit 会打印在退出总结上方、一次性 -q/-z 输出到 stderr（stdout 仍只放答案）；TUI session.close 返回消息、/new 以系统行显示；网关 /new 与关停通过适配器发给所属聊天。on_session_end 仍是纯观察者（每回合都触发，不是会话边界）。效果：插件能在用户离开或开新会话时交代一句话。</p>
+<p>插件系统 · 开关插件不再割掉核心工具</p>
+<p>82b9bfedd6 fix(plugins): enabling a plugin from Desktop/TUI/dashboard no longer strips the core tools</p>
+<p>05df0382a5 fix(plugins): re-enabling a plugin restores its toolset in a saved platform_toolsets list</p>
+<p>问题：在没有任何已存 platform_toolsets 时，旧的开关逻辑会种下一个只含 [插件工具集] 的列表，把 hermes-cli 组合整个替换掉，模型一下子只剩 1 个工具（26 个变 1 个，连终端都没了）。修复：不再种这个列表——没有已存列表时未知插件工具集本来就默认开启；重新启用插件时改为在激活之后再改列表（停用则先解析出 key 再写），桌面端/TUI/仪表盘和 hermes plugins 命令行为一致。效果：开一个插件不会再把内置工具清空，重新启用也能正确恢复工具集。</p>
+<p>插件系统 · Windows 上网关加载着插件也能卸载</p>
+<p>61b7f957ba fix(plugins): uninstall on Windows succeeds while the gateway has the plugin loaded</p>
+<p>6662326d7b fix: hot-mount plugin API routes installed after server start</p>
+<p>8620effe53 fix(dashboard): hot-mount plugin APIs without redirect, ahead of the SPA catch-all</p>
+<p>19cb1cbfed fix: disclose enabled plugins&#x27; registered skills in the system prompt&#x27;s available_skills index</p>
+<p>问题：Windows 上网关正加载着插件（有文件句柄或已映射的 .pyd）时，卸载会因为 WinError 5 失败并留下半删的插件；另外服务器启动后新装的插件 API 路由要重启才生效。修复：删除时能删多少删多少，遇到被占用的文件就把剩下的目录挪到 cache/plugin-pending-delete（对被映射的 DLL 也有效），目录本身被占用则删掉 manifest 让插件无法再加载——两种情况都会丢掉安装记录，网关下次启动清扫残留；插件 API 路由支持热挂载（在 SPA 兜底路由之前），不再重定向；已启用插件注册的技能会写进系统提示词的 available_skills 索引。效果：Windows 上不需要停网关就能卸载插件，装完插件立刻可用。</p>
+<p>插件系统 · 桌面端链接式插件热重载</p>
+<p>cc1500a071 fix(desktop): a linked plugin checkout drives its desktop half; doctor flags a stale copy</p>
+<p>问题：桌面端统一包的桌面半边是从 desktop-plugins/&lt;name&gt;/ 的副本加载的，不是从包本身——改源码不生效也没人提示；symlink 进 plugins/ 的开发布局更是完全不会被复制（Dirent.isDirectory() 对符号链接为 false）。修复：Electron 现在跟随符号链接的包目录、把它们标记为 linked，并在字节不一致时重新同步；渲染层会盯住该副本的源 plugin.js，保存即跑 reconcile 并热重载（目录与 git 安装仍按 mtime 判定）；hermes plugins doctor 会在副本与源不一致时告警并说明怎么刷新。效果：改插件源码能立刻在桌面端看到，stale 副本会被明确指出来。</p>
+<p>性能优化 · 桌面端构建与安装更新路径</p>
+<p>6232135eca perf(desktop): cache the React Compiler pass by content, so an update recompiles only the files it changed</p>
+<p>1a4d7768c5 perf(desktop): reuse the compiled renderer when only the install stamp changed</p>
+<p>97260490e1 perf(desktop): skip restaging native inputs whose receipt still matches</p>
+<p>7ec7857b0b perf(update): the product tail trusts the npm closure the PM step just verified</p>
+<p>2f6716dd7d perf(install): a pinned install checks out only the pin, not the branch tip first</p>
+<p>dbbf98371d perf(install): a pinned install.ps1 clone checks out only the pin, before it publishes</p>
+<p>708d45f90e perf(state): pre-filter the per-turn tool-retry scan with LIKE</p>
+<p>问题：桌面端构建和安装更新里有大量重复劳动，状态库也在每回合做无谓的全表 json 解析。修复：React Compiler 的编译结果改为按内容缓存（更新时只重编改动的文件，并保证缓存只服务生产构建、按 NODE_ENV 分键）；只有安装戳变化时复用已编译的 renderer；原生编译输入的暂存凭据没变就跳过重新暂存（原生辅助产物现在构建字节一致，暂存输入保持可比）。安装/更新侧改为只 checkout 固定的那个 pin（不再先拉分支 tip），Windows 的 install.ps1 同样先 checkout pin 再发布，更新尾部直接信任 PM 步骤刚校验过的 npm 闭包。状态库的每回合工具重试扫描加了一条 LIKE 预筛，跳过不可能含该键的行的 json 解析（json_extract 仍做最终判定，结果不变）。效果：真实 SessionDB 2 万行实测该扫描从 8.43 ms/回合降到 6.09 ms/回合；桌面端构建与安装更新的重复工作明显减少。</p>
+<p>其他改进 · Codex 流式集成 / /yolo 持久化 / CLI / 发布工具</p>
+<p>a9e2716c9b fix(codex): confirm a pending call whose call_id first appears on its done item</p>
+<p>c3302dd4fb fix(codex): integrate pending call-id aliases with stream correlation</p>
+<p>5e24de476d fix(codex): preserve calls across rotating stream item IDs</p>
+<p>889eddcd86 fix(gateway): /yolo survives a gateway restart</p>
+<p>50f8e4db48 fix(tui-gateway): /yolo restore keys on the stored session; pre-first-message toggle persists</p>
+<p>adc738170e fix(tui-gateway): restore YOLO on resume</p>
+<p>807fa8a0a4 fix(tui-gateway): persist session /yolo toggles to the session row</p>
+<p>d94b70f675 fix(cli): hermes model offers reasoning effort when the model ID is unchanged</p>
+<p>cc1679d44d feat(release): add a changelog subcommand and point oversized drafts at it</p>
+<p>问题：Codex 的流式响应在 item ID 轮转、call-id 只在完成项上首次出现时会把同一个调用结两次或丢调用；/yolo 只在内存里翻标志，网关一重启（更新、崩溃、systemd 重启、重开桌面端）就悄悄回到手动审批，而用户以为还开着；hermes model 换 provider 但保留同一模型 ID 时会跳过推理档位询问；发布草稿超长时没有好办法。修复：Codex 装配器改为按 output_index 匹配轮转的流 item ID、合并全部匹配的 call-id 别名、只在匹配到的公告自身没有 call_id 时才回退到 item/index 匹配（冲突的 call_id 仍不会误伤无关调用）；/yolo 标志写到聊天所属的路由条目（SessionEntry.yolo）并随会话恢复，首条消息前的切换也会写入惰性创建的行；hermes model 改为按「本次流程是否保存了选择」来提供推理档位（换 provider 保留同 ID 也会问）；发布工具新增 changelog 子命令，草稿超长时会指引用 --no-changelog 导出后手工精简。这三条 Codex 修复中两条来自社区贡献者（VictorYXL、DragonLi-Mi），另一条由核心维护者提交。效果：Codex 流式调用不再重复结算或丢失，/yolo 重启后仍生效，模型选择与发布流程更顺。</p>
+<p>其他改进 · 安装更新健壮性、平台与其他</p>
+<p>dcabf76310 fix(install): a pinned fresh clone pins, with retries, before it publishes</p>
+<p>4f9b741a3a fix(install-e2e): tolerate the update-result consume race and held lock files (#135261)</p>
+<p>a28a5d03a9 fix(update): a whole-second marker creation time in our own second is still us</p>
+<p>7ad6fd69d7 fix(termux): repin the termux pool and drop the libc++ shadow shim</p>
+<p>5d8eafbc88 fix(termux): keep apt&#x27;s libc++ ahead of the payload&#x27;s on the build linker path</p>
+<p>d6284c675e fix(termux): upgrade libc++ in the wheelhouse builder so cmake starts</p>
+<p>38880bd2f1 fix(s6): read the supervised pid from s6-svstat -o, not the status line</p>
+<p>71ff5238ec fix(approvals): treat webhook platforms as notifier-blind in _presence</p>
+<p>8918717b1a fix(approvals): resolve an unattended turn from unattended_mode when no notifier is registered</p>
+<p>51609d827b fix(solstice): load the transport on first use, not at discovery (#134233)</p>
+<p>问题：安装、更新、termux、s6、审批与 solstice 上各自散着一批可靠性问题。修复：固定版本的全新 clone 现在带重试地先 pin 再发布；install-e2e 容忍更新结果的消费竞争与遗留锁文件；update 里整秒创建、且落在同一秒的 marker 仍判定为自己。termux 重新固定工具池、去掉 libc++ 影子 shim，并保证 apt 的 libc++ 在构建链接路径里排在 payload 之前、wheelhouse 构建器也升级 libc++；s6 从 s6-svstat -o 读被监管的 pid 而不是状态行；审批把 webhook 平台视为无通知器，并在没有注册通知器时按 unattended_mode 判定；solstice 改为首次使用时再加载传输层。效果：这批边角路径不再各报各的错。</p>
+<p>桌面端本地化</p>
+<p>45e01a0ea4 desktop: move each locale&#x27;s onboarding strings into &lt;locale&gt;_onboarding.ts</p>
+<p>d6e5020cb8 i18n(desktop): the one-question clarify header in zh-hant and ar</p>
+<p>da70bd80ab i18n(desktop): onboarding strings in every locale, with an overlay completeness check</p>
+<p>c4ba8b1e8e i18n(desktop): translate cron.queuedRun in every overlay</p>
+<p>f9c8f3c33f i18n(desktop): translate the slow-start onboarding screen</p>
+<p>问题：上手引导的一批新界面需要补齐多语言。修复：每个语言的上手引导字符串搬进 &lt;locale&gt;_onboarding.ts 覆盖层，并加了一层覆盖完整性检查；zh-hant（繁体中文）和 ar（阿拉伯语）补上单问题澄清卡的表头；cron 的排队行（cron.queuedRun）也在每个语言覆盖层里补了翻译。效果：新界面在各语言下不再漏翻。</p>
+<p>插件目录 · 新增与推进</p>
+<p>e86b289636 feat(plugin-catalog): add nowstamp</p>
+<p>b889438d53 feat(plugin-catalog): add hermes-honcho-plugin plugin</p>
+<p>d590687d7f feat(plugin-catalog): add tinyfish plugin</p>
+<p>b4140e35ee feat(plugin-catalog): add hermes-pickup plugin</p>
+<p>1fa1c46796 feat(plugin-catalog): add approval-ledger</p>
+<p>720f8a5b74 feat(plugin-catalog): add laso-finance</p>
+<p>41a406a722 feat(plugin-catalog): add govee</p>
+<p>21794e5ded feat(plugin-catalog): add Frihet plugin entry (Frihet-io/hermes-frihet v0.1.0)</p>
+<p>b1679a7e24 feat(plugin-catalog): add public-holidays plugin</p>
+<p>589ef7c96d feat(catalog): add aphrodite plugin entry</p>
+<p>02cf5cbcbc feat(catalog): update aphrodite to v2.2.6</p>
+<p>068effc346 feat(plugin-catalog): quotum 0.2.0, seals tab</p>
+<p>9607818125 feat(plugin-catalog): make hermes-tenuo findable by security and permission searches</p>
+<p>825ba84de9 fix(catalog): repin echarts-in-chat with English-first UI</p>
+<p>d7bfd20e93 chore(catalog): bump echarts-in-chat to 2.1.0</p>
+<p>3470e3ee2f fix(plugin-catalog): stack — re-pin, add homepage link + banner</p>
+<p>9d50bd96f2 fix(plugin-catalog): update klipper-print-watch</p>
+<p>179b3f6de9 fix(plugin-catalog): update switchbot-control</p>
+<p>57bbd9e371 fix(plugin-catalog): pin reviewed commandcode-oauth 0.1.1</p>
+<p>问题：本期目录侧继续上新并推进条目。内容：新增 nowstamp、hermes-honcho、tinyfish、hermes-pickup、approval-ledger、laso-finance、govee、Frihet（v0.1.0）、public-holidays、aphrodite（v2.2.6，要求 Hermes &gt;= 0.20.2）等条目，quotum 升到 0.2.0 并加 seals 标签页，hermes-tenuo 现在能被安全与权限相关搜索命中；另有 stack、klipper-print-watch、switchbot-control、commandcode-oauth、echarts-in-chat（升到 2.1.0 并改成英文优先界面）等条目的重钉与升级。效果：插件市场可选项继续扩充。</p>
+<p>回退（本期不作为亮点）</p>
+<p>c20541d09a Revert &quot;feat(release): promote Docker stable/latest from a published receipt tag&quot;</p>
+<p>8a33891bdd revert: dashboard-auth token exchange breaks on gzip IdP responses (partial revert of #133938)</p>
+<p>41ab94b4e0 revert: plugins uninstall/update work again while the gateway runs (reverts #134189)</p>
+<p>说明：本期有 3 条 Revert。其中 c20541d09a 回退的正是本期合入的「按已发布 receipt tag 提升 Docker stable/latest」feat，因此该功能不作为本期亮点；8a33891bdd 因 gzip IdP 响应有问题部分回退了 dashboard-auth 的 token 交换；41ab94b4e0 回退了「网关运行时插件也能卸载/更新」（#134189）。</p>
+    </section>
+    
     <section id="2026-10-08" class="day">
       <h2>Hermes 日报 2026-10-08：更新器回收被杀 git 的锁、语音回合独立路由，插件目录上新 30 余项</h2>
       <p><strong>本期覆盖北京时间 10 月 7 日 06:30 ~ 10 月 8 日 06:30 进入 main 的提交，共 426 个 commit（不含 merge），本期没有合入 merge 提交。新增 35 个功能、199 个修复、2 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期延续修复季的节奏：插件目录相关提交 60 余条（涉及 30 多个插件条目的新增和推进），更新器围绕 git 锁和网关暂停又做了一轮加固，桌面端则是一批用户能直接撞上的交互修复。</strong></p>
