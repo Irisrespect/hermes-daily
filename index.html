@@ -22,9 +22,123 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 73 期 · 30262 个提交 · 每日自动更新 ·
+<p class="meta">共 74 期 · 30448 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-10" class="day">
+      <h2>Hermes 日报 2026-10-10：桌面端修 Mermaid 破图与本地运行提示条，图像生成默认走 Krea</h2>
+      <p><strong>本期覆盖北京时间 10 月 9 日 06:30 ~ 10 月 10 日 06:30 进入 main 的提交，共 186 个 commit（不含 merge），另有 15 个合并提交。新增 22 个功能、59 个修复、0 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期是一轮围绕桌面端与工具链的加固：桌面端修好了 Mermaid 图表里带换行/不换行空格的标签渲染成破图的老问题，删掉了输入框上方那张每个新会话都会冒出来的本地运行提示条，并给插件 SDK 加了桌宠气泡 API；图像生成把 Krea 2 Medium Turbo 扶正为新付费用户的默认出图通道、补齐了回退到 FAL 的路径；更新与安装路径修了 Desktop 专属 Node 依赖拖垮整条安装、Windows 打包版装插件失败、uv 缓存换锁后不重播等一批问题；技能系统做了一轮 Skills Guard 误报收敛，并把 hub 安装从「每个文件一次 API 调用」改成走 raw 链接。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端：Mermaid 图表带 &lt;br/&gt; 或 &amp;nbsp; 的标签不再渲染成破图；输入框上方「This could run on your computer」提示条被删除（保留模型菜单里的 Run locally 入口）；新增插件 SDK 桌宠气泡 API（ctx.pet.say）；上手引导连接器列表加上下渐隐</p>
+<p>图像生成：新付费用户默认走 Krea 2 Medium Turbo；Krea 在创建任务前拒绝请求时回退 FAL；带参考图时 Krea 的输入被描述成风格参考，避免风格被改写下提示词</p>
+<p>更新与安装：Desktop 专属 Node 依赖编译失败不再阻塞 TUI 与网页端（退一步跳过桌面端、TUI/网页端照常构建）；Windows 打包版（MSIX）装带 Python 依赖的插件修复；uv 缓存换锁后重新播撒、断点续传</p>
+<p>技能系统：Skills Guard 误报收敛（依赖令牌形状按大小写敏感、curl 管道规则需要操作数等），自家索引里约 15% 被误拦的第三方技能恢复可装；hub 安装改从 raw.githubusercontent.com 拉文件，同一份安装从 143 次 API 调用降到 2 次</p>
+<p>记忆 · 语音 · 本地模型：外部记忆预取溢出默认关闭但保留失控召回上限；TTS 合成失败不再删除已有文件；Windows 核显按系统可分配上限估显存；没有模型达到速度下限时不推荐</p>
+<p>重点条目：</p>
+<p>桌面端 · Mermaid 图表渲染破图修复</p>
+<p>766ab6dd2d fix(desktop): render Mermaid labels that contain &lt;br/&gt;</p>
+<p>2af85c331a fix(desktop): make mermaid SVG well-formed via the HTML parser, not a void-tag regex</p>
+<p>问题：Mermaid 图表里只要标签含换行（&lt;br/&gt;）或不换行空格（&amp;nbsp;，mermaid 的 #nbsp; 或字面 U+00A0），整张图就渲染成一张破图——alt 文本写着「Mermaid diagram」，但不抛错、不写任何日志，用户完全无从下手。根因：mermaid.render() 返回的是面向内联 HTML 的序列化结果，它的清洗器会把 `&lt;br/&gt;` 还原成开放的 `&lt;br&gt;`（不是合法 XML），`&amp;nbsp;` 是 XML 未定义的实体；随后 normalizeSvgSize 按严格的 image/svg+xml 解析，拿到的是 parsererror 文档而不是 &lt;svg&gt;，于是走「tagName 不是 svg」的提前返回，把未归一化的字符串原样交回去，`&lt;img&gt;` 的 data: URI 又被 Blink 按严格 XML 拒收。修复：先在 HTML 标记进入 XML 解析前补全所有 HTML 空标签（不只 &lt;br&gt;，还有 &lt;hr&gt;、&lt;img&gt;、&lt;input&gt; 等，且幂等——已闭合的标签和名字以空标签开头的非空标签如 &lt;break&gt; 都不动）；再把 mermaid 返回的 HTML 序列化结果交给它本就是为之而写的 HTML 解析器解析，用 XMLSerializer 重新序列化，一次性解决整类问题（序列化前先去掉标签上的裸 xmlns，否则规范实现会写出重复属性）。效果：用 32 个真实 Mermaid 代码块回放，修前 24/32 失败、且失败者全部含 `&lt;br/&gt;`（1:1 相关），修后 31/31 可渲染的图全部成功，第 32 个是本身非法的 Mermaid 源码、正确地继续回退成源码块。社区贡献（flyer、GrgaPalcic，关联 #133089、#134031）。</p>
+<p>桌面端 · 删除输入框上方的「This could run on your computer」提示条</p>
+<p>24051d9084 feat(desktop): drop the &quot;This could run on your computer&quot; strip above the composer</p>
+<p>问题：本地运行卡片会在首个回合结束后出现在输入框上方，只要机器目录里推荐了本地模型就会出现，并且跨重启一直挂着、直到被手动关闭——每个新会话都像一次关不掉的推销。修复：直接删掉这张卡片。本地运行的入口保留在它原本两个安静的位置——模型菜单顶部的「Run locally」行（直到设置完成），以及上手引导里走模型胶囊的那一步。卡片的状态机（armed/shown/dismissed、message.complete 钩子、menu-open 请求）只为卡片而存在，随卡片一起删除；store 保留两处仍需要的资格读取。效果：新会话不再被本地运行提示打断，想本地跑的用户走模型菜单仍然找得到。</p>
+<p>桌面端 · 本地安装提示只对推荐模型出现</p>
+<p>02118fc2de fix(desktop): offer local setup only for the recommended model</p>
+<p>问题：输入框的「This could run on your computer」卡片过去取推荐行、否则取第一个标记为 fits 的行。任何 build 能跑就算 fits，包括溢出到系统内存的，于是 16G 内存配 GTX 1080 的机器会被推荐 27B，而解析器在那个配置下从来不推荐它。修复：卡片只认推荐模型，没有推荐模型的机器就不再出现这张卡。效果：提示与实际可跑得动的模型对齐。</p>
+<p>桌面端 · 插件 SDK 桌宠气泡（ctx.pet.say）</p>
+<p>ecb66f60dd feat(desktop): plugin SDK pet bubble (ctx.pet.say)</p>
+<p>问题：插件想在核心桌宠的气泡里说话，只能去应用的 DOM 里定位桌宠画布、自己浮一个覆盖层上去（如 pet-wallet，见 #135178），既脆弱又容易和宿主打架。修复：新增 ctx.pet.say(text, {id, tone, ttlMs}) 返回一个清理函数，另有 ctx.pet.clear(id) 和 ctx.pet.visible（可读原子）。气泡由宿主统一渲染：窗口内只渲染插件行，弹出式覆盖层里这些行随已有的桌宠状态 IPC 推送一起走。文本为纯文本、上限 120 字、剥离控制字符与双向字符、带插件名标签，默认停留 6 秒（1~30 秒可调），每个插件最多同时 3 行、10 秒内 10 次；核心的错误/等待状态仍保留自己的气泡；没有桌宠时什么都不显示；插件卸载/停用/重载时它挂着的所有行都会被清掉。效果：插件能用一行官方 API 说话，不再需要自己叠覆盖层。</p>
+<p>桌面端 · 上手引导连接器列表上下渐隐</p>
+<p>9809922e04 feat(desktop): fade top/bottom of the onboarding connectors list</p>
+<p>94b1b6d422 refactor(desktop): drive FadeScroll&#x27;s edge fade with scroll-driven CSS</p>
+<p>问题：连接器/插件选择器（chip picker）的网格高度有上限，最后几行会被裁掉，但界面上没有任何「下面还有更多」的提示。修复：把网格包进已有的 FadeScroll——它本来就会给被裁掉的那一侧边缘加渐隐，内容装得下就完全不动。配套把这个渐隐从 React 状态 + 滚动监听 + resize 观察者的实现，换成 scroll-driven CSS：遮罩的停靠点由两个注册的 &lt;number&gt; 属性缩放，属性由滚动容器自身的位置驱动（animation-timeline: scroll(self y)），有内容被裁时才渐隐、装得下就永不调暗，没有监听器也没有状态；不支持 scroll-driven animation 的浏览器就不显示渐隐。上手引导的应用列表还把 pad 设为 1.5rem，让渐变从 chip 处开始而不是耗在盒子边缘的空白上。效果：列表被裁时用户能看到「还有更多」，滚动的开销也省掉了。</p>
+<p>图像生成 · Krea 扶正为默认出图通道并补齐 FAL 回退</p>
+<p>257849838f feat(image_gen): default new paid subscribers to Krea 2 Medium Turbo so Krea is the image lane without a config edit</p>
+<p>a9ebde190a feat(image_gen): fall back to FAL when managed Krea refuses a request before creating a job</p>
+<p>bcf216d461 feat(image_gen): describe Krea image inputs as style references so the model stops rewriting the style into the prompt</p>
+<p>4710e757ab fix(image_gen): fall back only when Krea provably created no job, and apply the Krea default on first-run setup too</p>
+<p>ad6759294d fix(image_gen): keep the upscale on the FAL fallback and name the upscaler in the note</p>
+<p>8daaaca084 fix(image_gen): say the FAL fallback also failed instead of claiming an image was generated</p>
+<p>34907c36df fix(image_gen): describe the prompt as subject and scene when references carry the style</p>
+<p>问题：托管的 Krea 在还没创建任务之前就拒绝请求时，出图会直接失败；带参考图时，模型容易把参考图里的风格重新改写进提示词，出图跑偏。修复：新付费订阅者默认走 Krea 2 Medium Turbo（不用改配置，Krea 即图像通道）；只有在 Krea 确实没创建任务时才回退到 FAL 跑一次，首次运行的 setup 也会应用 Krea 默认值；回退路径上保留放大（upscale）并在说明里点名用的是哪个放大器，回退也失败时如实报告「FAL 也失败了」，而不是谎称已生成。带参考图时，Krea 的图片输入被描述成风格参考，提示词本身被描述成主体与场景，模型不再把风格重写进提示词。效果：出图在 Krea 拒绝时能自动换道，风格参考更贴合原图，失败信息也不再误导。</p>
+<p>更新与安装 · Desktop 专属 Node 依赖失败不再阻塞 TUI 与网页端</p>
+<p>73162b00ee fix(update): a Desktop-only Node dependency failure no longer blocks the TUI and web UI</p>
+<p>问题：每次源码更新都用一条 npm ci 同时安装 ui-tui、web 和（存在已构建桌面端时）apps/desktop 的 Node 依赖。只有 apps/desktop 会带原生插件（node-pty、electron），所以编译器建不动它们的主机（例如 Ubuntu 20.04 的 g++ 9 拒绝 -std=gnu++20）会让整条安装失败，连 TUI 和网页端的构建也一起丢掉，每次启动都报「源码更新无法自动完成」。修复：当联合安装失败且其中包含桌面端时，去掉 apps/desktop 重试一次——TUI 和网页端照常构建，桌面端被报成「欠账」（「desktop dependencies failed」，正是交接脚本匹配的那一行），并提示这类从来不跑桌面端的主机可以用 `hermes uninstall --gui` 关掉它；每当无头 Linux 上的更新构建了桌面端，也会打印同样的提示。效果：一台只会用 TUI/网页端的机器不会再因为桌面端的编译问题而整体更新失败。</p>
+<p>更新与安装 · 慢速对象抓取不再拖垮更新预检</p>
+<p>2379b2e2eb fix(update): pre-apply exits that read exception/subprocess_failed name their reason</p>
+<p>5e46b9591f fix(update): say when the syntax preflight is skipped on a slow object fetch; sort gateway_pause_failed</p>
+<p>问题：更新前的语法预检（update_cmd_commit.read_target_files）会跑 `git cat-file --batch`，限时 120 秒。在 blobless 安装上（install.sh 用 --filter=blob:none clone），每个被改动的 blob 都要单独往返懒加载，慢网络下会超时，未捕获的 TimeoutExpired 会把整个更新在 2 分钟后判成 subprocess_failed（涉及 31 个 CLI 安装日 + 23 个桌面端安装日）。另外还有几处预应用阶段的退出没有明确的停止原因：读到不可读/不可解析的 config.yaml、配置的 channel 名非法、Windows 网关暂停失败，都笼统记成 `exception`。修复：未读到的批次按「未读文件」处理（这正是预检文件里写明的契约），并打印一行提示说更新后的语法检查仍会作为兜底跑；这些退出分别补上新原因 config_unreadable / channel_unresolved / gateway_pause_failed；另外把「config.yaml 不可读」这个停止原因整个删掉——因为同意（consent）门也读同一个 config.yaml、会直接读成「未开启采集」，所以这个值实际永远不会被写出。效果：慢网络下更新不再被预检莫名判死，遥测里的失败原因也能真正对上。</p>
+<p>更新与安装 · Windows 打包版（MSIX）装带 Python 依赖的插件修复</p>
+<p>eb699a158c fix(pm): MSIX plugin installs build on a writable copy of the bundled Python (#135236)</p>
+<p>问题：在打包版 Windows 应用里，启用带 Python 依赖的插件、以及 `hermes pm install`，都会失败——uv 的 lock/sync/pip check 以 101 退出，报「Unable to create process using …\venv\Scripts\python.exe」。根因：uv 通过运行 venv 的 Scripts\python.exe 来查询 venv，而这个重定向器位于包外，它会 CreateProcess pyvenv.cfg 里 `home` 指定的解释器；由于此前的改动把各个 generation 挪到了打包解释器上，`home` 指向 WindowsApps 下的文件，没有包身份（package identity）的进程不允许启动它（退出码 101 正是重定向器的 RC_CREATE_PROCESS）。修复：把固定版本 Python 的、已验证可写的副本恢复为用户 store 里密封 Windows payload 的构建解释器。效果：Windows 打包版可以正常安装带 Python 依赖的插件。</p>
+<p>更新与安装 · uv 缓存换锁重播与断点续传</p>
+<p>29416e2146 fix(pm): re-seed the uv cache when an update ships a new lock</p>
+<p>941d527a8c fix(pm): finish a partial uv cache seed instead of marking it complete</p>
+<p>问题一：uv_cache_dir() 第一次播撒后写一个裸的 `.seeded` 标记、之后不再与 payload 比较，所以更新带来新的 uv.lock 后，安装拿不到新 payload 的 wheel——启用插件会不带 --offline 重新解析、改从 PyPI 取新 pin；对 Windows ARM64 上的 cryptography 50.0.1（PyPI 上没有 wheel）就等于要走 Rust 源码构建。修复一：标记改为记录当前运行中 uv.lock 的摘要，换锁后第一次调用会把新 payload 合并进现有缓存。问题二：一次失败或被中断的播撒会跳过所有已存在的顶层条目，于是「建了 archive-v0/ 但没写完」的那次被记成完成，uv 随后报「The wheel is invalid: Missing .dist-info directory」。修复二：重试时合并进现有树（dirs_exist_ok），只复制缺失或与 payload 大小不同的文件，已完成的不动。效果：更新后的插件安装能拿到正确的 wheel，中断过的缓存也能自我修复。</p>
+<p>更新与安装 · 其它安装健壮性</p>
+<p>bb706e92c7 fix(pm): is_junction returns False for a path that does not exist</p>
+<p>fe2b130b8b fix(pm): record the Docker image&#x27;s baked extras and restore them on boot</p>
+<p>adb6d45038 fix(pm): use the pinned mirror when the upstream host does not resolve</p>
+<p>44c32dfa79 fix(pm): publish seeded cache files atomically</p>
+<p>问题：Windows 上新装插件时会先用 is_junction 探测 plugins/&lt;name&gt; 槽位，而对不存在的路径 lstat() 会抛 FileNotFoundError，导致每次全新插件安装崩溃（MSIX 冒烟的插件步骤在 rc.7-v0.21.7 上抓到）；Docker 镜像把八个 extra 烤进 /opt/hermes/.venv 却没记成 PM 的依赖选择，容器里第一次构建 generation（比如某个懒加载的 extra、或插件的依赖）从空选择开始，只带上被请求的东西、丢掉 aiohttp / 消息 SDK / mcp，重启后 API 服务器、平台适配器、MCP 服务器都起不来（#135329）；macOS 某条发布腿解析不了 ffmpeg.martin-riedl.de 时 PM 直接停住。修复：is_junction 对不存在的路径返回 False（与 os.path.isjunction 对齐）；镜像构建时用 --record-selection 把冻结构建的 --extra 列表写进 store facts 作为 venv 选择，recovery 阶段启动时把镜像自带的 extra 通过正常显式同步补回来；域名解析失败改为落回固定镜像（pinned SHA256 仍会校验字节）。效果：全新插件安装不再崩、Docker 重启后依赖不再丢失、镜像拉取不再被单个域名解析卡住。</p>
+<p>技能系统 · Skills Guard 误报收敛</p>
+<p>87a281e0c1 fix(skills): legitimate hub skills no longer trip Skills Guard false positives</p>
+<p>85188b47f7 fix(skills-guard): make the AWS key pattern case-sensitive</p>
+<p>b7a6fda9d1 fix(skills): curl needs an operand before the pipe-to-interpreter rules</p>
+<p>5d5e763780 fix(skills): inline shell snippets keep blocking community installs</p>
+<p>62e61882f7 fix(skills): decoded archives and curl | sudo bash stay flagged after the doc relaxations</p>
+<p>问题：抽样自家索引发现，约 15% 的第三方技能被 Skills Guard 拦下，而多数拦截是模式精度 bug、不是真威胁——依赖令牌形状（AKIA、ghp_、github_pat_、sk-、sk-ant-、glpat-、BEGIN PRIVATE KEY）随表按 IGNORECASE 编译，导致 `[0-9A-Z]{16}` 匹配到占位符 `AKIAxxxxxxxxxxxxxxxx`；destructive_root_rm 误伤 Dockerfile 的包缓存清理（/var/lib/apt/lists 等）；base64_decode_pipe 在 `| jq` / `| grep` 这类数据管道上也触发；html_comment_injection 只需要有注入措辞；setuid_setgid 只有执行形态才算 critical；文档里写一句 `curl | sh` 的安装说明（没有 URL）也按 critical 判死，而 community 源上的 critical 连 --force 都盖不过去，直接导致这篇技能装不上。修复：令牌形状改为大小写敏感（inline (?-i:…) 组）；destructive_root_rm 豁免 Dockerfile 包缓存清理（越过该目录、出现后续 `/` 或 `/etc` 操作数、`--no-preserve-root /` 仍然触发）；base64_decode_pipe 只在解码后的字节到达解释器（或 eval/source 内）时触发；html_comment_injection 需要真的注入措辞；setuid_setgid 只在执行形态下 critical；curl 必须有操作数才触发管道到解释器规则。扫描器版本号提升到 skills-guard-v9，缓存判定会重新扫描。inline_shell_exec 对 community 安装仍保持高危——评审发现嵌套 SKILL.md、其它 profile 的 external_dirs、锁文件不可读等情况下运行时仍会展开 `!`cmd``，降级会让这类包不带 --force 就装上。效果：自家索引可安装的技能从 83 降到 71（而不是 68），即 4 个本来被误拦的技能仍受保护，其余误报清掉。社区贡献（liuhao1024、Awshesh12）。</p>
+<p>技能系统 · hub 安装改走 raw 链接，不再每个文件一次 API 调用</p>
+<p>18ee4251d8 fix(skills): hub installs download skill files from raw.githubusercontent.com, not one API call per file</p>
+<p>51e712b651 fix(skills): review fixes — raw fetch falls back on DNS block, restore never writes through links or over user files</p>
+<p>问题：`hermes-index rate_limited`（14 天内 26 次 / 9 次安装）根因是 GitHubSource.fetch 在 repo + tree 之外，对技能目录里每个文件都发一次 Contents API 调用；匿名用户每小时只有 60 次额度，所以一个约 58 个文件的技能根本装不完，四个普通技能就能耗尽一小时额度（实测某技能花了 143 次调用、最终 rate_limited 失败）。修复：以树的 commit sha 为锚的文件抓取先读 raw.githubusercontent.com/&lt;repo&gt;/&lt;sha&gt;/&lt;path&gt;，拿到同样的不可变字节、但不占 REST 限额；raw 取不到（私有仓库、raw 故障，或 DNS 被投毒/NXDOMAIN 抛 SSRFConnectionBlocked）时回退 Contents API，并给该源打上「raw 不可用」的闩，避免每个文件都付一次 15 秒超时。同一份安装现在降到 2 次 API 调用、匿名也能成功；匿名拉 anthropics/skills/pdf 从 16 次降到 2 次。效果：技能安装不再被速率限制卡死。另外配套把恢复内置技能的几个坑一起补了（见下条）。</p>
+<p>技能系统 · 恢复内置技能不再被残留文件搞失败</p>
+<p>a1a0f0e030 fix(skills): restoring a built-in skill no longer fails on leftovers, and a failed restore is recorded as bundled</p>
+<p>问题：遥测继续显示 `hermes skills install llm-wiki` 以 failure_class=filesystem_error、source=hub 失败，有两条恢复路径是彻底坏的：一个技能目录被留下但没有 SKILL.md（手动删除时保留了用户文件，或复制中途失败）会让 copytree 每次重试都抛 EEXIST；通过符号链接分类目录（loader 会跟随，所以能正常工作）存在的技能会被 rglob 扫描漏掉，于是恢复撞上包含性守卫而失败。另外真正失败的恢复会被记成 source=hub（失败退出没有返回 bundle，_record_skill_install 就回退成 hub）。修复：恢复时绕过残留复制（dirs_exist_ok），没有 SKILL.md 的目录不算技能、里面的用户文件保留；规范路径下的 SKILL.md 算作「已存在」（还要求 frontmatter 的 name 匹配，避免目录里放着别的技能的 SKILL.md）；bundled 分支明确标记 origin=bundled，让所有 bundled 路径的结果都记成 source=bundled。另外评审补了两点：残留的目标目录里若有任何符号链接/junction 就拒绝复制（copytree 的 dirs_exist_ok 会跟着链接跑出 skills/），且只复制缺失的文件（用户编辑过的文件不再被覆盖）。效果：恢复内置技能不再随机失败，失败时也能正确归因。</p>
+<p>记忆 · 外部预取溢出改为 opt-in，但保留失控召回上限</p>
+<p>2327290b0d fix(memory): make external prefetch spilling opt-in</p>
+<p>8bff64d6ed fix(memory): keep a runaway-recall ceiling when prefetch spilling is off</p>
+<p>a114e7a344 fix(memory): detect providers past the first 8 KB of __init__.py</p>
+<p>6a2909c6b1 fix(memory): a failed agent-start provider install is not retried by every process start</p>
+<p>问题：外部记忆预取的溢出行为此前是默认开启的；同时 provider 检测只看 __init__.py 的前 8 KB，且 agent-start 阶段失败的 provider 安装会被每个进程启动重试。修复：外部预取溢出改为默认关闭，但为了「一个失控的服务商不能撑爆上下文窗口、把会话卡死」，外部召回在 max(10 × hooks.output_spill.max_chars, 100k 字符) 以内原样保留、超过这个天花板仍会溢出；正常按预算召回（Honcho 约 16 KB）不受影响。provider 检测会读到 __init__.py 前 8 KB 之后的内容。效果：记忆预取默认更克制，同时保留了失控保护。</p>
+<p>语音 · TTS 合成失败不再删除已有文件</p>
+<p>7085fbf775 fix(tts): a failed synthesis no longer deletes an existing file</p>
+<p>问题：text_to_speech 在失败时会清理它这次合成写入的每一个路径，其中包括一个本来就存有用户文件的 output_path——一次失败可能把用户自己的文件删掉。修复：目标已存在时先写到一个隐藏的兄弟文件，成功时 delivery 步骤仍用 os.replace() 覆盖到目标（覆盖契约保留），失败只清理这个兄弟文件。效果：合成失败不再误删用户文件。</p>
+<p>本地模型 · Windows 核显显存估算与推荐门槛</p>
+<p>7cc440395e fix(local-models): size a Windows integrated GPU from what Windows lets it allocate</p>
+<p>f560c14e73 fix(local-models): recommend nothing when no model reaches the speed floor</p>
+<p>问题一：没有 nvidia-smi 答案、也没有独立显卡设备时，probe_budget 把整机内存都算作统一内存。Windows 对核显有上限（DXGI 的专用 + 共享，也就是任务管理器里显示的那个数字）：31.5 GB 机器上的 Arc B390 实际只有 18 GB，但本地模型页显示 31.5 GB、还把 27B 判成装得下。修复一：显存池按该上限封顶，通过 DXGI 读取引擎指定的适配器（当 Vulkan/HIP 引擎要跑模型时，退而取唯一的非 NVIDIA 适配器）；CPU 引擎仍用内存数值，且这个 cap 只会调低不会调高。问题二：没有常驻模型能过 20 tok/s 速度下限时，解析器仍会「退而求其次」推荐最快的那个（fastest-resident）。一台没有独显的 32G 机器读成 31.5 GB，只有 27B 装得下、却只有约 13 tok/s，于是这些机器被引向一个跑得很慢的稠密模型。修复二：这类机器不给推荐，所有装得下的模型仍在浏览页一点可达。效果：显存估算不再虚高，也不会再把人引到跑不动的模型上。</p>
+<p>平台与插件生态 · Spotify 从核心迁出到插件目录</p>
+<p>71704ffb49 refactor: move Spotify out of core into the spotify catalog plugin</p>
+<p>aad3fc74e2 Plugin catalog: spotify (official, NousResearch)</p>
+<p>其他修复 · 网关 / 插件 / 工具 / CLI</p>
+<p>99b57a42c7 fix(gateway): ignore other Unix users&#x27; gateway processes in the process scan</p>
+<p>d2639c0dc8 fix(plugins): a linked plugins/&lt;name&gt; slot reads &quot;already installed&quot;, not a bad manifest</p>
+<p>16f5cdc534 fix(plugins): repin hermes-telemetry at the 0.9.0 release commit</p>
+<p>acabfabf41 fix(mcp): a failed OAuth catalog install from a card or the agent says why, instead of `exception`</p>
+<p>66e0cee526 fix(browser): end timeout=None captured waits when the supervisor loop closes</p>
+<p>9f4033eabe fix(cli): blank-install TUI reaches its own setup screen (#128663)</p>
+<p>a274d3388f fix: core modules import again on Python 3.11-3.13 (re-quote eager forward references)</p>
+<p>0670ba4524 fix(tui_gateway): a settled client-gone interrupt beats the wakeup-schedule exemption</p>
+<p>4bb139921f fix(tui_gateway): keep a detached session alive while it owns an active /loop or /heartbeat</p>
+<p>问题：`hermes gateway restart --all`（以及 status、cron 的网关检查、更新时的机队清扫）按 argv 全机匹配网关进程、没有属主检查，于是别的 UID 开的网关会被当成 SIGTERM 目标（报「Permission denied to kill PID」）并被报成一个未折叠的 per-profile 网关、附带 `hermes gateway migrate --multiplex` 建议；通过链接放进 plugins/&lt;name&gt; 的槽位会被读成「bad manifest」而不是「已安装」；hermes-telemetry 的目录 pin（旧 pin 是 0.8.0）指向一个 flat 布局的树，其 pyproject.toml 的 include 匹配不到任何目录、根级 wizard 模块又和旧的打包入口约定冲突，于是 `hermes plugins install hermes-telemetry` 会死在 build_editable、报「No distribution was found」；MCP 从卡片或 agent 触发的 OAuth 目录安装失败时只甩一个 `exception`；浏览器捕获式等待在 supervisor 循环关闭时不会结束（timeout=None 会永久挂住）；空白安装时 TUI 走不到自己的 setup 画面（#128663）；核心模块在 Python 3.11-3.13 上无法导入（前向引用没有字符串化）；派生的会话在客户端断开约 20 秒后被 WS-orphan 回收器收走（TTL/LRU 回收器随后也会收），而它实际还持有活跃的 /loop 或 /heartbeat，于是计划冻结、状态却显示 active；被中断的分离回合若在握手后重新武装了孤儿计时器，两个闩锁一个都清不掉，之后没有任何 tick 能认领该回合、每次重新附着都被 4009 拒绝，循环永远到不了预算、会话被钉住。修复：网关进程扫描对非 root 调用方跳过其它 UID 的进程；链接槽位按「已安装」读取；hermes-telemetry 重钉到 0.9.0 发布提交（上游修好了打包：wizard 模块改名让开、package-dir 把 flat 布局映射到 hermes_telemetry 命名空间）；MCP OAuth 安装失败给出可读原因；浏览器捕获等待在 supervisor 循环关闭时结束；TUI 空白安装能进 setup；核心模块把前向引用重新字符串化；网关把活跃且非网关路由的 /loop、/heartbeat 当作在飞的委派工作来对待（孤儿回收改为重新武装、TTL 和会话上限回收器跳过它），并且优先把已结算的 session 照常收走，让 client-gone / turn-cancel 闩锁能清掉。效果：这些零散的「明明重启了却不管用」「装不上插件」「循环卡死」问题一起收口。</p>
+<p>插件目录上新</p>
+<p>6d1a7f42fe feat(plugin-catalog): add codex-account-switch</p>
+<p>8e6c676e45 feat(plugin-catalog): add wyoming-voice-bridge</p>
+<p>11dbb6661a feat(plugin-catalog): add command-ledger</p>
+<p>26553dca90 feat(plugin-catalog): add redline plugin</p>
+<p>022010cc28 feat(plugin-catalog): add print-job-watch</p>
+<p>9e08be7268 feat(catalog): list hermes-openwhispr (community, voice)</p>
+<p>b1f025b3b0 feat(plugin-catalog): add cursor-provider v0.3.5</p>
+<p>本期目录新增 codex-account-switch、wyoming-voice-bridge、command-ledger、redline、print-job-watch、hermes-openwhispr（社区语音，本地桌面桥默认、付费云可选，零 tools/hooks 注册）以及 cursor-provider v0.3.5 等条目；另有 Enchanted Composer、huddo 0.7.1、agent-batch、OpenViking 2.1.1 的过审与重钉。</p>
+<p>发布工具</p>
+<p>25a096f317 fix(release): treat any missing stable baseline as no upgrade arm</p>
+<p>4e23d79de4 fix(release): let the first bundle release pass without an upgrade baseline</p>
+<p>问题：还没有任何稳定版发出过签名的包，所以 releases/stable/release-candidates.json 不存在，三个「Pin actual OLD and NEW signed packages」作业会因为「没有已发布的稳定包基线」而拒绝。另外，跳过 bundle 的发布永远不会写稳定基线指针，所以它的缺失在任何时候都是正常的，不只是第一次 bundle 发布之前。修复：transitions 只在「没有任何最终稳定 tag 记录过候选清单、且没有提供 baseline-manifest 输入」时，把 404 当成首次发布；它仍会校验回执、发出空矩阵和 baseline=none；打包升级臂在该输出上跳过；只有当它们自己的规划器以 baseline=none 成功时，门才接受它们的跳过；真正发布过 bundle 之后基线再缺失仍会阻塞；默认指针 404 现在一律规划成「没有升级臂」。效果：首个 bundle 发布不会被基线检查卡住，同时保留了「真发布后缺基线就报错」的保护。</p>
+<p>回退</p>
+<p>本期 raw 提交中没有 subject 以 Revert 开头的条目。</p>
+    </section>
+    
     <section id="2026-10-09" class="day">
       <h2>Hermes 日报 2026-10-09：全新上手引导与 setup 助手合入，桌面端修输入框折叠与本地后端回收</h2>
       <p><strong>本期覆盖北京时间 10 月 8 日 06:30 ~ 10 月 9 日 06:30 进入 main 的提交，共 408 个 commit（不含 merge），另有 21 个合并提交。新增 38 个功能、143 个修复、7 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交——本期最大的一批（09-30 提交的 setup / 上手引导）就是这样随分支合入的。本期是功能季叠加加固季：一整套全新的上手引导流程（约 55 条）进入 main，桌面端围绕输入框折叠、本地后端存活和免费层登录引导做了三组用户能直接看到的改动，插件系统又修了一轮启用/卸载/toolset 的老问题，另有 7 条性能优化集中在桌面端构建缓存与安装更新路径。</strong></p>
