@@ -5,8 +5,91 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 10 Oct 2026 06:41:36 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 11 Oct 2026 06:47:33 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-11：源码安装默认走 stable 更新通道，桌面端更新不再自我死循环</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-11</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-11</guid>
+      <pubDate>Sun, 11 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖北京时间 10 月 10 日 06:30 ~ 10 月 11 日 06:30 进入 main 的提交，共 181 个 commit（不含 merge），另有 2 个合并提交。新增 21 个功能、47 个修复、0 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期的主线是「更新通道」：官方源码安装的 hermes update 默认不再逐个 commit 跟 main，改成在已发布的正式版本之间移动，桌面端「关于 ▸ 更新」也给出了通道选择；同一条线上还修了桌面端发起的更新卡在「自己拒绝自己」的无限重试（#134268）、shallow 或离线 checkout 被误判回退到旧 release、stable 查询白耗匿名 GitHub 额度等一串问题。插件侧，需要 Codex 订阅的插件不再自己持有 token，改由核心代发请求，避免一次性 refresh token 被并发刷新吊销。技能系统修了「中途安装的技能要等一次压缩才生效」「另一个进程写入的技能看不见」「一句注释被当成删除根目录」以及社区技能 inline shell 门控放行等多处。本地模型侧修了 Ollama Cloud 工具调用丢思维链。</strong></p>
+<p>📌 今日要点：</p>
+<p>更新通道：源码安装的 hermes update 与桌面端更新按钮默认在已发布的 vX.Y.Z release 之间移动，不再逐 commit 跟 main；--set-channel main 是回到逐提交跟踪的办法，--set-channel stable 是明确落到 release commit</p>
+<p>桌面端更新：新增通道选择器（只在安装确实能保存时出现，旧运行时不再每次点击都失败），并修好了桌面端发起的更新因为把手交错的 pid 报给 hermes update 而永远认领不了自己的 claim、只能无限重启重试（#134268）</p>
+<p>稳定版查询：stable 只认 GitHub 最新已发布 release（不认 R2 记录、不认候选指针），shallow/离线 checkout 不再被误判成落后而回退，查询带上用户 GitHub token、失败会点名是限流还是额度，并给出重置时间</p>
+<p>插件安全：需要 Codex 订阅的插件改由核心 credentialed_provider_request 代发请求，插件不再自己读刷新 ~/.codex/auth.json，避免一次性 refresh token 被并发刷新吊销整个 token 家族</p>
+<p>技能系统：会话中途安装的技能不必等一次压缩就进入模型路由用的索引；另一个进程写入的技能即时可见；安全扫描不再把行末注释当成删除根目录；社区技能 inline shell 门控改为失败关闭；索引不再发布装不上的 skills.sh 行</p>
+<p>本地模型：Ollama Cloud 的工具调用回放不再被剥掉 reasoning_content，kimi-k3、glm-5.3 这类思考模型不再在工具调用之间丢思维链</p>
+<p>重点条目：</p>
+<p>更新通道 · 源码安装默认走 stable</p>
+<p>6a92a2aa49 feat(update): source installs default to the stable release channel</p>
+<p>158cd52a6b fix(update): stable is the latest published GitHub release, never an R2 record</p>
+<p>问题：官方源码 checkout 上的 hermes update 过去是逐个 commit 跟 main 走的，想留在正式版本上得自己想办法；stable 通道本身又依赖 R2 上的 releases/channels/stable.json，没有这条记录时更新直接失败并报「Channel object not found: releases/channels/stable.json」。修复：hermes update 和桌面端更新按钮现在在已发布的 vX.Y.Z release 之间移动，hermes update --set-channel stable 也可用。stable 解析只读 GitHub 上最新发布的 release（非草稿、非预发布、严格 vX.Y.Z，并在 origin 上校验 tag），不再先问 R2，也忽略 R2 的 release-candidates 指针（那是指针在 GitHub 草稿发布前就写下的）。default_channel() 让官方 origin 的源码 checkout 默认 stable，fork、镜像、没有 checkout 的树保持 main，包安装（MSIX、Store、bundled、electron-updater）完全不受影响。没有主动选过通道的安装只前进不后退——已经比最新 release 更新的 checkout 原地不动，等有更新的 release 才移动；--set-channel stable 才是「明确同意落到 release commit」的显式选择。这套规则在 --check、实际应用路径、以及桌面端和横幅用的被动 source_check 里保持一致。效果：源码安装不再每天跟着 main 漂移，想跟每一个提交的人显式切回去即可。</p>
+<p>更新通道 · 稳定版查询的健壮性</p>
+<p>dce1e9b375 fix(update): a shallow or offline checkout ahead of the release is never moved back to it</p>
+<p>baab4808d0 fix(update): the stable lookup sends the user&#x27;s GitHub token and names a rate limit as one</p>
+<p>cb80675ab3 fix(update): stable lookup failures travel as exceptions and name the quota the failed request spent</p>
+<p>问题：一是 shallow clone 里 merge-base --is-ancestor 的退出码 1 只是历史边界的猜测，却被当成「HEAD 缺这个 release」的证据，于是已经越过 v0.21.6 的 checkout 被「更新」回 v0.21.6，GitHub compare 不可达时也一样。二是 _resolve_stable 用裸 urllib 读 releases/latest 和 commits/&lt;tag&gt;，完全没有凭据，即使设了 GH_TOKEN 或 gh 已登录也照样消耗匿名 60 次/小时的每 IP 额度（更新的其余检查早就走 github_api 的令牌阶梯了），一个办公室、CI 或容器的出口很容易打满，然后失败被报成「No published stable release could be verified」。三是这条失败路径经由模块字典传递，401/403 的原因说不清。修复：只有真凭实据才移动 checkout（完整历史下的 exit 1，或 GitHub 明确说 behind/diverged），未知就保持 HEAD；GitHub API 读取改走 source_check._request（token → gh CLI → 匿名，被拒的 token 退回匿名重试），R2 读取保留自己的路径，token 不会离开 api.github.com；失败改抛异常并描述清楚——限流 + 重置时间，匿名时给 GITHUB_TOKEN 提示，并标出这次请求到底带没带 token，这样「用户的 GITHUB_TOKEN 额度用完了」和「匿名限额」不再混为一谈。效果：更新检查不再因为匿名额度打满而误报没有发布版本，也不再把人回退到更旧的版本。</p>
+<p>桌面端 · 更新通道选择器</p>
+<p>9287719a65 feat(desktop): About ▸ Updates picks stable releases or every commit for source installs</p>
+<p>a7b2ba02e3 fix(desktop): channel selector only where it can save, shows the choice at once, and never calls a custom branch main</p>
+<p>问题：桌面端「关于 ▸ 更新」过去不给源码安装选更新通道。第一版实现有三个评审问题：旧运行时（v0.21.6）会应答检查却拒绝 --set-channel，于是选择器每次点击都失败；选中的通道要等强制检查返回后才显示；跟随自定义分支的 checkout 被渲染成「每一个提交」（main）。修复：source_check 在回复里标记 channelSelectable，桌面端只在安装确实能保存这个选择时才显示这一行；确认后立刻显示选择，保存失败则重新读取安装的实际状态而不是猜；只有 stable 或 main 本身会出现这一行，自定义分支不再被冒充成 main。</p>
+<p>桌面端 · 更新交接的 pid 认领修复（#134268）</p>
+<p>013e94b38a fix(install): name the marker owner as the Desktop hand-off pid</p>
+<p>问题：POSIX 的更新交接脚本把 marker 第 1 行交给一个 custodian 子 shell（marker_refresher_start）盯守，然后导出的却是交接脚本自己的 pid。hermes update 只在 owner 是自己的 pid、HERMES_UPDATE_HANDOFF_PID 的值、或自己的祖先时才认领一个活跃 claim（update_lock.UpdateLock._is_partner），而 custodian 是交接脚本的兄弟进程——三条都不满足，祖先链也永远走不到它。结果：桌面端发起的每一次更新都拒绝自己脚本刚刚建立的 claim 并以 2 退出（报「Another Hermes update is already running ... process &lt;custodian&gt;」），桌面端只能不断重启重试。修复：改导出 $MY_PID——交接成功时它是 custodian 的 pid，没成功时是脚本自己的 pid。效果：桌面端发起的更新能认领自己的 claim，不再陷入重启循环。</p>
+<p>插件 · Codex 请求由核心代发</p>
+<p>4070f011a2 feat(plugins): core-made Codex requests so plugins never hold the token</p>
+<p>问题：需要用户 ChatGPT/Codex 订阅的插件（如 hermes-live-voice 要签发 OpenAI Realtime 的 client secret）会各自实现一份 ~/.codex/auth.json 的读取 + 刷新。Codex 的 refresh token 是一次性的，插件那第二份刷新器会和 Hermes 加锁的刷新撞车，可能把用户整个 token 家族吊销。修复：新增 hermes_cli.plugin_provider_requests.credentialed_provider_request()，由核心代为发请求——通过 resolve_codex_runtime_credentials（Hermes 自己的加锁刷新、按 profile 隔离）解析凭据，自己附加 Authorization，只发往 chatgpt.com / api.openai.com，不跟随重定向，返回 status/headers/body。调用方按调用栈上的插件目录归属，并且必须在 plugin.yaml 里声明 requires_auth: [openai-codex]；这个声明在安装时和 hermes plugins show 里都可见，目录里新增该声明的重新 pin 会向用户请求同意。纯可导入函数，dashboard 的 plugin_api.py 模块也能直接用。效果：插件再也不用把用户 token 拿在手里，一次性 refresh token 的并发刷新风险消失。</p>
+<p>技能系统 · 会话中途安装的技能立即进入模型索引（cloudflare/cloudflare-os#267）</p>
+<p>ec78ae2211 feat(prompt): skills installed mid-session reach the model without a prompt rebuild (port cloudflare/cloudflare-os#267)</p>
+<p>问题：持久化的 &lt;available_skills&gt; 索引为了保住 provider 前缀缓存，是逐字节跨轮复用的。于是在 prompt 建好之后才落地的技能（hub 安装、别的会话里的 skill_manage、组织同步、curator）要等一次压缩重建 prompt 才能进入模型真正路由用的索引——skills_list 是实时的，但 prompt 叫模型去扫索引，而不是去调它。cloudflare-os#267 在他们的 chat-cached catalog 上发现了同一个毛病：「目录说的是这个会话现在能碰到什么，而这不是一段聊天能持有的既成事实」。修复：Hermes 处理已存 prompt 漂移的惯用做法是在缓存前缀后面挂一次性提示，而不是重建。agent/skills_index_delta.py 因此把增量挂在与「界面切换提示」同一条的每轮用户消息通道上：新增技能自己的索引行（名字 + 描述，就是路由信号）、被移除的名字，相对已存 prompt 累积、只有增量变化时才重新挂（从 api_content sidecar 读回来，避免网关每轮新 agent 叠副本）；增量被撤销后旧提示会退役。当前索引取自 prompt 用的同一个缓存构建器，没有变化的轮次只花一次 LRU 命中。效果：装完技能下一轮模型就能用，不必等压缩。</p>
+<p>技能系统 · 安全扫描与可见性修复</p>
+<p>02c9603730 fix(skills): a trailing `//` comment no longer reads as `rm -rf /`</p>
+<p>c098b2bf1d fix(skills): a skill written by another process reaches a running process&#x27;s skills index</p>
+<p>097fcaa1de fix(skills): every turn announces skill changes once, on every surface</p>
+<p>587f638e52 fix(skills): keep inline shell off for nested, cross-profile and unreadable-lock community skills</p>
+<p>3eb7ed08d1 fix(skills-index): stop shipping skills.sh rows that cannot install</p>
+<p>问题一：上一轮改动让 destructive_root_rm 检查每个 rm 操作数（不只第一个），但这个循环也接受行末的一个裸双斜杠 token，于是命令后面跟的 JS/JSONC 注释被匹配成「以 / 为根删除」——带 `// clean` 注释的清理命令从 clean 变成 critical，`&quot;rm -rf *&quot;: &quot;deny&quot;, // Block recursive deletes` 也一样；第二行正是 igorwarzocha/opencode-workflows 的 opencode-config 技能里的权限示例，它因此在 main 上从 caution 变成 dangerous（且不可覆盖）。修复：第一个操作数之后的裸 `//` 会被跳过，但它后面的操作数仍然照查（`rm -rf build // /etc` 依旧 critical），首操作数是 `//`、`//etc` 或 `/` 时仍然算根。</p>
+<p>问题二：进程内的技能索引缓存只用配置（目录、工具、平台、禁用名单）做键，进程内写入会清缓存，但另一个进程的写入不会——在第二个终端跑 hermes skills install、git pull 一个外部目录、或网关 curator 为 CLI 写技能，都会让所有运行中的会话停留在改动前的索引直到重启（#92313）。修复：键里带上每个 root 下 SKILL.md/DESCRIPTION.md 的文件签名（真实 755 技能 home 上 168 个文件约 1.6 ms），快照校验复用同一份清单，不再走两遍树。</p>
+<p>问题三：#118661 的技能变更提示只在「恢复已存 prompt」的路径上触发，而长驻 agent（经典 CLI、TUI、桌面端）每个会话只走一次，这些界面根本看不到会话中途的技能变化。修复：改从 build_turn_context 每轮对着本轮实际发送的 prompt 检查；长会话不重复公告未变的增量，压缩重建后若已列出公告过的技能则保持安静，`plugin:skill` 这类带限定名的技能也能正确解析，插件上线的提示不再重复列一遍技能。</p>
+<p>问题四：inline-shell 信任门只匹配当前 profile 的 hub lock 里那个确切安装目录，而且 lock 读取失败会放行。于是 --force 装的社区 bundle 里的嵌套 SKILL.md、通过 skills.external_dirs 被另一个 profile 看到的同一个技能、以及任何位于被截断或形状不对的 lock 下的技能，在查看时都会执行自己的 `!`cmd`` 片段。修复：匹配社区安装目录的后代、同时读拥有该技能树的那个 lock，lock 存在却读不出来时失败关闭。</p>
+<p>问题五：索引构建器每次约发布 1.9k 行没有 resolved_github_id 的 skills.sh 行，多数是仓库 404 或整棵树里没有匹配的 SKILL.md 目录（上游改名/删除），客户端每装一个都要花约 40 次 GitHub 调用然后以 stale_index 失败。修复：fuzzy 匹配同时忽略 `-` 和 `_`，单技能仓库（根目录或通用 skills/ 下的 SKILL.md）按客户端的方式解析，404 或整树无匹配就丢掉这一行并记数，截断的树做有界探测，瞬时错误保持原有未解析行为。</p>
+<p>本地模型 · Ollama Cloud 工具调用丢思维链</p>
+<p>ce3f83088a fix(agent): keep reasoning_content on Ollama Cloud tool-call replays</p>
+<p>8e33fdd7af fix(agent): match Ollama &quot;-cloud&quot; tags; correct echo-family docs</p>
+<p>问题：Ollama Cloud 用户反馈 reasoning 被错误地送回。自 #50480 起，replay 策略会对 DeepSeek/Kimi/MiMo 回显家族之外的所有 provider 剥掉 reasoning_content，于是 ollama-cloud 上的 assistant 工具调用轮次回放时完全没有 reasoning；Ollama 的 /v1 会把该字段映射到 chat 模板的 thinking 输入，所以 kimi-k3、glm-5.3 这类思考模型在工具调用之间丢掉了自己的思维链。修复：新增「ollama」回显家族（provider 为 ollama-cloud、host 为 ollama.com、或本地服务的 `:cloud` 模型），纯本地 Ollama 模型仍然走剥离一侧；本地 Ollama 暴露云模型的两种写法 `&lt;model&gt;:cloud` 与 `&lt;model&gt;:&lt;size&gt;-cloud`（gpt-oss:120b-cloud）都按云模型处理，并要求带 `:`，避免 gmi-cloud 这类 provider id 被误匹配；同时更正了 require 侧只列 DeepSeek/Kimi/MiMo 的注释与文档。</p>
+<p>插件目录 · 上新与重命名</p>
+<p>fc4c69a561 feat(plugin-catalog): add memory-shield</p>
+<p>66733c9767 feat(plugin-catalog): memory-shield 1.1.1 (bounded hook scan)</p>
+<p>a41147bcb4 feat(plugin-catalog): memory-shield 1.1.2 (review fixes)</p>
+<p>012c1e7ea6 feat(catalog): add Memoria memory provider</p>
+<p>94193fb228 feat(plugin-catalog): add salesforce-chatter platform plugin (0.2.1)</p>
+<p>3a46b9b24b feat(plugin-catalog): add liquid-inference-provider</p>
+<p>761462bfb2 feat(plugin-catalog): add jp-edinet</p>
+<p>11f66125f3 feat(plugin-catalog): add jp-subsidies</p>
+<p>0c892f1e52 feat(plugin-catalog): add hermes-adaptive-effort plugin</p>
+<p>beb62ceb91 feat(plugin-catalog): add beam plugin</p>
+<p>1231058a6e feat(plugin-catalog): rename meshtastic-gateway to radio-dm-gateway</p>
+<p>fb6f09374d feat(plugin-catalog): remove old meshtastic-gateway file name</p>
+<p>876190273c Add hermes-vision-inline to the plugin catalog</p>
+<p>99b067e315 feat(plugin-catalog): bump command-ledger to 1.1.0</p>
+<p>1a66e0c7b0 feat(plugin-catalog): bump approval-ledger to 1.1.0</p>
+<p>压缩与中继遥测 · 一轮契约对齐（内部）</p>
+<p>2e4e024ec2 fix(compression): restore the transcript when a compression candidate is refused</p>
+<p>bd6d576eba fix(compression): roll back mutating engine failures</p>
+<p>2159dc3e78 fix(relay): align the hermes.compaction v1 contract with what Hermes emits</p>
+<p>f925b01791 fix(relay): stop waiting on Relay after one stalled compaction mark</p>
+<p>760c93fef7 fix(shared-metrics): count an empty-transcript refusal under its own class</p>
+<p>4c7ab8b2a0 fix(compression): name the automatic trigger and effect in attempt telemetry</p>
+<p>问题：上下文引擎可以就地改动传给它的消息列表，而 context-engine 插件指南说这种改动只有在这一次 pass 提交时才可见；但传了自己 commit fence（网关的会话清理）或把 compression.context_timeout_seconds 设为 0 的调用方，会把实时列表直接交给引擎而没有 facade 的深拷贝。compress_context 只在 no-progress 和 superseded 两条拒绝分支上恢复压缩前的快照，引擎中止、空 transcript、would-grow 这三条拒绝却把引擎留下的实时列表原样返回——一个清空输入并返回空列表的引擎，会让 compress_context 返回空 transcript，同时还在警告「会话未被改变」。修复：compress_context 在 _candidate_rejected 拒绝候选、或 commit 拒绝一个变大的候选时都恢复快照，让每一种拒绝都返回原始 transcript；no-progress 和 superseded 分支不再自己恢复（调用方已经为每一次拒绝恢复）。引擎抛异常时也回滚到压缩前的事件记录，增长判断基于不可变的输入快照，记忆发布推迟到候选通过所有拒绝门之后，这样就地改动无法绕过拒绝或泄漏副作用。Relay 侧同一批修复把 hermes.compaction v1 契约与实际发出的事件对齐、区分「不可读的会话归属查询」和「真的丢了」、按轮次（而不是事后）打点 micro-compaction、明确 overflow_reason 与自动触发/效果标签、一个停滞的 compaction 标记之后不再继续等 Relay、迁移过来的 Relay 0.10 配置不再被 0.10 的 OTLP 自动导出波及。这批多为内部遥测与网关侧改动，普通用户看不到直接变化。</p>
+<p>其它修复与工具链</p>
+<p>e5d94d9537 fix(checkpoints): avoid history queries in the footprint notice</p>
+<p>f86276d2eb nous portal reasoning content echo</p>
+<p>0035c85145 fix: add tsx to linted extensions</p>
+<p>d95e35fe0f fix: side effect of linter fixes</p>
+<p>6e5a56d947 fmt(js): `npm run fix` on merge (#136310)</p>
+<p>检查点的 footprint 提示不再跑历史查询（复用 _store_has_head，tools/checkpoint_maintenance.py）；Nous Portal 的 reasoning content 回显；CI 侧把 ruff 的严格配置设为默认、给 JS 加 lint（预提交钩子加 js linting、pin 具体 js 依赖版本、合并时跑 npm run fix 格式化）、python 圈复杂度上限进预提交钩子并重新启用 TID251 检查；另有两条裸 fix:（给 lint 扩展名加 tsx、linter 修复的副作用）以及一批 contributor 邮箱映射的 chore。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-10：桌面端修 Mermaid 破图与本地运行提示条，图像生成默认走 Krea</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-10</link>
