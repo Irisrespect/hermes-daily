@@ -166,6 +166,12 @@
 <p>5f9b77cce0 ci(release): stop building macOS Intel and Termux in stable releases by default</p>
 <p>74d788fcc9 feat(release): offer to abandon a blocking attempt from an interactive terminal</p>
 <p>问题一：DEFAULT_CONFIG 在 30 天里改了 183 次，却没有任何检查保证新配置键进了文档——全局急停命令 /pause 曾有两个月没有文档。修复：新增 scripts/ci/check_docs_drift.py，列出每个 DEFAULT_CONFIG 叶子与每个已注册斜杠命令、找出文档从未提到的；今天未记录的 132 个键进基线文件，测试只对新增缺口失败，不会拦无关 PR，/pause 也在这一版补上文档。问题二：一行代码就能改掉每个会话发给模型的内容（指南常量换档、工具集增删工具、动态改写器改描述），而 diff 看不出来。修复：提示词面被渲染成快照提交进仓库、像代码一样评审——对九个面（CLI 的 claude/gpt/gemini/hermes、代码工作区的 CLI、桌面端、telegram、discord、cron）用生产代码渲染系统提示词与 tools[]，时钟、宿主系统、网络、工具可用性、环境探测与机器路径全部固定，保证笔记本与 CI 产出相同字节；快照过期即失败，附件工作流贴出每个面的 token 变化。问题三：CI 任务在 checkout 里留下文件没人发现。修复：新增 check-clean-worktree 组合动作，作为每个检出仓库的 job 的最后一步报告残留文件（默认 warning 模式）。问题四：稳定版默认还构建 macOS Intel 桌面包与 Termux APT 包，而 Intel macOS 在主干上已不受支持、它的打包分支要跑 76~88 分钟。修复：改为显式 --include-macos-intel / --include-termux 才构建，标志写进签名声明。问题五：release.py release 遇到未完结的发布尝试只打印放弃命令让操作者自己复制。修复：在交互终端里直接问「放弃这个 ref 并切一个新尝试？」，默认否，非交互仍然拒绝。此外发布流程还修了一批细节：放弃只放弃已批准的那个尝试、且要等新切出的尝试可用；校验和失败的构件会被重新下载；升级分支因为没有基线而跳过时仍然要跑 publish-bundles；staging 逐行校验每个元数据的提交与标签；Store 提交改用 get 而不是 status 读提交结果（rc.12-v0.21.7 曾因为把 Spectre 输出当 JSON 解析而失败）。</p>
+<p>相关提交：</p>
+<p>a12c3417c8 fix(release): abandon only the approved attempt, and only after the new cut is viable</p>
+<p>76c1a50eb1 fix(release): an artifact download that fails its checksum is fetched again</p>
+<p>a138be8023 fix(release): publish-bundles runs when an upgrade arm skipped for lack of a baseline</p>
+<p>efd17a70b5 fix(release): staging checks each metadata row&#x27;s commit and tag, not stamp-only fields</p>
+<p>1fd1827726 fix(release): the Store submit reads the submission with &#x27;get&#x27;, not &#x27;status&#x27;</p>
 <p>其它</p>
 <p>36e0c68ecc feat(optional-skills): anatomy, ported for Hermes (MIT, wheresryan22/anatomy)</p>
 <p>04eb00cef7 fix(browser): browser_exec uses the local fallback when the cloud browser provider fails</p>
