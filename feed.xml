@@ -5,8 +5,163 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 11 Oct 2026 06:47:33 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 12 Oct 2026 06:47:04 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-12：一个连接器可以挂多个命名账号，思考模型的思维链不再丢</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-12</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-12</guid>
+      <pubDate>Mon, 12 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖北京时间 10 月 11 日 06:30 ~ 10 月 12 日 06:30 进入 main 的提交，共 206 个 commit（不含 merge），另有 1 个合并提交。新增 25 个功能、80 个修复、0 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期的主线是「连接器的多账号」：一个托管连接器（比如 Gmail）现在可以同时挂多个命名账号（home / work），桌面端对话框、CLI 的 hermes connectors、TUI 的 /connectors 三处都能列出、命名、重命名、重连和移除账号。第二条主线是推理内容的保留：OpenAI、xAI、Gemini、Copilot、Anthropic、Bedrock 各条路由上，思考模型的思维链不再在轮次之间、压缩之后或 --resume 之后被丢掉。桌面端还加了「编辑或重新生成会归档后续对话时先确认」；网关侧修了完成消息（委派与后台任务）在归属确认失败时被丢弃或重复投递的一串问题；插件目录把官方插件统一迁到 hermes-official-plugins 仓库，并新增准入规则 17（禁止不可扫描的二进制载荷），据此下架 tabro。</strong></p>
+<p>📌 今日要点：</p>
+<p>连接器多账号：一个 app 可以挂多个命名账号，桌面端对话框、hermes connectors 命令与 TUI 的 /connectors 面板都能列出、命名、重命名、重连和移除；账号级操作一律按账号 id 寻址，不再按名字</p>
+<p>推理保留：OpenAI / xAI / Gemini / Copilot / Anthropic / Bedrock 各条路由的思考内容不再在轮次之间、压缩或 resume 之后丢失，被服务商按名字拒绝的推理字段也记进会话配置，不必每次重启再吃一次 400</p>
+<p>桌面端深裁剪确认：编辑或重新生成如果会归档之后的所有用户轮次，先弹同一个破坏性确认；过去一条过期绑定会静默裁掉上百条消息（#133716）</p>
+<p>阿里云内容护栏：Qwen 的输入/输出护栏过去被当成服务端错误反复重试最长 4 分钟，现在归类为内容策略拦截，直接结束这一轮</p>
+<p>插件安全：官方插件统一迁到 hermes-official-plugins 仓库；新增准入规则 17 禁止不可扫描的二进制与提交进仓库的字节码，并据此下架 tabro；安装扫描器清掉约 15 类误报（38 个 pin 从 caution 变 safe）</p>
+<p>重点条目：</p>
+<p>桌面端 · 一个连接器可以挂多个命名账号</p>
+<p>9a83171db5 feat(desktop): list, name and rename several accounts per connector</p>
+<p>4a4e1f765e fix(desktop): account actions act on the account the user picked</p>
+<p>问题：一个托管连接器过去只能有一个账号——想要 Gmail 的「工作」和「私人」两个账号就得来回切换。修复：托管连接器现在可以同时持有多个账号。连接器对话框按名字列出每个在线账号，没有名字的显示厂商标签，需要时行内有「重命名」「移除」（只移除这一个，需确认）和「重连」；「添加另一个账号」先问名字，再在该名字下连接；被重连替换掉的账号折叠在「N 个已退役」下；卡片显示账号名，或「N 个账号」。重命名立刻生效，被网关拒绝时回滚并给出网关的原因。当 agent 自己挑了一个名字去连账号时，聊天卡片会写明「Hermes 把这个 Gmail 账号命名为 work。」，点重命名会打开该账号的名字编辑器——没有任何东西会自己弹出来。效果：同一个 app 下的多个账号可以并存、各自命名、各自修复，不必删掉旧的再连新的。</p>
+<p>桌面端 · 账号级操作按 id 寻址</p>
+<p>df728fc7b4 fix(desktop): reconnect goes by account id, failed sign-ins retry, add errors show</p>
+<p>ca4aca13e5 fix(desktop): reconnect on an unnamed account repairs that account by its id</p>
+<p>f38da142bc fix(desktop): Rename links go by account id and open once, a started add refreshes the list</p>
+<p>问题一：重连过去可能按名字找账号，而乐观重命名会在服务端应答前就改掉行上的名字，另一个会话也可能占着同一个名字——只按名字可能修到另一个账号。修复：重连一律按 connection_id 寻址，名字只用于显示。问题二：没有名字的行点重连时不带任何地址，网关无从修起，只报「先给它起个名字」。修复：无名行也带上该账号的 connection_id。问题三：聊天通知里的「重命名」链接过去按名字走，且缓存的账号列表可能早于页面加载后新建的账号，会把一个还在的账号判成「已经不存在」。修复：链接按账号 id 走，先刷新账号列表再判断；已开始的添加或重连会立即刷新列表；账号真的没了就不打开并说明。效果：账号操作稳定落在用户点的那一个账号上。</p>
+<p>桌面端 · 账号界面的一批交互修复</p>
+<p>49c396d20a fix(desktop): a sign-in in one profile no longer locks another profile&#x27;s accounts</p>
+<p>e22e4517ad fix(desktop): Try again is disabled while its start is in flight</p>
+<p>66f4ab7932 fix(desktop): a sign-in stays visible when the same profile is picked again</p>
+<p>c77a5be979 fix(desktop): a Rename link refreshes the account list before calling the account gone</p>
+<p>问题一：登录查找只匹配 app，所以一个 profile 里开着的 Gmail 登录会把其他所有 profile 的 Gmail「添加账号」「重连」全部禁用，停止等待还可能作用到另一个 profile 的操作上（评审第二轮）。修复：按操作启动时的 profile 作用域匹配。问题二：两次快速点击「Try again」能在两个替换登录都没结束前到达后端并开出两个替换登录。修复：按钮跟随该 app 的 pending connect，飞行中禁用。问题三：多连接桌面端上，作用域选择器会把 {connectionId, profile} 固定住，而环境作用域发起的操作只持有一个裸 profile 名，于是再次选中同一个 profile 时开着的登录窗口消失了（评审第三轮）。修复：作用域按解析后的后端比较。问题四：「重命名」链接会拿一份可能过期的缓存列表判断账号是否消失。效果：账号界面不再出现「明明在却说不在了」「登录窗口自己关掉」「一次点击开出两个登录」这类状态错位。</p>
+<p>桌面端 · 核心侧的命名账号能力</p>
+<p>4834cf0d97 feat(connectors): gateway contracts for named connector accounts</p>
+<p>0ca69688b0 feat(connectors): connect, repair, rename and list named accounts</p>
+<p>6301bf4bc3 feat(connectors): a connection operation can target one named account</p>
+<p>ec8a971c08 feat(connectors): manage_connections targets can name an account</p>
+<p>8c86e112f7 feat(connectors): connector results name the account they ran under</p>
+<p>cd764c5ce0 feat(connectors): account rows say when an account is retired, and a repair can name one by id</p>
+<p>43e054890c feat(cli): the connection card says which name Hermes gave an account</p>
+<p>网关契约与核心工具这一层为具名账号补齐了能力：连接、修复、重命名、列出都可以指名某一个账号（连接操作可以只作用于一个具名账号），连接结果会说明它是在哪个账号下跑的，账号行会标出「已退役」，修复可以按 id 指名退役账号，manage_connections 的目标也可以带账号名。命令行连接卡会写出 Hermes 给这个账号起的名字。这一批是上面桌面端与 CLI/TUI 行为的底座，普通用户直接看到的是各界面里能按名字管理多个账号。</p>
+<p>桌面端 · 本地化文件拆分</p>
+<p>fcd90decf3 fix(desktop): keep the locale catalogs under their size cap</p>
+<p>问题：账号字符串把 en/fr/de/es/zh 与类型文件顶过了健康度棘轮给每个文件定的体积上限。修复：连接器卡片与账号字符串拆到各自的主题文件（&lt;locale&gt;_connector_card.ts、&lt;locale&gt;_connector_accounts.ts、types_connectors.ts），与其他大主题用的同一套拆法；每个目录文件都比主干上更短，并重新生成了 locales/_keys.desktop.json。</p>
+<p>连接器 · 命令行与 TUI</p>
+<p>af530e86d6 feat(cli): hermes connectors lists, connects, renames and removes accounts</p>
+<p>d216e425a4 fix(cli): connectors registers on its own, retired accounts can be removed</p>
+<p>问题：命令行过去只能按 app 连一个账号，没有「同一个 app 的多个具名账号」这个概念。修复：hermes connectors 可以列出账号（退役的折叠在 --all 后）、连接一个新的具名账号并等待浏览器步骤、按名字或 app 标签重命名、确认后移除某一个账号；Ctrl-C 会了结当前操作，所以下一次连接不会被上一个挂起的操作挡住。hermes connectors 现在自己注册解析器（不再挂在 mcp 下面），sessions 的懒处理挪进自己的子命令模块以保持 main.py 不超体积上限；disconnect --alias 现在可以选中退役账号（由 accounts --all 显示），而重连永远不会指向退役账号。效果：脚本化和终端用户可以完整管理具名账号。</p>
+<p>连接器 · TUI 的 /connectors 面板</p>
+<p>0daa6d7731 feat(tui): /connectors manages named connector accounts</p>
+<p>6b7f5f8e88 feat(tui,cli): reconnect repairs the chosen account by id, retired accounts fold</p>
+<p>问题：TUI 里没有管理账号的入口，而且完全打对的本地命令按回车时，网关的模糊补全可能把别的命令排到前面（打 /connectors 跑成了 /login）。修复：/connectors 面板按 app、名字、状态列出每个账号，无名账号显示 app 标签，退役的折叠在 Tab 后；r 就地重命名、a 添加另一个具名账号并等待其链接、c 重连某一个（只在需要修复的行上提供，健康行按 c 会回答「已连接」）、x 确认后移除。完全打对的 TUI 本地命令现在直接执行。重连改为按 id 修复被选中的账号（具名或不具名都行），旧账号转为退役、替换者顶上，不删除任何东西。agent 用自己挑的名字连账号时，设置卡标题带上该名字，settled 的会话行提示「Hermes 把这个 &lt;app&gt; 账号命名为 &lt;name&gt;。随时可以重命名。」效果：终端里也能完整管理具名账号，误触和误删都收敛了。</p>
+<p>连接器 · 面板交互修复</p>
+<p>ffe20f24ad fix(tui): Ctrl+C in /connectors closes the panel without reconnecting</p>
+<p>91d2f95117 fix(tui): /connectors yields keys to prompts and reconnects only named accounts</p>
+<p>cb9f6ac736 fix(tui,cli): reconnect is offered only as a repair, sign-in failures keep their reason</p>
+<p>1705a3f47e fix(tui): /connectors calls the gateway directly and a lapsed wait claims no failure</p>
+<p>问题一：Ink 把 Ctrl+C 报成带 ctrl 的 c，于是按下 Ctrl+C 关闭面板的同时那一下也触发了 c 的重连。修复：字母快捷键走 panelShortcut，忽略 Ctrl 与 Meta 组合键。问题二：移除账号直接读 y，任何提示打开时都读键，一句给别的提示的 y 可能删掉账号；而且无名行重连会发一个只带 app 的请求，对任何健康账号都会报成功。修复：移除走共享确认提示，任何 agent 提问或确认打开时面板交出按键；重连必须知道账号名或 id。问题三：登录失败或过期时看不到网关给的原因。修复：显示网关的 detail。问题四：等待链接的超时被报成「连接失败」，但迟到的回复可能已经连上。修复：只说明等待结束，重新加载的列表显示真实状态。效果：面板不会再误删、误连或误报失败。</p>
+<p>桌面端 · 编辑或重新生成前先确认深裁剪</p>
+<p>cbb057c0b7 fix(desktop): confirm a regenerate that would archive later user turns</p>
+<p>问题：重新生成的目标来自绑定的消息作用域。在长时间运行的渲染器里这个绑定可能过期、指到几小时前的某一轮，而截断式 prompt.submit 会静默归档之后的所有对话——#133716 里窗口从 430 条变成 323 条，107 条仍在使用的消息被归档，用户没有任何提示。修复：planConfirmedReload（rewind.ts，主聊天与会话磁贴共用）把「会丢掉后续用户轮次」的重载交给还原检查点用的同一个确认框（共享 ConfirmDialog，复用现成文案），拒绝就不提交任何东西；正常的尾部重新生成没有后续用户轮次，行为不变。效果：一次过期绑定不会再悄悄吃掉上百条消息。</p>
+<p>桌面端 · 编辑也走同一道确认</p>
+<p>c72f4fa1dd fix(desktop): edit asks before a deep cut; a server 4033 asks once and retries</p>
+<p>57f825763b fix(desktop): count failed later turns when deciding a deep regenerate</p>
+<p>问题一：编辑每次提交都自己发确认参数（confirm_deep_truncate），于是服务端那道闸门对桌面端编辑形同虚设（#133748 评审发现）。修复：planConfirmedEdit 与重载对齐——会归档后续用户轮次的编辑先弹同一个破坏性确认，尾部编辑或失败轮次的编辑不打扰，拒绝则不发送；客户端与服务端对「后续用户轮次」的计数口径不一致会让一次深度裁剪变成一句无法解释的「重新生成失败」，现在服务端的 4033 拒绝会被接住、问一次再带确认重试，拒绝则静默回滚而不是弹错误。问题二：计数用了跳过失败轮次的口径，而网关会持久化失败轮次的用户行并计入，于是在一个失败的后续轮次之前重新生成既不发确认、又拿到一个无法解释的 4033。修复：任何后续可见的用户行都会触发确认。效果：编辑与重新生成在动到历史之前都会先问用户。</p>
+<p>桌面端 · 确认本身的一轮修复</p>
+<p>1b8a09f88d fix(desktop): a server 4033 re-runs the rewind from the top instead of retrying a stale plan</p>
+<p>4f5be98c29 fix(desktop): a 4033 confirm answered after a session switch is dropped</p>
+<p>183e955bd0 fix(desktop): an edit retry only reuses the deep confirm it covered; a session switch drops the edit</p>
+<p>问题一：4033 兜底对话跳过了过期记录检查——接受会重试一份在对话框打开期间可能已经过期的计划，拒绝会把较新的消息回滚到提交前的快照。修复：从顶部重跑回溯，而不是复用过期计划。问题二：接受 4033 之后的重跑又一次读取当前会话，如果用户在对话框开着的时候切换了会话，一次 parentId 为空的重新生成会截断并重发另一个会话的最后一轮。修复：这次确认属于被拒绝的那个会话，只有会话（磁贴的运行时）仍是同一个才重跑。问题三：4018 的过期目标重试会把用户的深裁剪确认带进一份已经多出后续用户轮次的刷新记录里，等于替没人确认过的轮次跳过闸门。修复：只有刷新后记录里的后续用户轮次数量相同时才带上确认，否则不带确认重发。效果：确认只对它真正覆盖的那次操作生效。</p>
+<p>桌面端 · 版本详情与插件动作</p>
+<p>573f514a19 feat(desktop): version details name the update channel; the overlay links to change it</p>
+<p>26fa3aa079 fix(desktop): Change only where Settings can switch; name the release only on an explicit not-ahead</p>
+<p>问题一：状态栏点版本号弹出的更新浮层不显示更新通道，源码安装看不出自己被钉在稳定版上。修复：VersionDetails（关于页与浮层共用）为源码 checkout 增加一行「Channel」——「Stable releases」「Every commit (main)」或「Branch: &lt;名字&gt;」，打包安装不显示这一行（通道属于包本身）。浮层给一个「Change」链接，关掉对话框并深链到设置里的更新选择器（通道不能在浮层里切换）；停在稳定版时状态行会写明版本号（「You&#x27;re on the latest stable release (v0.21.6).」），只前进不后退的 checkout 保持通用文案。问题二（#136313 评审）：浮层对自定义分支的 checkout 和比 --set-channel 更老的运行时也给了「Change」，但设置页在这两种情况下根本没有选择器，链接点进去是空的；而且老检查器不发 aheadOfRelease 字段，会被读成「就在这个 release 上」。修复：只有 sourceUpdateChannel() 允许选择时才传该动作，检查器始终发送这个布尔值，状态行只在明确的 false 时才点名 release。效果：通道状态可见、可跳转，且不再指向一个不存在的入口。</p>
+<p>桌面端 · 插件调用应用内置动作</p>
+<p>0e0539c0f0 feat(desktop): plugins run built-in app actions (ctx.runAction)</p>
+<p>问题：想要应用内置动作（切换浏览器面板、打开设置）的插件只能伪造一个合成键盘事件，用户改绑或解绑快捷键之后就静默失效（目录里的 browser-toggle 插件就是这样）。修复：新增 ctx.runAction(id)，调用与快捷键分发器和命令面板完全相同的处理函数——useKeybinds 通过 registerBuiltinActionRunner 发布处理器表、调用时读取，所以绑定变化不再影响插件；只允许视图/导航类动作的白名单（PLUGIN_APP_ACTIONS），破坏性或特权 id 直接拒绝；返回结构化结果而不抛异常（{ok:true} 或 {ok:false, reason:&#x27;unknown&#x27;|&#x27;denied&#x27;|&#x27;unavailable&#x27;, error}）；ctx.listActions() 列出允许的 id 与本地化标签；文档补了 API 一节、白名单表与迁移说明。效果：插件调用内置功能不再依赖用户的按键绑定。</p>
+<p>推理与回放 · 思考模型的思维链不再丢</p>
+<p>3a53716ce4 fix: OpenAI and xAI models keep reasoning across turns and through compaction</p>
+<p>问题：实测（api.openai.com、api.x.ai）发现 Responses 路由有四处会丢掉推理内容：gpt-5.4/5.5/5.6/6.x 默认只回应当前轮的推理，回放的早期轮次内容会被丢弃；压缩会把路由本来会读的早期推理条目剪掉；同一家族的兄弟变体签发的加密推理被认为不可回放；解密内容被拒时的处理会连带丢掉不需要丢的条目并重发一次完全相同的请求。修复（Teknium 的裁定是「每个模型的推理都会在服务商能消费的地方被回放」）：codex 传输对 gpt-5.4/5.5/5.6/6.x 家族发送 reasoning.context=&quot;all_turns&quot;（o 系列、gpt-5-mini/nano、5.1-5.3 会因此报 400，所以不在表内，openai-codex 后端与其他宿主不变）；压缩在「路由确实会读早期推理」时保留 codex_reasoning_items；同一家族兄弟变体之间（gpt-5.6-luna → terra、5.4 &lt;-&gt; 5.4-mini、6-astra &lt;-&gt; 6.1-sol）允许回放，其他路由仍要求精确匹配模型；turn_recovery 第一次遇到 invalid_encrypted_content 时只丢弃不是这个端点+模型签发的条目。效果：OpenAI 与 xAI 上的长会话不再因为一次压缩或一轮回放而丢掉思考内容。</p>
+<p>推理与回放 · Gemini / Copilot / Anthropic / Bedrock 各条路由</p>
+<p>2b2e4d908d fix: Gemini and Copilot keep their reasoning carriers across turns</p>
+<p>f691e7b7fb fix: Gemini/Copilot signatures survive reloads; an error body can&#x27;t switch off DeepSeek replay</p>
+<p>d6f3199584 fix: Bedrock Converse reasoning survives a reload from state.db</p>
+<p>79b45d1647 fix: signed reasoning replays after resume on Anthropic and Bedrock Converse</p>
+<p>3e31dc2239 fix(bedrock): Claude reasons over Converse and replays per-model reasoning</p>
+<p>33d6139ccd fix(anthropic): replay signed thinking on Bedrock, Vertex, Foundry and MiniMax</p>
+<p>da9c15942e fix(bedrock): Anthropic-shaped thinking stays Claude&#x27;s on Converse</p>
+<p>8ed7d31b20 fix(anthropic): Haiku 5.5 thinks adaptively</p>
+<p>问题一：Gemini 文本轮的 thought signature（原生 thoughtSignature，或 OpenAI 兼容/Vertex 的消息级 extra_content.google.thought_signature）在捕获时就被丢掉，Copilot 的 reasoning_text / reasoning_opaque 与 Gemini-3 的 function.thought_signature 从未被读取，回放签名自然无从谈起。修复：这些载体都被保留并回放。问题二：路由整形会在「不读这个数组」的路由上丢掉 reasoning_details（Gemini、Vertex、Copilot、自定义），而那里面藏着私有的原生助手记录，于是每个重载的轮次（每个网关轮次、每次 --resume）都丢掉签名并翻转缓存前缀。修复：私有记录在整形后仍然保留，由传输层按路由过滤。问题三：Bedrock Converse 的签名思考只活在永不持久化的 bedrock_content_blocks sidecar 里，重载后 Claude 或 gpt-oss 的轮次没有任何推理可回放。修复：Converse 的推理按 Anthropic 形状存进 reasoning_details，转换器再读回来（Claude 是签名，其他模型是可读文本）。问题四：Anthropic 的「非 anthropic.com 即第三方、一律剥离思考」兜底把 Bedrock、Vertex、Foundry、MiniMax 上 Claude 的签名思考都丢了。修复：按 Anthropic 自己的文档，签名在 Claude API、Bedrock、Google Cloud 之间有效，Bedrock 还要求把最后一个工具调用轮的思考送回；Converse 上只有 Claude 读这些载体（其他 Converse 模型会拒绝），非 Claude 模型保持原行为；非 Claude 的 Converse 推理模型也补上了 thinking 开关。问题五：Haiku 5.5 被一条笼统的「haiku 跳过」规则关掉了思考，而 Anthropic 与 Bedrock 都把它列为自适应思考模型。修复：只对 Haiku 4.5 保持跳过。效果：各家思考模型在跨轮、跨压缩、跨 resume 时都能保住自己的思维链。</p>
+<p>推理与回放 · 回放覆盖面和自适应记录</p>
+<p>336b11584c fix: replay prior reasoning to every chat-completions route that can read it</p>
+<p>86aa201bba fix: compaction salvage no longer strips reasoning from retained turns</p>
+<p>37d6492474 fix: encrypted reasoning items are never deleted from retained history</p>
+<p>df3c21400d fix: /steer, /branch and compaction accounting keep reasoning intact</p>
+<p>f89688440e fix: a learned reasoning-field rejection survives a resumed process</p>
+<p>问题一：chat-completions 这条线上，过去只对 DeepSeek/Kimi/MiMo/Ollama 回显 reasoning_content、只对 OpenRouter 回 reasoning_details，而 turn_context 到处弹掉 reasoning 字段，于是只读 reasoning 的 Ollama /v1 从来收不到任何推理。修复：向每一条能读它的 chat-completions 路由回放推理。问题二：被服务商按名字拒绝推理字段的严格通道（Portal 的 Fireworks :US 模型）只在内存里记住这次拒绝，hermes chat --resume 或网关重启后第一条请求又要吃一次 400。修复：记进会话的 model_config。问题三：压缩的「防增长」环节会把除最新一轮外所有助手轮次的推理/推理明细剥掉、并剪掉早期 codex_reasoning_items，然后才把结果提交为规范历史——在长会话上等于永久失去连续性。修复：推理文本不再是收缩目标（工具输出与摘要仍然是），codex 条目按路由规则处理。问题四：加密推理条目会被压缩删除、或者被一次「先删掉失败请求根本没发送的异己条目、再重发同样字节的请求」的重试误伤。修复：压缩只丢掉被遮蔽的检查点，重试只剥离真正被回放的未验证条目。问题五：/steer 并入工具结果轮次会结束正在进行的工具循环（只读最后一轮思考的 Claude 模型因此丢掉循环里的思考），CLI 的 /branch 没有像网关和 TUI 那样复制 reasoning_content，预检估算给 Gemini/Copilot 签名与 Converse sidecar 定价不一致会引发反复压缩。修复：三者都对齐。效果：长会话、分支、压缩、resume 这些容易丢推理的路径都被覆盖。</p>
+<p>推理与回放 · 阿里云内容护栏不再进入重试循环</p>
+<p>42f210de11 fix: Alibaba&#x27;s content guardrail ends the turn instead of a 4-minute retry loop</p>
+<p>问题：Qwen 经 OpenRouter 或 Nous Portal 会把阿里 Model Studio 的输出护栏报成带 provider_unavailable 的带内 502（「Output data may contain inappropriate content.」），输入护栏报成 DashScope 的 400 data_inspection_failed。这两个说法都不在内容策略模式里，于是 502 走了服务端错误重试阶梯，Hermes 把同一段内容一遍遍送进同一个拒绝，最长转 4 分钟。修复：两种都归类为 content_policy_blocked，直接结束这一轮。效果：触发护栏时几秒内就给出结果，不再空转。</p>
+<p>网关 · 完成消息的归属</p>
+<p>802fd5782f fix(gateway): offer an admitted completion again when its turn cannot confirm the owner</p>
+<p>7d432912d1 fix(gateway): hand the resolver the owner the completion pre-flight proved</p>
+<p>fd4e277c84 fix(gateway): keep the pre-flight&#x27;s proof through a completion&#x27;s turn</p>
+<p>63fdd21151 fix(gateway): refund the delivery attempt when completion ownership is uncertain</p>
+<p>a481580f25 fix(gateway): retry uncertain completion ownership</p>
+<p>0b86710cef fix(gateway): preserve conversation ownership for worker completions</p>
+<p>dc29b0d2e9 fix(gateway): keep delegate completions on parent session</p>
+<p>38c82c81fb fix(gateway): bound the delegate provenance walk</p>
+<p>733c2c88d9 fix(gateway): read a raw api_server completion&#x27;s notice policy in its served profile</p>
+<p>问题：投递预检会先证明一个完成消息（委派/后台任务的结果）该送达哪个会话，准入随后结算持久认领；但解析器会把 owner 的会话行再读一遍、把压缩过的 owner 的血缘再走一遍。于是一次瞬时的读失败就把一个已经被接受的结果丢掉了——而账本记着它「已投递」，永远不会再投。反过来，准入在一个轮次无法确认 owner 时会把事件丢掉，同样不会被重投；重试判决还会把投递次数用掉（实测八次瞬时失败就够丢结果）。修复：完成消息携带预检证明过的会话（含被压缩 owner 的实时 tip），只要路由仍指向它就直读返回、不再重读归属，路由变了才做完整检查；轮次无法确认 owner 时把本轮准入的行退回 pending 并重新入队，下一次投递对压缩后的会话重跑预检；重试判决不再消耗投递次数（与适配器未就绪的完成一样延后）；委派完成消息固定留在父会话、血缘回溯有上界、worker 完成的会话归属沿用同一套校验；被服务的 profile 上，raw api_server 完成消息的通知策略按真正承载该会话的 profile 读取。效果：后台任务与委派的结果不会再因为一次瞬时读失败而静默消失或重复投递。</p>
+<p>插件目录 · 官方插件迁到 hermes-official-plugins</p>
+<p>74e59cd340 plugin-catalog: official plugins install from hermes-official-plugins</p>
+<p>d4d2ab7b5d plugin-catalog: six official plugins install from hermes-official-plugins</p>
+<p>问题：Nous 的官方插件过去分散在各自的仓库里。修复：homeassistant、spotify、claude-subscription-directsdk 三个插件先搬进 NousResearch/hermes-official-plugins 的子目录（每个仓库的历史都带过来了）；随后第二批 hermes-memory-wiki、hermes-telegram-business、blender、snyk、touchdesigner 也迁入，同时离开应用包的桌面端强调色选择器 accent-picker 以目录条目形式从同一仓库加入。插件代码没有变化，清单面完全一致，所以重新 pin 不需要新的用户同意。已安装的会自己跟上：左核迁移按目录名安装，重新 pin 会克隆条目当前的仓库/子目录并改写安装记录。目录条目还补上了 1200x600 的卡片图。效果：官方插件有了统一的来源与入口。</p>
+<p>插件目录 · 准入规则 17 与 tabro 下架</p>
+<p>decf192176 plugin-catalog: delist tabro; add rule 17 (no unscannable executable payloads)</p>
+<p>cdce56faf2 plugin-catalog CI: enforce rule 17 — scan pinned entries for unscannable payloads</p>
+<p>问题：tabro 在插件树里带了一个预编译的 Windows 可执行文件（relay-native-host-0.4.2.exe）。安装扫描器读不了机器码，而它校验用的 SHA-256 与文件写在同一个提交里，只能证明文件在那次提交之后没被改过、不能证明它是从哪来的，评审也无法确认它与仓库里的 C++ 源码一致。修复：下架 tabro（删除 plugin-catalog/tabro.yaml；已安装的继续可用，也没有列入 removed.yaml——没有恶意证据，只是无法验证二进制），并新增准入规则 17：不允许编译后的二进制、提交进仓库的 Python 字节码、以及藏这两者的压缩包（按文件头识别 ELF/Mach-O/PE/WebAssembly，不看扩展名，改名绕不过去）；原生组件只有在带 GitHub 构建来源证明（gh attestation verify 对照 pinned commit）时才允许，安装时下载只允许来自工具的官方源、按校验和固定并披露；规则镜像进文档提交指南。CI 侧在 pinned-source-validate 里加了强制扫描（scripts/scan_plugin_payloads.py，纯标准库，所以无安装环境的校验器与第三方 CI 都能跑），条目可以用 attested_binaries 声明已验证的路径。效果：目录里不会再出现无法评审的二进制载荷。</p>
+<p>插件目录 · 安装扫描器清掉约 15 类误报</p>
+<p>4e03f4581a fix(scanner): clear ~15 classes of install-scanner false positives (catalog sweep)</p>
+<p>问题：扫描器在 plugin-guard-v10 上把 543 个目录 pin 里的 53 个判成 caution，几乎全是误报——而 caution 会静默阻止 plugins update 跟随一个已经评审过的 pin，所以每一个都是用户可感知的拦截。修复：清掉全目录扫描暴露的每一类误报（降级而不删除：发现仍然可见，只是结论不再拦人），每一类都有 red-on-base 的 A/B 证明（良性的写法变安全、同一规则的攻击孪生体仍然 caution/dangerous），并做了整库零退化复扫——38 个 pin 从 caution 变 safe，0 个变差。修掉的类包括把正文里的「the platfoRM rOute to ~/.hermes」当成删除家目录、自卸载文档的匹配面过窄、JS 的 env || 与 Python 的 env | {...} 被判成 dump 全部环境变量、以及已知可信安装器的 curl 管道执行等。效果：plugins update 能正常跟随这些 pin。</p>
+<p>插件目录 · 上新与版本推进</p>
+<p>946b132397 plugin-catalog: add holographic (memory provider leaving core, new maintainer)</p>
+<p>718d8339108 catalog: add qdrant-memory durable memory provider</p>
+<p>4367085418 plugin-catalog: add browser-toggle</p>
+<p>b8f0013127 plugin-catalog: add hermes-taskbar-badge</p>
+<p>cfdacb323a Add plugin catalog entry: hermes-lang-it (Italian language pack)</p>
+<p>aaac823a3a plugin-catalog: add optchat-memory</p>
+<p>b6e03671c7 catalog: pin Jet Browser v0.8.0 source</p>
+<p>bf54e1b2c1 feat(plugin-catalog): add Model Router v0.4.1</p>
+<p>71e45333ea feat(plugin-catalog): add jp-kokkai</p>
+<p>86ea23a433 feat(plugin-catalog): add doc-markdown</p>
+<p>fd74e718a0 feat(plugin-catalog): bump stream-speed to 1.2.0</p>
+<p>29b9f17c8f feat(plugin-catalog): bump aux-ledger to 1.2.0</p>
+<p>a6ec36238d plugin-catalog: re-pin agora to v2.0.11</p>
+<p>c3a2543637 plugin-catalog: fish-audio v1.3.2; requires_hermes &gt;=0.21.6</p>
+<p>c57331677d fix(plugin-catalog): hermes-lang-vi requires_hermes &gt;=0.21.6, not the unreleased 0.22</p>
+<p>ebde127a8d fix(plugin-catalog): bump web-search-plus to 5.0.1</p>
+<p>3512bc7992 fix(plugin-catalog): bump hermes-field-notes to 1.2.4</p>
+<p>本期目录上新：holographic（记忆服务商离开核心、转为社区目录插件，带新维护者；0.2.1 到 0.6.1 一连串版本，从十种语言扩到十四种，用关键词做同义扩展）、qdrant-memory（持久记忆服务商）、browser-toggle（浏览器面板开关，含 README 与截图）、hermes-taskbar-badge、hermes-lang-it（意大利语语言包）、optchat-memory、Jet Browser（含运行时校验器与 v0.8.0 源固定）、Model Router v0.4.1、jp-kokkai、doc-markdown 等。版本推进与固定：stream-speed 与 aux-ledger 升到 1.2.0，agora 重新固定到 v2.0.11，fish-audio v1.3.2 要求 Hermes &gt;= 0.21.6，hermes-lang-vi 的要求版本从尚未发布的 0.22 改成 0.21.6，web-search-plus 5.0.1、hermes-field-notes 1.2.4、jp-egov-law 重新固定等（另有一批 contributor 邮箱映射与目录侧的评审 chore）。</p>
+<p>发布、CI 与工具链</p>
+<p>4e8fe569e4 feat(ci): new config keys and slash commands must ship with docs</p>
+<p>ae3598c7cd feat(ci): reviewers see every change to the system prompt and tool schemas</p>
+<p>9859e0db5e feat(ci): report files a CI job leaves in the checkout</p>
+<p>5f9b77cce0 ci(release): stop building macOS Intel and Termux in stable releases by default</p>
+<p>74d788fcc9 feat(release): offer to abandon a blocking attempt from an interactive terminal</p>
+<p>问题一：DEFAULT_CONFIG 在 30 天里改了 183 次，却没有任何检查保证新配置键进了文档——全局急停命令 /pause 曾有两个月没有文档。修复：新增 scripts/ci/check_docs_drift.py，列出每个 DEFAULT_CONFIG 叶子与每个已注册斜杠命令、找出文档从未提到的；今天未记录的 132 个键进基线文件，测试只对新增缺口失败，不会拦无关 PR，/pause 也在这一版补上文档。问题二：一行代码就能改掉每个会话发给模型的内容（指南常量换档、工具集增删工具、动态改写器改描述），而 diff 看不出来。修复：提示词面被渲染成快照提交进仓库、像代码一样评审——对九个面（CLI 的 claude/gpt/gemini/hermes、代码工作区的 CLI、桌面端、telegram、discord、cron）用生产代码渲染系统提示词与 tools[]，时钟、宿主系统、网络、工具可用性、环境探测与机器路径全部固定，保证笔记本与 CI 产出相同字节；快照过期即失败，附件工作流贴出每个面的 token 变化。问题三：CI 任务在 checkout 里留下文件没人发现。修复：新增 check-clean-worktree 组合动作，作为每个检出仓库的 job 的最后一步报告残留文件（默认 warning 模式）。问题四：稳定版默认还构建 macOS Intel 桌面包与 Termux APT 包，而 Intel macOS 在主干上已不受支持、它的打包分支要跑 76~88 分钟。修复：改为显式 --include-macos-intel / --include-termux 才构建，标志写进签名声明。问题五：release.py release 遇到未完结的发布尝试只打印放弃命令让操作者自己复制。修复：在交互终端里直接问「放弃这个 ref 并切一个新尝试？」，默认否，非交互仍然拒绝。此外发布流程还修了一批细节：放弃只放弃已批准的那个尝试、且要等新切出的尝试可用；校验和失败的构件会被重新下载；升级分支因为没有基线而跳过时仍然要跑 publish-bundles；staging 逐行校验每个元数据的提交与标签；Store 提交改用 get 而不是 status 读提交结果（rc.12-v0.21.7 曾因为把 Spectre 输出当 JSON 解析而失败）。</p>
+<p>其它</p>
+<p>36e0c68ecc feat(optional-skills): anatomy, ported for Hermes (MIT, wheresryan22/anatomy)</p>
+<p>04eb00cef7 fix(browser): browser_exec uses the local fallback when the cloud browser provider fails</p>
+<p>7dc0df1be8 fix: browser_exec honours hybrid routing for private/LAN URLs</p>
+<p>5515e41725 fix: compute each URL&#x27;s routing verdict once, not once per decision</p>
+<p>7cbbb586c3 fix(browser): browser_exec&#x27;s private-URL route reaches local Chromium on its own daemon</p>
+<p>4976fa223d fix(tests): keep MagicMock home paths out of the repo checkout</p>
+<p>74f77ab9b0 Code health blocks new wall-clock sleeps in tests (HX013), adds a shared wait_until helper (#136644)</p>
+<p>4eba3ebed1 ci(clean-worktree): run only when every earlier step passed</p>
+<p>可选技能新增 anatomy（MIT，wheresryan22/anatomy 的 Hermes 专供移植，钉在 v1.0.0）：用一个交互式等距机械图来讲清一个技术概念（SVG，可选 WebGL 分层与 beta 3D 模式），并带几何审计与线端检查器；移植保留上游正文，SKILL.md 增加「在 Hermes 里运行」一节（工作目录、vision_analyze 看图、后台终端跑长审计等）。浏览器工具修了路由：browser_exec 在配置了云浏览器但会话创建失败（实测 Browser Use 网关 429）时不再整体失败——会话层本来就会回退到本地 Chromium 并把会话标成 fallback_from_cloud，但 browser_exec 只读 cdp_url、本地会话是懒启动所以拿不到端点，于是一次云侧限流就让整个调用失败；现在按无提供商路径解析打包 Chromium 的 CDP 端点，并把提供商失败记一次日志。另一个更实质的问题：browser_navigate 会把私网/回环/局域网 URL 路由到本地 Chromium（browser.auto_local_for_private_urls 默认开启），而 browser_exec 的预检不查这个决定，于是每个局域网地址都被一刀切拒绝成「Blocked: URL targets a private or internal address」——在默认的 Browser Use 模式下 browser_exec 是唯一的浏览器工具，等于文档里的混合路由工作流不可达；而单纯放开预检也不对，因为 exec 整个代码块只解析出一个 CDP 端点，放开后私网请求会打到云端、正是这道护栏要防的泄漏。现在判定与路由一起移动（_hybrid_routes_locally 作为唯一事实来源），路由判定也改成每个 URL 算一次而不是每个决策算一次。工具链侧：测试里不再新增墙钟 sleep（新增共享 wait_until 助手），CI 的 clean-worktree 检查只在前面所有步骤都通过时才跑。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-11：源码安装默认走 stable 更新通道，桌面端更新不再自我死循环</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-11</link>
