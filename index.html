@@ -22,9 +22,167 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 76 期 · 30835 个提交 · 每日自动更新 ·
+<p class="meta">共 77 期 · 31082 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-13" class="day">
+      <h2>Hermes 日报 2026-10-13：连接器重做为单次调用，没账号也能用；桌面端状态栏可改工作目录</h2>
+      <p><strong>本期覆盖北京时间 10 月 12 日 06:30 ~ 10 月 13 日 06:30 进入 main 的提交，共 247 个 commit（不含 merge），另有 4 个 merge。新增 43 个功能、89 个修复、1 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期第一条主线是连接器的接口级重做：每次连接器调用变成独立的单次请求，失败里的调用错误直接渲染给模型，每个网关请求带上调用方身份与调用 ID 并逐条落日志；同时没有 Nous 账号的用户现在也能用连接器（游客身份在第一次要应用时才创建，CLI、终端界面、消息网关与桌面端一致），只用连接器和托管工具的免费游客不再被免费推理的浏览器验证拦住。第二条主线是工具层的「改文件悄悄改错」收口：转义漂移的自动纠正抽成共享逻辑并只在校验通过时动手，patch 的缩进重排不再毁掉行中锚点。桌面端新增从状态栏直接改当前会话的工作目录；「持久 Shell」开关终于真正生效；Langfuse 从核心搬进官方插件目录；提示词瘦身约 2100 个 token 每请求。</strong></p>
+<p>📌 今日要点：</p>
+<p>连接器重做：每次调用是独立的单次 execute 请求，失败里的调用错误（code + family）变成那条调用自己的错误条目，模型看到的是 TOOL_NOT_ALLOWED 这类具体原因；502/503/504 重试一次、429 只在等待不超过 10 秒时重试一次，始终同一个幂等键</p>
+<p>调用追踪：每个网关请求带 hermes-agent/&lt;版本&gt; (&lt;界面&gt;; &lt;系统&gt;) 的 user agent 与 x-request-id，开了遥测还带会话/轮次/工具调用 ID；每次连接器结果落一行带网关请求 ID 的日志；批量里的每条调用按自己的 ID 派发、各自计数</p>
+<p>没有账号也能用连接器：manage_connections 对所有界面可见，游客身份在第一次要应用时创建（打开桌面端连接器页面就算要应用），模型侧读取工具永不铸造身份；只用连接器的免费游客拿连接器专用令牌，不再过免费推理的浏览器验证</p>
+<p>工具层收口：只有旧文本里出现的转义才算漂移，只在新文本里出现的转义一律拒绝、文件保持不动；patch 的缩进重排不再给行中锚点的每一行双重叠加缩进</p>
+<p>桌面端与性能：可以从状态栏改当前会话工作目录（分屏各自可改、Bot Chat 也能用）；持久 Shell 开关真正接线；提示词瘦身约 2100 token 每请求（browser_vault 五个工具合并并延后加载、terminal schema 精简）</p>
+<p>重点条目：</p>
+<p>连接器 · 每次调用都是独立的单次请求</p>
+<p>d535df3a1d feat(connectors): execute sends one call per request and reads status codes</p>
+<p>f6318814b1 feat(connectors): render CONNECTION_EXPIRED and error families for the model</p>
+<p>41cd1c5f99 feat(connectors): wire models for single-call execute and error families</p>
+<p>问题：连接器的调用过去按批走下去，一次失败只能笼统地报「连接器网关请求失败」，模型拿不到具体原因，重试策略也不分明。修复：每一次连接器调用现在是独立的单次 execute 请求。失败状态如果 body 里带调用错误（code + family），就变成那条调用自己的错误条目，而不是整批的传输失败，模型看到的是 TOOL_NOT_ALLOWED 这类具体原因；CONNECTION_EXPIRED 与错误族会渲染给模型看。重试规则明确：502/503/504 重试一次，429 只在 Retry-After 指出不超过 10 秒的等待时重试一次，始终用同一个幂等键。只认批量形式的老网关会回 400 并点名 tools，客户端自动退回数组形式并记住该来源（进程内）。每条失败的调用打一行 WARNING，带状态、code 和网关的请求 ID。效果：连接器出错时模型能直接读出原因并自行修正，而不是一条无法行动的失败。</p>
+<p>连接器 · 调用方身份与调用追踪</p>
+<p>e375e86a6c feat(connectors): name the caller on every gateway request</p>
+<p>ceaef9ad59 feat(connectors): thread call ids to the gateway and log every connector outcome</p>
+<p>242439977b fix(connectors): batch entries dispatch under their own call ids</p>
+<p>c71fb6f161 fix(shared-metrics): count each connector batch entry once, not the batch</p>
+<p>62c37f2a03 fix(connectors): execute logs its checked outcome with the gateway request id</p>
+<p>626eeec287 fix(connectors): log each connector outcome after the body is checked</p>
+<p>d10dbb8fc6 fix(connectors): the card&#x27;s Try again keeps the opening call&#x27;s ids</p>
+<p>问题：网关侧很难判断一个连接器请求是谁发的、属于哪一轮对话，出问题时也没有可对齐的 ID。修复：新增 tools/managed_gateway_identity.py 统一构造调用方身份——user_agent() 形如 hermes-agent/&lt;基础版本&gt; (&lt;界面&gt;; &lt;系统家族&gt;)，界面取自会话平台；correlation_headers() 为每次 HTTP 尝试带上 x-request-id，并在 profile 开启遥测时带上会话、轮次与工具调用 ID（x-nous- 前缀由网关在转发给厂商前剥去）；log_connector_outcome() 为每个连接器 HTTP 结果打一行日志，带网关的 x-request-id，失败 WARNING、成功与账号路由「尚未创建」的 404 记 DEBUG。批量里的每条调用按自己的调用 ID 派发（不再共用整批的 ID），共享指标里每条批量调用各记一行而不是给整批记一行，被放弃的批量只给自己已开始的那条记一次。执行结果在 body 校验之后才记录，卡片上的「再试一次」保留最初那次调用开的 ID。效果：一次连接器请求从模型到网关到厂商可完整对齐。</p>
+<p>连接器 · 没有 Nous 账号也能用（游客身份）</p>
+<p>d7830c6f42 feat(connectors): a guest identity is created on the first connector use, on every surface</p>
+<p>问题：没有 Nous 登录的用户只有在商店版桌面端里才能用连接器——那里开机引导会铸造一个游客身份（HERMES_GUEST_ONBOARDING=1）。纯 CLI、终端界面、消息网关与其他桌面端构建里 manage_connections 工具是隐藏的，连接器根本够不着。修复：任何没有 Nous 身份的用户现在都能看到 manage_connections，游客身份在第一次要应用的时候才创建。connect 门（connectors_available）也接纳「有可能拿到身份」的无身份用户（nous.guest 不为 false、没有 bearer、没有终端侧拒绝），判断不看网络所以 keep_fn 仍然便宜；托管客户端（每个托管 manage_connections 动作背后的真实网关客户端）会先调 ensure_guest_identity()，铸造是同步的、沿用既有 5 秒预算，失败则回退到免费额度的等待文案；桌面端连接器页面的两个账号门也照此创建——打开页面本身就是「要应用」，因为没有身份时页面一行都点不了。模型侧的读取腿（tool_search、tool_describe、连接器调用）永远不铸造身份，没有身份时不发请求并回答 not_set_up（提示指向 manage_connections，过去同一情况会说「重新登录 Nous」）。免费模型那条路不变：guest_enabled() 仍要求启动门，所以为连接器建的游客永远不会变成推理服务商。设置对话里的应用卡片不再自己铸造，它的行来自 connectors.list RPC。效果：任何界面上没有账号的用户都能直接用连接器。</p>
+<p>免费额度 · 只用连接器的游客不再撞浏览器验证</p>
+<p>ea45ec3936 feat(free-tier): connectors and managed tools use a connectors-only guest token</p>
+<p>5ebef93797 fix(free-tier): a guest kept for connectors never acts as a free-tier login</p>
+<p>54eae7a160 fix(connectors): guest creation waits out a failed attempt, and only intent creates it</p>
+<p>da8b412460 fix(free-tier): drop guest pool rows, note failed mints under the lock, share connectors_token</p>
+<p>问题：只用连接器或托管工具的免费游客，也会被免费推理的浏览器挑战拦住——它们本来不需要推理。修复：连接器侧的令牌解析（工具网关、NAS 连接器路由、账号读取）会复用当前活着的游客令牌（推理令牌也覆盖），否则按 purpose=connectors 铸造一枚 NAS 从不挑战的令牌，存在 providers.nous.connectors_token 里、与已有的推理槽并列，所以当前版本写出的 auth.json 照常加载；令牌填哪个槽由 JWT 的 scope 断言读取，比 hermes-portal#1516 更早的 NAS 也还能走今天的挑战路径。推理令牌只在真正调用免费模型时、在 run_with_challenge 内部铸造。另外两条非对话路径不再替游客偷偷铸造推理：auth keepalive 跳过游客，Nous 模型目录与定价读取改走后台调用、退回精选列表而不是打开浏览器挑战。配套修复：为连接器保留的游客永远不会被当成免费登录使用；游客创建会等掉一次失败尝试，且只有明确的意图才会创建；游客池的行会被清理，铸造失败的记录在锁内备注，connectors_token 在多处共享。效果：只用连接器的免费用户不再被无谓的验证打断。</p>
+<p>桌面端 · 从状态栏改当前会话的工作目录</p>
+<p>63ed3caa4b feat(desktop): change the focused chat&#x27;s working directory from the statusbar</p>
+<p>问题：会话开在错误的文件夹时，用户没有地方改——侧边栏的「移到项目」只对普通会话可用，Bot Chat 根本走不到。修复：workspace 下拉里新增「Change working directory」，调起远端感知的文件夹选择器，然后对聚焦的那个会话（主会话，或某个分屏自己的运行时）执行 session.cwd.set。正在跑一轮时该动作禁用（后端会拒绝），冷启动的分屏和挂着另一个网关的分屏不显示这一项（选择器浏览不到那边的文件系统）。文案复用已有的 changeCwdTitle，没有新增字符串。效果：开错目录的会话可以直接就地改回来。</p>
+<p>桌面端 · 一批细节修复</p>
+<p>6e4445cbf7 fix(desktop): keep preview input alive when the window is in the background</p>
+<p>f8b272b90e fix(desktop): defer global default flip until manual provider connect is confirmed</p>
+<p>f1e3f1f2ad fix(desktop): prefetch a connector&#x27;s tool list only when it is connected</p>
+<p>7c90699391 fix(desktop): a preview locate that never answers is not a click</p>
+<p>094bc70ff7 fix(desktop): the Persistent Shell description says what the toggle does</p>
+<p>问题一：窗口切到后台之后，预览 guest 被浏览器后台节流，drive_preview 等的动画帧永远不再触发，预览输入像死了一样。修复：聊天窗口留在流节流的档位上，预览输入不再被掐死。问题二：从设置或模型选择器的「添加服务商」手动接入时，刚刚连上的服务商会在确认卡片出现之前就被写成全局默认，用户关掉浮层或改选别的服务商，默认值已经被悄悄翻掉。修复：把这次提前写入收窄到首次运行，手动路径改为在确认（Begin）时持久化，关掉浮层就不会动原来的默认值。问题三：只有连接器真的连上了才预取它的工具列表。问题四：预览定位请求一直不回答时不再被当成一次点击（改成超时判定）。问题五：「持久 Shell」开关的说明文字改成它实际的行为。效果：桌面端这几处状态错位都不再出现。</p>
+<p>终端 · 持久 Shell 开关真正生效</p>
+<p>89963452ee fix(terminal): make persistent_shell / TERMINAL_*_PERSISTENT actually work</p>
+<p>问题：spawn-per-call 重写之后（更早的一个提交），terminal.persistent_shell / TERMINAL_*_PERSISTENT 这些开关只被读进配置、从没传到环境构建里——SSHEnvironment 不接这类参数，_create_environment 丢掉了 local_config，于是每个本地与 SSH 会话无论怎么设置都会跨命令带着 cwd 和导出的环境变量。修复：BaseEnvironment 增加 persist_env（默认 True）；设为 False 时每条命令的包装仍然 source 登录时快照、仍然发 cwd 标记，但跳过命令后的导出重灌，一条命令里的导出不会进到下一条。SSHEnvironment / LocalEnvironment 接受 persistent 参数，_build_ssh_env 转发 ssh_config[&#x27;persistent&#x27;]，所有本地构造路径（终端、文件工具、execute_code、ensure_task_env）统一转发 TERMINAL_LOCAL_PERSISTENT。默认值与今天的真实行为一致（TERMINAL_LOCAL_PERSISTENT 实际默认 true，文档过去写 false 但被忽略）。文档里「普通 shell 变量会持久」「本地不持久」的说法也重写成确切行为。效果：只有显式把开关设成 false 的用户会看到变化——他们拿到自己要求的隔离。</p>
+<p>工具层 · 转义漂移的自动纠正收口</p>
+<p>74bec4c243 feat(tools): share escape-drift correction</p>
+<p>3a3d1281eb fix(tools): reject quote escapes that only the replacement carries</p>
+<p>bc26e5caa9 fix(tools): only auto-correct escape drift when both strings are consistent</p>
+<p>4f3dbdd512 fix(tools): reject ambiguous backslash drift</p>
+<p>2f65302821 fix(tools): auto-correct quote-escaping drift too, and surface which fired</p>
+<p>acbcb26d63 fix(tools): auto-correct doubled-backslash patch args for the affected model</p>
+<p>acd400f03d fix(tools): drop model-name gate from backslash-doubling autocorrect</p>
+<p>问题：模型传 patch/write_file 参数时常常带多余的转义（反斜杠、引号），自动纠正过去会「照着新文本剥一遍」，把模型真正想写的转义也一起剥掉——对一个内容是 message = &quot;it&#x27;s fine&quot; 的文件发 old_string=it\&#x27;s fine、new_string=it\&#x27;s \&quot;great\&quot;，会真的写成 message = &quot;it&#x27;s &quot;great&quot;&quot; 还报 success。修复：转义漂移的自动纠正抽成共享逻辑（feat(tools): share escape-drift correction），并且只在校验通过时才动手——只有 old_string 里出现的转义种类才算漂移，只在新文本里出现的转义一律拒绝、文件保持不动、让模型自己重发（引号路径与反斜杠路径用同一个拒绝语义）；两个字符串不一致时不做纠正；反斜杠漂移有歧义时直接拒绝；引号漂移也会自动纠正并说明是哪一种触发了。双反斜杠的补丁参数只对受影响的模型自动纠正，不再按模型名硬门控。效果：自动纠正只会做能证实的事，不会静默改坏文件。</p>
+<p>工具层 · patch 缩进重排与模糊匹配信号</p>
+<p>23282cf1b1 fix(tools): stop patch&#x27;s reindent pass from mangling mid-line anchors</p>
+<p>395e1cd7b1 fix(tools): narrow mid-line reindent guard</p>
+<p>adb928c1c9 fix(tools): surface structural-edit signals for patch/write_file</p>
+<p>b2835584b7 fix(tools): drop the write_file rewrite warning</p>
+<p>fe4bb33189 fix(tools): scope the patch boundary note and count replaced lines in write_file</p>
+<p>5b2c0c1eb6 fix(tools): add V4A boundary note</p>
+<p>问题一：patch 的缩进重排会毁掉「行中锚点」的替换。_reindent_replacement 用 old_string 自己首行的缩进（old_indent）与文件区域对比来重锚定缩进，而 old_string 锚在一行中间时它本来就没捕获行首空白，旧检查 _leading_whitespace(line).startswith(old_indent) 于是恒真（空串是任何串的前缀），new_string 的每一行都被再叠加一次文件缩进、工具还报 success: true。修复：改为比较匹配自身的起点是不是行首（match_starts_at_line_start：起点为 0 或前一个字符是换行），否则在算 old_indent 之前就直接原样返回 new_string；整行锚点（哪怕 old_string 不带缩进）逻辑完全不变，55 个既有 tests/tools/test_fuzzy_match.py 用例全通过；另一条修复收窄了行中重排的守卫。问题二：模糊匹配过去的策略被直接丢掉，非 exact 策略会算出近似行窗口、可能把编辑挪一行，而写入后的字节一致性校验抓不到（它只能确认目标内容落地、不能确认边界正确）。修复：捕获实际生效的策略，非 exact 时附一条提示。问题三：write_file 那条「大改写」警告被去掉——它在 write_file 的正常用法（有意全量重写）上每次都响，且只对会为 lint/LSP 预读旧内容的文件类型生效（.md/.yaml/.sql 永远不响），一个该响时不响、不该响时乱响的信号只会被模型学会忽略。另保留 patch 与 V4A 的边界提示，并给出被替换行数。效果：编辑边界可见、缩进不再被双重叠加。</p>
+<p>插件 · Langfuse 从核心搬进官方目录</p>
+<p>94f9e7152a plugin-catalog: add langfuse (official, moved out of core)</p>
+<p>cdf5732af6 refactor: move Langfuse out of core into the langfuse catalog plugin</p>
+<p>06c5e6dedb plugin-catalog: pin langfuse to the merged hermes-official-plugins main</p>
+<p>53df274b08 fix: Langfuse migration installs without a prompt at startup and keeps the old plugin key working</p>
+<p>问题：Langfuse 过去是核心自带的可观测性后端，与「官方能力优先走目录插件」的方向不一致；而搬迁本身也会踩到老配置。修复：Langfuse 移出核心、作为官方目录插件发布（目录新增 langfuse 条目并 pin 到 hermes-official-plugins 的 main）。迁移坑一：profile 里留着旧的 `plugins.enabled: [langfuse]` 时，PM 会认为新安装「已被选中」，于是升级后第一次交互式 hermes chat 会停在「Prepare these with Hermes through PM now? [y/N]」而终端被聊天输入占着（在 PTY 里实测复现）。修复：recover_at_startup 为所有搬出核心的条目取得同意后直接安装（与 memory_provider_migration 的做法一致），终端里跑 hermes update 仍然会问。迁移坑二：`observability/langfuse` 继续作为该插件的别名——加载器的门会把它算进 plugins.enabled / plugins.disabled（管理员的托管列表替换 profile 的列表时追踪仍然开着，残留条目无害），_find_plugin_entry 为每个 hermes plugins 动词解析它，「已搬出核心」的提示只在插件未安装时出现；langfuse_in_use 按托管覆盖配置读取，名字从行上推导。效果：升级后 Langfuse 用户不会卡在提示上，追踪配置继续生效。</p>
+<p>插件 · 开发接口与自动安装退避</p>
+<p>1a4af83a8a feat(plugins): validate warns on imports of private Hermes core modules</p>
+<p>0290081fa4 docs(plugins): catalog rule 9 notes validate warns on private core imports</p>
+<p>ad37bfb17f feat(plugins): optional per-launch provider on SubagentLaunchRequest</p>
+<p>c82127bb6a fix(plugins): subagent lifecycle children follow the delegation config</p>
+<p>5a71512662 fix(plugins): subagent lifecycle facade works under plugin-host isolation; add steer</p>
+<p>c5a3231c53 fix(plugins): lifecycle launches accept plugin toolsets</p>
+<p>3569e8461e fix(plugins): left-core startup installs back off exponentially instead of hourly forever</p>
+<p>新增：hermes plugins validate 现在会把插件对未公开核心模块的导入列成一条聚合警告（给出 file:line 与模块/名字），只是警告、从不拒绝；「公开」的判定是插件作者文档里导入或推荐的模块加上 PluginContext 发放的，公开模块里的下划线名字仍然会警告（配套文档说明了这条目录规则）。插件还可以给单次子代理启动指定一个已配置的服务商——字段走与 /review 相同的 _resolve_delegation_credentials 路径，优先级为 request.provider &gt; delegation 配置 &gt; 父级，无法解析的服务商在注册前就抛 SubagentLifecycleError；这个字段只对插件可见，不暴露给模型的 schema。配套修复：生命周期子代理跟随 delegation 配置、在插件宿主隔离下也能工作，并新增了 steer。问题：搬出核心后的自动安装（Home Assistant、Spotify、记忆服务商）在永远成功不了的情况下（版本门、root 拥有的 plugins 目录、连不上 GitHub）会每小时在第一次启动时无限重试，遥测显示每个受影响用户每天约两次失败。修复：失败戳记录连续失败次数，启动窗口按 1 小时逐次翻倍、上限一周（1h→2h→4h…→7d）；离线一小时的笔记本仍能在一小时内拿到插件，hermes update 仍然总是重试，记忆服务商装成功后清零，老版本留下的空戳按一次失败算。</p>
+<p>插件目录 · 上新与 re-pin</p>
+<p>02b8251834 feat(plugin-catalog): add hermes-devin</p>
+<p>542221c23a feat(catalog): add Sem and Weave code-review skills</p>
+<p>8b4405cd77 plugin-catalog: add waypoint (session status for Hermes Desktop)</p>
+<p>afe12046c4 plugin-catalog: add profile-picker</p>
+<p>3b9f19bbf5 chore(plugin-catalog): add Telegram Client (v1.2.9)</p>
+<p>cb5a2ab459 plugin-catalog: update Jot to 0.4.0</p>
+<p>3278fbd281 feat(plugins): submit Tameru 1.4.1 through the plugin catalogue</p>
+<p>7b141aa727 feat(plugin-catalog): add looot</p>
+<p>6d7edfe616 feat(plugin-catalog): add jp-address</p>
+<p>dc8ced5db0 feat(catalog): add Hermes Quest v0.1.0</p>
+<p>0a1a5cec68 feat(catalog): add Senler.io User plugin</p>
+<p>9d48c70ff7 feat(plugin-catalog): add digital-marketing-pro</p>
+<p>7fe187e77d feat(plugin-catalog): add consolidated Ace Data Cloud Media (salvage of #136440)</p>
+<p>d70278a6f9 feat(catalog): add Deferred Questions plugin (salvage of #135962)</p>
+<p>bb8bb994ea create hermes-tabular plugin</p>
+<p>fd6d69dbe7 Add plugin-catalog entry: nine-balance-widget</p>
+<p>08f3f5a399 catalog: add voicestudio (salvage of #134468)</p>
+<p>3a1dfa2c9e catalog: add cognition standalone memory provider (salvage of #133775)</p>
+<p>ce1b63fde5 feat: add hermes-activity to plugin catalog</p>
+<p>本期目录上新：hermes-devin（Devin 集成）、Sem 与 Weave 的代码审查技能、waypoint（桌面端会话状态，2.1.0/2.3.0/2.4.0 连续推进）、profile-picker、Telegram Client（1.2.9 起连续 re-pin 到 1.2.14）、Jot 0.3.0→0.4.0、Tameru 1.4.1、looot、jp-address、Hermes Quest（v0.1.2 起经安全评审后 pin）、Senler.io User、digital-marketing-pro（合并发布）、Ace Data Cloud Media、Deferred Questions、hermes-tabular、nine-balance-widget、voicestudio、cognition 独立记忆服务商、hermes-activity。版本推进与 re-pin：stream-speed 1.3.0、aux-ledger 1.3.0、redline 0.2.0、glasser 0.1.1、parrotnotes 1.2.2、hermes-dreaming 2.3.0、Model Router v0.4.2、agora 2.0.12、crew 0.9.2、openltm 2.17.2、hindsight 0.10.3、iowap 0.3.1、diaktoros 0.3.0、fish-audio 1.5.1、hermes-workflows 1.3.6、birkin-mnemosyne 0.2.1、Vornik 0.19.0、jev-effort-router 0.3.0、hermes-teammates 0.1.2、hermes-experientiallabs 等。另有一批 contributor 邮箱映射与目录侧的评审披露 chore。</p>
+<p>命令行 · Ctrl+C 先清掉草稿再打断</p>
+<p>bfa443c033 fix(cli): Ctrl+C clears a typed draft before interrupting a running turn</p>
+<p>问题：经典 CLI 里 Ctrl+C 与 Ctrl+Q 先判断「agent 是否在跑」再判断「有没有草稿」，于是想擦掉半句后续输入的一按就把正在跑的轮次杀掉、而文字仍留在提示符里。Ink TUI 早就让草稿优先（resolveCtrlCComposerAction），经典 CLI 一直是例外。修复：经典 CLI 对齐——第一次按清掉草稿、轮次继续跑，空提示符上再按才打断，2 秒内第三次强制退出。效果：清草稿不再误杀正在跑的轮次。</p>
+<p>性能 · 提示词瘦身 -2.1k tokens/请求</p>
+<p>3bf97898ac perf(prompt): fixed prefix back under the post-diet size (-2.1k tokens per request)</p>
+<p>问题：八月那次提示词瘦身之后，核心提示面又长了约 3.4k token，几乎全来自直接加进「从不延后」核心的功能。修复（perf(prompt)）：收回最大的几块——五个 eager 的 browser_vault_* 工具（list/fill/unlock/save_login/enter_code）合并成一个带 action 枚举的 browser_vault 工具，并默认延后到 tool_search 之后（它仍然跟着浏览器走，空保险箱也能发现 save_login，所以只付一行目录的代价）；terminal 的 schema 从 1136 收到 651 个 Qwen token，描述与参数文档不再互相重复；tool_search / tool_call 的关键词查询规则只写一次；系统提示里的「Async handoff」块移除（规则本来就写在 delegate_task 描述和模型会读到的后台派发结果里，轮询由结构保证）。实测：库存 CLI 提示面（prompt-surface render，字符/4）18,612 → 16,524，全新安装的 Qwen3 分词器口径 14,962 → 13,120。效果：每请求少约 2100 个 token。</p>
+<p>模型 · Ultrafast 只在真正提供它的账号上出现</p>
+<p>690b75a31a fix(fast): offer Ultrafast only where it is served; /fast ultra shorthand</p>
+<p>f1c1b34cdc fix(models): enable Sol Ultrafast requests and pricing</p>
+<p>问题：ChatGPT / Codex 后端对没有权益的账号也会接受 service_tier: &quot;ultrafast&quot;，然后静默给默认档——实测 pro 计划下 Sol 与 Astra 都只跑出约 49 tok/s、served_tier=default，而同一账号的 /models 目录里只有 priority。官方 Codex 客户端正是按该账号的目录来门控 Ultrafast 的。修复：/fast ultrafast（CLI、网关选择器、TUI 的 config.set）与桌面端的能力标志都改为先问 agent.codex_service_tiers.ultrafast_offered（原有路由门 + Codex 订阅下读取账号自己的目录，用 salvaged 的凭据级档位缓存，调用方持 API key 时读存下的 ChatGPT OAuth JWT），目录读不出来时从不拒绝；API key 路由不变；新增 /fast ultra 简写。Sol 的 Ultrafast 请求与定价也一并放开。</p>
+<p>认证与模型路由</p>
+<p>58e0a6e2c3 fix(auth): key_cmd Console keys on api.anthropic.com go out as x-api-key, not Bearer</p>
+<p>82ef40ab29 fix(auth): sk-ant-svc / sk-ant-admin Console keys also go out as x-api-key</p>
+<p>3328743235 fix(auth): classify sk-ant-usr* API keys as x-api-key, not OAuth</p>
+<p>0e161737d2 fix(opencode-go): route Claude models to the Messages wire (#134848)</p>
+<p>0b89435e7e fix(models): muse-spark 1.2/1.3 are on the Nous Portal, stop hiding them from the Nous picker</p>
+<p>问题一：通过 key_cmd 拿到的可调用凭据走的是每请求 hook 客户端，而那个 hook 总是写 Authorization: Bearer 并剥掉 x-api-key，于是在原生 endpoint 上用 key_cmd 打印出的 Anthropic Console 密钥（sk-ant-api / -usr / -svc / -admin）被当成 Bearer 发出去——同一把密钥从 .env 或凭据池走却是 x-api-key。修复：hook 接受可选的 sends_as_api_key(token) 判定，Anthropic 构建器只在原生主机上传「非 OAuth」，按每次铸造分类（key_cmd 可能轮换）；OAuth 令牌、Azure Entra JWT 与第三方网关保持 Bearer 不变。问题二：opencode-go 的目录里有 claude-haiku-5-5，但 _OPENCODE_API_MODE_PREFIXES 的 Go 条目里没有 claude- 前缀，于是落到 chat_completions 被 relay 以 400 ModelProtocolUnsupported 拒掉（不可重试，整轮死在第一次调用）。修复：Go 上的 claude-* 改走 anthropic_messages，与 Zen 一致。问题三：meta/muse-spark-1.2 与 1.3 被误列进 _OPENROUTER_ONLY，于是 Nous Portal 的 /model、hermes model 与发布的清单都把两个用户实际能用的模型藏了。修复：从该集合里移除这两个 id（-contributor 变体确实是 OpenRouter 独有、保留），并重新生成 model-catalog.json。</p>
+<p>杂项修复</p>
+<p>21a9a1f0ec fix(tui_gateway): a resumed named-profile chat lands in its own workspace</p>
+<p>53bc70c5ee fix(tui_gateway): recover session.interrupt when the compute host is dead</p>
+<p>3cda7a922a fix(tui_gateway): let session.interrupt stop a session whose agent never built</p>
+<p>7cc3fb8cb5 fix(kanban): respawn guards compare mixed int/ISO times by value</p>
+<p>f5a6651231 fix(kanban): dispatcher sweeps survive text timestamps too</p>
+<p>d56e357556 fix(kanban): coerce foreign timestamp values when reading task/run/event rows</p>
+<p>956c8106a3 fix(kanban): coerce text timestamps when loading tasks</p>
+<p>6090407840 fix(profiles): remove Windows alias on profile delete</p>
+<p>9c8cefe366 fix(profiles): alias_path never names a foreign same-named command; tests run on the real host</p>
+<p>ea356bc111 fix(profiles): doctor counts a pre-.bat Windows wrapper as the profile&#x27;s alias</p>
+<p>c1196ebd0c fix(profiles): one wrapper-candidate list for delete; doctor reads alias_path</p>
+<p>6d4b211ab4 fix(cli): check the platform wrapper name in doctor&#x27;s profile alias probe</p>
+<p>0033af0e4d fix(doctor): orphan-alias hint is platform-correct; docs cover orphan removal</p>
+<p>ea665e6d71 fix(profile): doctor names the orphan-alias remove command; typos still exit 1</p>
+<p>5ddcac5ac3 fix(profile): point the empty-alias dead end at hermes doctor</p>
+<p>6fa79e9b96 fix(profile): let `profile alias --remove` clean up an orphan alias</p>
+<p>9f3a5345bf fix(browser): take the direct-API shortcut only when BROWSER_USE_API_KEY is set</p>
+<p>28287937bf fix(browser): error when browser-use is selected without an API key</p>
+<p>004dcc079e fix(browser): resolve managed Browser Use provider through its session path</p>
+<p>9f63a6fe5c fix(pm): core-only installs on mirrors without upload times work again</p>
+<p>25d6fa11d7 fix(pm): an index without upload times names the index, not a plugin conflict</p>
+<p>abbc2ba35c fix(pm): release age is checked when Hermes locks, not on users&#x27; machines</p>
+<p>3c758ec967 fix(install): git failures name git&#x27;s own error, so Hermes-Setup&#x27;s screen shows the cause</p>
+<p>8a7a5a905f fix(install): name -TypeName on the new Invoke-Logged queue</p>
+<p>会话与网关：恢复的具名 profile 会话落在该 profile 自己的工作目录，而不是启动 profile 的 /opt/data（Bot Chat 是永久会话，之前的新会话修复到不了它；Docker 下命名的 profile 行里存着启动 profile 的 /opt/data，pwd 与文件面板都显示默认 profile 的文件）；新增 _profile_default_cwd 统一解析「这个 profile 的会话落在哪」，resume 会丢掉指向 Hermes 根、/opt/data/home、兄弟 profile 树或安装树的过期 cwd，并在加载时把这类行修回会话自己的 cwd。session.interrupt 在计算宿主已死、或会话的 agent 从未建立时也能生效。看板：读取任务/运行/事件行时会强制转换外部写入的时间戳（混合 int / ISO / 脏文本都不再让重排扫描或完成列排序崩掉），重排守卫按值比较混合的 int/ISO 时间。profile 别名（Windows）：删除 profile 时连带删掉它的命令别名 wrapper，doctor 按 alias_path 判定而不是猜文件名，pre-.bat 的 wrapper 也算这个 profile 的别名，别名不会指向同名的外部命令，orphan 别名会给出平台正确的移除命令。浏览器：browser-use 只有在设了 BROWSER_USE_API_KEY 时才走直连捷径，没 key 时直接报错（而不是留下一个没有 CDP 的 browser_exec），托管 provider 按其会话路径解析。包管理与安装：核心安装在没有上传时间的镜像源上重新可用（索引不再被误报成插件冲突），发布年龄改在 Hermes 加锁时检查而不是在用户机器上。</p>
+<p>其它</p>
+<p>2ddbd66ac6 eval(prefix_rediet): tolerate string-encoded tool_call entries in the call tally</p>
+<p>bfa4f5098c feat(release): the stable sequencer narrates what it is doing</p>
+<p>4b050f6731 fix(release): stable advance trusts receipts instead of downloading ~33 GB</p>
+<p>36efcb8c87 fix(release): a fresh flip advances the head with the receipt it just wrote</p>
+<p>310e05c027 fix(release): the final stable tag push authenticates with GH_TOKEN</p>
+<p>576012d329 fix(release): stable advance checks native metadata against the payload tag</p>
+<p>71d34bad10 fix(release): the builds-table render gets its R2 credentials and cannot block the release</p>
+<p>0e5b323fdd fix(release): the final gate&#x27;s builds-table step gets the R2 URL and claim tag</p>
+<p>ddfe1d7662 fix(release): a Store submission failure never blocks publishing</p>
+<p>6992df4cdc fix(release): the Store submit reads the CLI&#x27;s PascalCase submission keys</p>
+<p>a0a49926f4 fix(check): blob-size exempts untracked copies and reads --head&#x27;s allowlist (review)</p>
+<p>3c758ec967 fix(install): git failures name git&#x27;s own error, so Hermes-Setup&#x27;s screen shows the cause</p>
+<p>发布流水线这一期是一批加固（对普通用户不可见，列在这里以免被当成遗漏）：稳定版推进改信 receipt、不再为了验证下载约 33 GB；新切出的尝试直接用刚写下的 receipt 推进 head；最后的 stable 标签推送改用 GH_TOKEN 认证；stable advance 会拿原生元数据与 payload 标签对账；builds 表渲染拿到它的 R2 凭据、不会卡住发布；Store 提交失败永远不阻塞发布，且会读 CLI 的 PascalCase 提交键；稳定版 sequencer 会播报自己在做什么；相关测试跟着 fixture 调整。工具链：blob 体积守卫进 scripts/check（豁免未跟踪的副本、读 --head 的允许清单），CI 拒绝新增二进制或超过 500 KiB 的新文件。另有一个评测修复（prefix_rediet 评测容忍字符串编码的 tool_call 条目）以及一批 test / docs / style / refactor 提交（连接器错误分类、把执行结果接到共享的连接器结果行、doctor 用规范 PROFILE_ID_RE、desktop 状态栏与 wiring hook 保持在 main 的体积上限内等）。</p>
+    </section>
+    
     <section id="2026-10-12" class="day">
       <h2>Hermes 日报 2026-10-12：一个连接器可以挂多个命名账号，思考模型的思维链不再丢</h2>
       <p><strong>本期覆盖北京时间 10 月 11 日 06:30 ~ 10 月 12 日 06:30 进入 main 的提交，共 206 个 commit（不含 merge），另有 1 个合并提交。新增 25 个功能、80 个修复、0 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期的主线是「连接器的多账号」：一个托管连接器（比如 Gmail）现在可以同时挂多个命名账号（home / work），桌面端对话框、CLI 的 hermes connectors、TUI 的 /connectors 三处都能列出、命名、重命名、重连和移除账号。第二条主线是推理内容的保留：OpenAI、xAI、Gemini、Copilot、Anthropic、Bedrock 各条路由上，思考模型的思维链不再在轮次之间、压缩之后或 --resume 之后被丢掉。桌面端还加了「编辑或重新生成会归档后续对话时先确认」；网关侧修了完成消息（委派与后台任务）在归属确认失败时被丢弃或重复投递的一串问题；插件目录把官方插件统一迁到 hermes-official-plugins 仓库，并新增准入规则 17（禁止不可扫描的二进制载荷），据此下架 tabro。</strong></p>
