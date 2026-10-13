@@ -5,8 +5,134 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 13 Oct 2026 06:41:58 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 14 Oct 2026 06:53:07 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-14：桌面端首次启动引导重做；插件目录一次上新约二十条</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-14</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-14</guid>
+      <pubDate>Wed, 14 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖北京时间 10 月 13 日 06:30 ~ 10 月 14 日 06:30 进入 main 的提交，共 516 个 commit（不含 merge），另有 3 个 merge。新增 78 个功能、205 个修复、2 个性能优化。口径是按「合入 main 的时间」统计（tip 增量采集，取上一期采集点到本期采集点之间的新提交），不是 commit 作者时间，所以会包含作者时间较早、本期才进入 main 的提交。本期第一条主线是桌面端首次启动引导（first-run onboarding）的整体重做：引导在聊天里以卡片逐步推进，主题和强调色、界面布局都能实时预览、点 Continue 才保存，新增「跳过设置」和设置里的「再次运行引导」，免费模型改造成桌面端首次安装的一次性试用，并配套修了三十多条引导状态问题。第二条主线是插件目录一次上新约二十个条目（TTS Buddy、wicked-memory、auto-pin、hermes-vcc、channel3、heartbeat2、hermes-mobile、telegram-stickers、NetMind、Kumiho Memory、index-search、event-read、myswarm、long-conversations、希腊语语言包等），同时补齐了目录的审核披露规则。此外连接器补上了「插件工具收发本地文件」，记忆系统新增 `patch` 定点修改动作，接入 Gemini 4 Argon 并支持长解码，更新检查开始区分「回滚」与「有新更新」。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端首次启动引导重做：引导变成聊天里的卡片流（问候、问名字、挑主题与强调色、挑布局、选第一个任务），每张卡答完收成一条回执；主题与布局实时预览、Continue 才提交，直接关掉卡片不会动已保存的布局</p>
+<p>引导的出口与重跑：输入框里有「跳过设置」，设置里有「再次运行引导」（用当前模型重开一个引导会话）；本地能跑模型的机器上，引导结束后的本地模型推荐排在登录推荐之前</p>
+<p>免费模型改成桌面端首次安装试用：只允许桌面本地后端、没有 Nous 身份、没有配置服务商、机器从未用过 Hermes；按操作系统用户算一次——标记与所有证据都在该用户的家目录里，同一台电脑上的另一个账户算独立的首次安装</p>
+<p>插件目录上新约二十条 + 目录治理：新增 auto-pin、wicked-memory、TTS Buddy、channel3、heartbeat2、hermes-mobile、telegram-stickers、NetMind、Kumiho Memory、event-read、index-search、myswarm、long-conversations、hermes-vcc、hermes-lang-el，browserpaw 以 v4.0.0 重新上架；Index 连更两版、account-pool 升 4.0.1；每个条目新增审核披露与最低核心版本声明</p>
+<p>连接器收发本地文件：带文件输入的插件工具不再把厂商存储描述符丢给模型（模型无法产出 → 调用必失败），文件输入显示为本地路径、执行前按媒体投递规则校验并暂存上传；工具返回的文件存到 downloads/connectors，该目录成为可信媒体投递根</p>
+<p>记忆系统新增 patch：改打包了多条事实的记忆里的一句话不再需要用整条 replace（那样会静默吃掉同条目里的兄弟事实还返回成功），patch 只在条目内部定点替换并报告替换前后内容</p>
+<p>模型与更新：接入 Gemini 4 Argon（最高 1M 输出 token 的长解码、档位映射到 thinkingLevel、按 continuationToken 续发并合并多跳）；更新检查在 checkout 已包含某稳定版时改成提示「回到稳定版」并点名版本，不再谎报有新更新</p>
+<p>重点条目：</p>
+<p>桌面端 · 首次启动引导（onboarding）整体重做</p>
+<p>b50e71d550 feat(desktop): restore main&#x27;s first-run intro machinery under onboarding/first-run</p>
+<p>232f5c486b feat(desktop): Skip setup, the local-model offer after onboarding, Run onboarding again</p>
+<p>8cf3377191 feat(onboarding): the first-task catalog and which rows each machine may offer</p>
+<p>cd59efaed2 feat(desktop): setup_beat cards for each onboarding beat, collapsing to a receipt</p>
+<p>935b1837c2 fix(desktop): accent and layout picks preview live and Continue commits them</p>
+<p>219a9fb42f feat(onboarding): greet and ask the name in the user&#x27;s locale</p>
+<p>33fa45ef78 feat(desktop): on a machine that can run a local model, the local-model offer comes before the sign-in offer</p>
+<p>af4a05154e feat(desktop): Run onboarding again replays the whole first-run intro</p>
+<p>问题：桌面端第一次启动的引导流程被重新设计成聊天内的卡片式体验，需要把主分支上原有的开场机制（启动遮罩、演示布局、开场文案与离开规则）搬回到新的 onboarding/first-run 目录，并让引导每一步都可见、可答、可撤回。修复：`b50e71d550` 把主分支的 boot-overlay hold、演示布局（单聊、极简输入框、隐藏侧栏与状态栏，通过 modeLayout.hold 借用）、开场文案与离开规则恢复到 components/onboarding/first-run 与 store/onboarding-intro.ts，并新增 `intro` presence 面，让引导运行期间提示（tips）先等待；`cd59efaed2` 让每个引导节拍对应一张 setup_beat 卡片，答完收成一条回执；`8cf3377191` 定义十三个首个任务行（各自的 pill、门控、技能与骨架），门控只读硬事实——本轮装了插件、本轮连了应用、macOS——而「Hermes 怎么用」是固定行，永不进入模型的挑选范围。效果：第一次启动的引导变成一条可以看见每一步、随时退出、并且能重跑的流程。</p>
+<p>桌面端 · 引导的预览、保存与出口</p>
+<p>935b1837c2 fix(desktop): accent and layout picks preview live and Continue commits them</p>
+<p>d0aa08dbf9 fix(desktop): a layout preview is saved only when Continue keeps it</p>
+<p>232f5c486b feat(desktop): Skip setup, the local-model offer after onboarding, Run onboarding again</p>
+<p>219a9fb42f feat(onboarding): greet and ask the name in the user&#x27;s locale</p>
+<p>问题：引导里的主题与布局选择如果是选一下就写盘，用户随手点开看看就会污染已保存的配置；而引导一旦开始，用户没有明确的退出路径。修复：主题强调色与布局改为实时预览、只有点 Continue 才提交（`935b1837c2`）；布局预览不写已保存布局，只有 Continue 保留时才保存（`d0aa08dbf9`）。同时在输入框里加了「跳过设置」（调 onboarding.skip），在设置里加了「再次运行引导」——它会用当前模型重新开一个引导聊天（`232f5c486b`）。问候与问名字跟随用户的语言（`219a9fb42f`）。效果：引导可以放心地试，也可以中途退出或事后重跑。</p>
+<p>桌面端 · 本地模型推荐排在登录推荐之前</p>
+<p>33fa45ef78 feat(desktop): on a machine that can run a local model, the local-model offer comes before the sign-in offer</p>
+<p>问题：登录推荐在第一个任务之后三分钟弹出，会把本来要等一段安静时间的本地模型推荐挡掉，能跑本地模型的机器上反而先被推去登录。修复：新增 `$localModelOfferPending`，在引导结束后的本地模型邀约处于「已布置未回答」期间保持为真：启动时从存储的键读出为真，机器读出来跑不了本地模型（或读不出来）时转假，邀约被回答或忽略时也转假；它为真期间不认领登录推荐，转假后重新同步。从设置、状态栏等入口主动登录的路径不变，从没跑过引导的安装也永远不会置位。效果：能跑本地模型的机器，先拿到本地模型的选项。</p>
+<p>免费额度 · 免费模型改成桌面端首次安装试用</p>
+<p>4920f87b3f feat(free-tier): the free model is a desktop first-install trial, claimed once per machine</p>
+<p>7580c33d3f feat(onboarding): the first desktop boot records that onboarding is due and the trial reserved</p>
+<p>88be7bd28f feat(onboarding): one machine-level answer to &quot;has Hermes been used here&quot;</p>
+<p>207b61fe96 fix(free-tier): one welcome-trial claim at a time per OS user</p>
+<p>30cd380ac8 docs(free-tier): the trial is once per OS user, not once per machine</p>
+<p>问题：`HERMES_GUEST_ONBOARDING` 是一个进程级的启动门：只要设了它，每次 CLI、网关和 serve 启动都会铸一个匿名 Nous 账号，连连接器游客都能带上推理额度，范围明显过大。修复：从 Python 里彻底删除该启动门，改为 `hermes_cli/welcome_trial.py` 的 `claim_desktop_free_tier()`——它铸一个游客、在它身上盖 `welcome_claim` 并标记这台机器。一张拦截表决定是否具备资格：只允许桌面端的本地后端（SSH、URL、云、CLI、网关一律不行）、`nous.guest` 为开、没有 Nous 身份、没有配置任何服务商、以及这台机器从未用过 Hermes（读 install_state，未打包的桌面端可以传 assume_fresh）。`grandfather_existing_guest()` 只为已经在 nous/welcome 上聊过的游客保留试用，只用过连接器的游客不算。启动时不再铸币，`free_tier_bootstrap` 只记录谁带推理并跑一次 grandfather 检查；CLI 与网关的启动钩子被删除，凭据失效后的推理重铸也被删除（丢掉的申领不会再被申领回来）。申领失败（错误码 5079）不写任何东西，下次启动重试；重跑引导永不重新申领。计费口径由 `30cd380ac8` 的文档更正：标记与所有证据都放在该操作系统用户的家目录里，所以**是按操作系统用户一次，而不是按机器一次**——同一台电脑上的另一个账户算独立的首次安装。效果：免费模型从「任何进程都能铸游客」收窄成「桌面端首次安装的一次性试用」，并且一个操作系统用户同时只能有一次申领。</p>
+<p>连接器 · 插件工具可以收发本地文件</p>
+<p>e1b18e2bca feat(connectors): connector tools send and save local files</p>
+<p>5f7473446b feat(connectors): client calls to stage file inputs and fetch file outputs</p>
+<p>2d6a0e6f32 feat(gateway): connector downloads are a trusted media delivery root</p>
+<p>56b10be733 feat(metrics): count connector file-input refusals by error class</p>
+<p>问题：带文件输入的插件工具只把厂商的存储描述符给模型看，而模型没有办法产出这种描述符，于是每一次这样的调用都必然失败；工具返回的文件同样没有落地的地方。修复：检索与描述阶段把文件输入显示成本地路径；执行之前，每个路径先用媒体投递规则检查，再经工具网关暂存并上传，暂存后的描述符替换回路径（`e1b18e2bca`）。工具网关侧新增 `POST files/upload` 暂存文件输入并返回预签名存储地址，工具结果携带预签名下载地址；新增 `ConnectorClient.stage_file` 与 `put_file` / `get_file`，用普通 HTTP 客户端、只带网关返回的响应头与存储通信，网关自己的 bearer 不会到存储（`5f7473446b`）。工具返回的文件保存到 `&lt;home&gt;/downloads/connectors`，模型看到的是路径，而不是存储地址或密钥；该目录被当作可信媒体投递根，对当前 home 与每个 profile 都生效，所以下载下来的文件可以直接再发出去（MEDIA: 或作为连接器的文件输入），即使媒体投递开着严格模式（`2d6a0e6f32`）。指标按错误类别统计文件输入被拒（`56b10be733`）。效果：需要文件的连接器工具第一次真正可用，而且下载下来的文件可以继续流转。</p>
+<p>记忆系统 · 新增 patch，定点修改不再连坐整条</p>
+<p>b5ba0abacb fix(memory): add &#x27;patch&#x27; action for partial edits so replace stops eating sibling facts</p>
+<p>412512365f fix(memory): make patch edit exactly one span</p>
+<p>5e0ec82d1f fix(memory): mirror a patch to providers as a whole-entry replace</p>
+<p>cf2ffb3cbf fix(memory): drop the replace action; patch is the only edit</p>
+<p>问题：想改一条「打包了多条事实」的记忆里的一句话，只能用整条 replace 表达——old_text 只负责定位条目，content 覆盖整条，同条目里的兄弟事实被静默吃掉，还返回 `success: true`（#124582）。问题出在 replace 的整条覆盖语义本身是对的，缺的是 API 的 old_text / new_text 读法早就暗示的「拼接」形状。修复：新增 `patch` 动作（单条与批量），沿用既有的 `_locate` 定位语义（精确 / 唯一 / pinned 不变），在条目内部把 old_text 的每一处替换成 content，其余部分逐字保留，并报告 `patched_entry_before` / `patched_entry_after`，避免之前防住的丢失类型从新路径回来（`b5ba0abacb`）。随后补上「patch 恰好编辑一个跨度」（`412512365f`）、把 patch 镜像给服务商时按整条替换（`5e0ec82d1f`），并把 replace 动作整个移除、只留 patch（`cf2ffb3cbf`）。效果：改一条记忆里的一句话不再牺牲同条目的其他事实。</p>
+<p>插件目录 · 一次上新约二十个条目</p>
+<p>c19f1bbed9 feat(catalog): add TTS Buddy native speech provider</p>
+<p>5886aa8ab7 feat(plugin-catalog): add hermes-vcc — deterministic no-LLM compaction engine</p>
+<p>874fdb7549 feat(plugin-catalog): add auto-pin plugin</p>
+<p>3caaa1e49b feat(plugin-catalog): add long-conversations plugin</p>
+<p>0ab5304364 feat(catalog): add wicked-memory tools plugin</p>
+<p>24b6bd5f0d feat(plugin-catalog): add channel3 shopping plugin</p>
+<p>087d9250c5 feat(plugin-catalog): add heartbeat2 plugin</p>
+<p>bd0e22fa42 feat(plugin-catalog): add hermes-mobile platform adapter entry</p>
+<p>6ec8942125 feat(plugin-catalog): add telegram-stickers</p>
+<p>1b31697ef8 feat(plugins): list NetMind model provider in catalog</p>
+<p>c2808a975e feat(catalog): add Kumiho Memory hosted MCP plugin</p>
+<p>8cb2ba29f7 feat(plugin-catalog): add hermes-lang-el — Greek (Ελληνικά) Desktop language pack</p>
+<p>6764b144ba feat(plugin-catalog): add event-read</p>
+<p>580c2a7f6b feat(plugin-catalog): add index-search</p>
+<p>47140e5f65 feat(catalog): add myswarm plugin</p>
+<p>7a035176c2 feat(plugin-catalog): relist browserpaw at v4.0.0</p>
+<p>问题：目录本期一次收进大量新条目，需要逐条给出定位、提供的能力与最低核心版本。修复/内容：新增 TTS Buddy（原生语音服务商）、hermes-vcc（确定性、不用 LLM 的压缩引擎）、auto-pin、long-conversations、wicked-memory（工具插件）、channel3（购物）、heartbeat2、hermes-mobile（把 Hermes 接到手机的平台适配器）、telegram-stickers、NetMind（模型服务商）、Kumiho Memory（托管 MCP）、event-read、index-search、myswarm、hermes-lang-el（希腊语桌面语言包，约五千个键量级的桌面文案），browserpaw 以 v4.0.0 重新上架。效果：可直接在目录里安装的新能力数量明显增加。</p>
+<p>插件目录 · 版本更新与审核披露</p>
+<p>939647bdf2 feat(plugin-catalog): add account-pool</p>
+<p>f18d7d55e6 feat(plugin-catalog): bump approval-ledger to 1.2.0</p>
+<p>059150a855 feat(plugin-catalog): bump error-ledger to 1.3.0</p>
+<p>cba45e8a66 fix(plugin-catalog): only plain UTF-8 data may ship compressed</p>
+<p>问题：目录条目需要能表达「这个版本在哪些核心版本上可用」「它到底提供什么」，并且要挡住以压缩形式夹带非纯文本数据。修复：Index 在 0.48.4 / 0.48.5 之间连更并重新 pin、account-pool 从 3.13.0 到 4.0.1（含评审修复）、approval-ledger 升 1.2.0、error-ledger 升 1.3.0；目录侧为条目补上审核披露（reviewed disclosure）与 `requires_hermes` 最低版本声明（例如 waypoint / context-audit 需要 &gt;=0.21.6，因为 pre/post_auxiliary_call 钩子在那版才有），并明确只允许纯 UTF-8 数据以压缩形式分发。</p>
+<p>更新检查 · 区分「回滚」与「有新更新」</p>
+<p>e3533693c0 fix(desktop): a stable release older than the checkout is offered as a rollback (#137714)</p>
+<p>bb122da09f fix(update): a stable release older than the checkout reads as a rollback (#137714)</p>
+<p>6e7d80cedb fix(desktop): the rollback dialog names its button and claims no changes (#137714)</p>
+<p>e36fa7ba6b fix(update): --version, the dashboard and a remote backend name a stable rollback too (#137714)</p>
+<p>b207765e4c fix(desktop): preserve stable update channel context</p>
+<p>d4e7b65956 fix(update): a git exiting mid-scan no longer makes the index.lock owner unknowable</p>
+<p>问题：当当前 checkout 已经包含某个稳定版时，`source_check` 仍然上报 `updateAvailable: true, behind: -1`，于是状态栏、更新浮层、状态栏与命令面板的 tooltip 都在说「有新更新可用」，`hermes update --check` 也说「Selected release available」。修复：检查现在带上 `rollback: true`（只按本地祖先关系判断，关系未知仍然算更新），各处文案改成「回到稳定版」，并点名要回到哪个版本号；桌面端回滚对话框补了按钮名与「不会改动任何东西」的说明（`6e7d80cedb`）。`e36fa7ba6b` 把同一口径扩展到 `--version`、仪表盘和远端后端。另修：git 扫描中途退出时不再让 index.lock 的归属变得不可知（`d4e7b65956`）。效果：安装状态不再把「回滚」谎报成「有新更新」。</p>
+<p>模型 · 接入 Gemini 4 Argon 与长解码</p>
+<p>7e85c68a0d feat(gemini): Gemini 4 Argon support with long decode</p>
+<p>e6370f4004 fix(gemini): bound long decode by hops; scale the non-stream stale budget; first-hop context buckets</p>
+<p>121aee41b6 fix(gemini): resume a dropped long-decode stream from its last checkpoint</p>
+<p>4ec52fc958 fix(gemini): gate thinkingLevel and sampling on Gemini version &gt;= 3, not a &quot;gemini-3&quot; prefix</p>
+<p>446508f44b fix(gemini): drop deprecated thinkingBudget and sampling params for Gemini 3.6+</p>
+<p>5de5a2c5cf fix(catalog): keep Gemini 3.8 Flash as the silent default; Argon second</p>
+<p>问题：需要接入 Gemini 4 Argon，并处理 Google 的长解码——单次请求有 32,768 token 上限，超出会截断并谎报 finish=stop。修复：把 `gemini-4-argon` 加进 Gemini / Vertex / OpenRouter·Nous 目录，原生客户端支持长解码（最高 1M 输出 token）；推理档位映射到 Gemini 4 的 `thinkingLevel`（Argon 总会思考，拒绝 minimal、也拒绝 level 与 thinkingBudget 并存：none→low 且隐藏思考、minimal→low、xhigh/max→high），高于 high 的档位在原生端点上买长解码预算（xhigh→262,144 输出，max/ultra→1,048,576，API 会按窗口减输入封顶）。`generateContent`（一元与流式）跟随 `finishReason: CONTINUATION`：用 continuationToken 重发同一请求、把多跳并成一个回合、最后只发一个 finish chunk；用量按多跳求和计费（与 google-genai 和计费一致），但首跳的 prompt（initial_prompt_tokens）喂给压缩与上下文计量，所以长解码回合不会触发提前压缩。另加原生客户端的 20 分钟读取超时与 gemini-4 的 600 秒过期下限。目录里 Gemini 3.8 Flash 仍是静默默认，Argon 排第二。效果：Argon 的长输出不再被当成正常结束的截断。</p>
+<p>桌面端 · 一批细节修复</p>
+<p>757705867a fix(desktop): Hermes Cloud bots without Screen say it is not included instead of offering an install</p>
+<p>d8e94b5694 fix(desktop): catalog deep links ask the backend for the entry</p>
+<p>daa3f0e1d4 fix(desktop): a session&#x27;s previews come back beside the chat, not stacked over it</p>
+<p>cefd15747d fix(desktop): a new chat opened from outside the composer shows its first message</p>
+<p>56b5471235 fix(desktop): launch Store relaunch waiter with a hidden console</p>
+<p>90292fe021 fix(desktop): let the relaunch waiter remove its stage dir</p>
+<p>问题一：Hermes Cloud 里没有 Screen 能力的机器人仍然给出安装引导，用户按下去也没法用。修复：直接说明「不包含此功能」。问题二：目录深链自己拼条目信息，出错时不可用。修复：改向后端查询该条目，目录查询失败只在后端确实没有这个方法时才回退成不可用。问题三：会话预览叠在聊天之上。修复：恢复成聊天旁边显示。问题四：从输入框外新开的聊天不显示第一条消息。问题五：Store 版的 relaunch waiter 会弹出控制台窗口，且不能清理自己的 stage 目录。效果：这几处状态错位都消失。</p>
+<p>性能 · 引导状态应答缓存化</p>
+<p>fbc361ef57 perf(onboarding): the due answer is worked out at serve boot and served from a cache</p>
+<p>0fa7491034 perf(onboarding): one provider walk per due answer, one AWS chain walk, no IMDS on the desktop backend</p>
+<p>问题：桌面端启动时会问 `onboarding.state`，而这个处理函数在连接的串行队列上现算全部内容，同时启动线程又在做同样的服务商读取；一次慢应答就会错过桌面端的截止时间，于是这一次启动的引导被直接跳过。修复：新增 `hermes_cli/onboarding_due.py` 缓存答案（run, eligible）。读方最多等 8 秒在飞的计算，超时则现算并缓存；serve 的 lifespan 在桌面本地后端先启动计算（`start_due_boot`），在 setup bootstrap 记录完新安装、保留好既有游客的试用之后执行。任何可能改变答案的写入都会丢缓存（set_run、操作系统用户标记、setup 记录的 refresh 与 reconcile），并对答案读到的文件打一个戳来发现进程外的改动；`onboarding.state` 改在 RPC 池上跑（`_LONG_HANDLERS`），等待不再占住连接的队列，远端后端立刻回答 eligible: false，`--fresh-install` 仍然现问。另外每次 due 判定只走一遍服务商阶梯、一次 AWS 凭据链（过去走到两遍），桌面本地后端跳过 EC2 实例元数据查询（用 botocore 会话设置，不动 os.environ）。效果：慢应答不再让这一次启动的引导被跳过。</p>
+<p>工具层 · JSON Schema $ref 解析修复</p>
+<p>6512e72ef5 fix(tools): resolve local schema refs during arg coercion</p>
+<p>8f81791172 fix(tools): map sanitized argument keys back through a $ref</p>
+<p>8f2c147c57 fix(tools): resolve ref pointers through arrays and percent escapes</p>
+<p>8636ccc4c5 fix(tools): bound recursive union ref traversal</p>
+<p>021e7abb93 fix(tools): publish a same-name schema on explicit reload</p>
+<p>问题：参数强制转换时遇到本地 schema 引用（`$ref`）会解析不了；被清洗过的参数键无法通过 `$ref` 还原；引用指针穿过数组或带百分号转义时失败；递归的联合类型引用遍历没有上限；同名 schema 在显式 reload 时不发布。修复：逐条补上本地引用解析、反向映射、数组与百分号转义支持、遍历上限，以及显式 reload 时发布同名 schema。效果：以 `$ref` 组织参数结构的工具不再因为引用解析失败而拿不到参数。</p>
+<p>其他修复</p>
+<p>57fa33675f fix(agent): a plugin that goes live mid-turn is told in the next tool result, once</p>
+<p>3399df06b5 feat(plugins): presence by catalog name; plugins.manage action presence</p>
+<p>b577935fe9 fix(install-state): a root&#x27;s file linked into a protected folder is never opened</p>
+<p>a34a281b9f fix(install-state): a Windows gateway&#x27;s Scheduled Task and Startup fallback name its home</p>
+<p>2c64fe6f67 fix(install-state): a system gateway counts only for the account it runs as</p>
+<p>65ccdf7369 fix(install-state): a locked state.db is not prior use</p>
+<p>1e92db235f fix(platform): host summary reports the macOS version on a Mac</p>
+<p>840c2d9dff fix(platform): RTX Spark needs the N1X marker, not just an NVIDIA GPU</p>
+<p>5384e22099 fix(platform): host facts are right on every OS and read no environment</p>
+<p>f7b26efc2f fix(mcp): a parked OAuth server no longer replays its dead refresh token on every new session</p>
+<p>1ec95c2cb0 fix(auth): the no-provider error no longer promises a free Nous tier</p>
+<p>问题与修复：会话中途上线的插件会在下一轮的工具结果里被一次性告知模型，不再重复播报（`57fa33675f`）；插件 presence 支持按目录名查询，引导问卷只会显示桌面端真的装了的应用，且只等一次 5 秒的清单读取超时（`3399df06b5`）；安装状态判定收紧——链接进受保护目录的文件永远不被打开（`b577935fe9`）、Windows 网关的计划任务与启动回退会写明自己的 home（`a34a281b9f`）、系统网关只算它实际运行的那个账号（`2c64fe6f67`）、被锁住的 state.db 不算「此前用过」（`65ccdf7369`）；平台事实在 macOS 上正确报出系统版本（`1e92db235f`）、RTX Spark 需要 N1X 标记而不只是 NVIDIA 显卡（`840c2d9dff`）、host facts 在各系统上取值正确且不再读环境变量（`5384e22099`）；MCP 里被停放的 OAuth 服务不再每次新会话都重放已经失效的 refresh token（`f7b26efc2f`）；无服务商时的报错不再承诺免费的 Nous 额度（`1ec95c2cb0`）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-13：连接器重做为单次调用，没账号也能用；桌面端状态栏可改工作目录</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-13</link>
