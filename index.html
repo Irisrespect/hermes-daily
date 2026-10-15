@@ -112,6 +112,10 @@
 <p>问题（语音留言丢失）：等待语音转写时合并进来的第二条语音留言不会被转写——中断监视器捕获了待处理事件的音频路径、等待转写后缓存结果，而期间合并进来的第二条留言让一个还不存在的缓存失效，于是发布了第一条留言的旧转写，第二条从未被转写。修复与效果：只要媒体未变就重新跑转写 - 07139993ce。</p>
 <p>问题（审批门控失效）：共享网关承担所有本地会话之后，两个审批门控不再成立——config.yaml 里手工删掉的命令白名单条目因为只在导入时读一次而继续自动批准（`rm -rf` 不再询问）；插件门控在共享网关上也不再生效。</p>
 <p>修复与效果：每次审批检查都应用上次同步之后的磁盘差异，删除的条目立即停止匹配、新增的开始匹配，本进程做过但无法保存的「总是允许」会被保留；插件门控在共享网关上恢复 - eea7c437eb。</p>
+<p>问题（拒绝回复回显信任条款）：原生准入的拒绝回复会发给聊天里的所有人，逐字点名失败的是哪个信任或来源条款（multiplex_without_provenance、authorization_home_without_provenance 等），等于帮伪造信任字段的发送者做探测。</p>
+<p>修复与效果：回复现在只点名一份显式的内容条款白名单（text、media_*、auto_skill、channel_*、reply_expected），其它条款（包括以后新增的）统一给通用的 invalid_params 提示；gateway.log 仍按 WARNING 记录完整条款、线上原因不变 - 872cea386b、2de0378ad4。</p>
+<p>问题（session.create 的拒绝只有代码）：session.create 过去用裸的 invalid_params 拒绝，策略模块里 17 处 raise 都不带日志，客户端只打印代码、gateway.log 一片沉默，一条早上三份报告都说不出是哪项检查拒绝了启动。</p>
+<p>修复与效果：拒绝现在带上字段与细节，客户端面板读到的是「invalid_params (run_budget: must be a positive number of seconds)」这样的说明；17 处全部点名字段，并有测试遍历模块 AST，新的裸 raise 会直接失败 - c7afde344a。</p>
 <p>问题（Mattermost 纯文本贴被拒）：Mattermost 适配器构建入站事件时用 `media_urls or None`，于是每个没有附件的贴文都带 None，而原生准入要求这两个字段都是列表，每条纯文本消息都被以 invalid_params 拒绝（命令绕过准入，所以 /reset 还能用）。</p>
 <p>修复与效果：传 `_download_attachments` 已经返回的列表；Mattermost 是唯一有这个模式的适配器 - 825fdb7984。</p>
 <p>插件目录：官方逆向工程插件上架与兼容</p>
