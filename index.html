@@ -22,9 +22,94 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 81 期 · 34617 个提交 · 每日自动更新 ·
+<p class="meta">共 82 期 · 35177 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-18" class="day">
+      <h2>Hermes 日报 2026-10-18：桌面端排队消息可以引导和编辑，插件目录新增 33 个条目</h2>
+      <p><strong>本期覆盖 10 月 16 日 ~ 10 月 17 日合入 main 的提交，共 560 个 commit（不含 merge），另有 23 个 merge。新增 40 个功能、270 个修复、3 个性能优化。</strong></p>
+<p>口径说明：按「合入 main 的时间」统计，不是 commit 作者时间。本期可以看成两个主题。第一是桌面端的排队与状态：排队面板上服务端持有的排队行过去只能删除，这期给网关加了两个所有者动词（引导 queued prompt、编辑 queued prompt），并配套十条修复把转移中、被取消、退回队列、迁移过来的旧聊天这些边界全部补齐；同时修好了网关中途被杀后「丢回合」卡片藏在折叠区里看不见的问题。第二是插件：插件目录这一期涌入 129 条相关提交、新增 33 个插件条目；平台插件（第三方聊天平台适配器）真正需要用的接口从私有名字提升为公开接口，群聊白名单与配对抑制从硬编码改为平台自行声明。Windows 侧则修了一整批提权更新后的目录权限问题（11 条），本地模型新增 NVIDIA Nemotron 3.5 Bolt。</p>
+<p>📌 今日要点：</p>
+<p>桌面端排队消息可以引导和编辑：队列里的提示词不再只能删除，可以中途把文字交给正在跑的那一轮；只在该轮还没跑完时生效，交不进去就回到原来的排队位置按顺序跑。</p>
+<p>桌面端掉线丢回合的卡片浮出折叠区：网关中途被杀、恢复把该轮标为 unknown 时，直接看到「Turn lost during restart」和 Discard，标题写明队列已暂停。</p>
+<p>平台插件的公开接口正式整理：插件注册的平台现在能自己声明群聊白名单与配对抑制，第三方平台适配器与内置 QQ、Telegram 同权。</p>
+<p>Windows 提权更新后的目录权限修了一整批：提权运行留下的目录、里面遗留的旧文件、HERMES_HOME 本身是链接的情况都能正确修回用户权限，且提权授予绝不会顺着链接跑出家目录。</p>
+<p>插件目录一次新增 33 个条目：官方 X Chat 插件、hermes-xai（桌面端 Grok 语音 + 只读 xAI Collections 检索）、Nextcloud Talk、Unraid、Fleet Connector 等；模型目录同时加入 deepseek/deepseek-v4.1-flash-1017 快照。</p>
+<p>重点条目：</p>
+<p>桌面端：排队消息可以引导和编辑（本期最大的一块）</p>
+<p>问题：桌面端的队列面板对服务端持有的排队行只渲染「删除」。这个限制是刻意的——网关当时没有任何动词能消费一条还没开跑的排队准入，而把 prompt.cancel 和 session.steer（或者重新提交）拼起来是两次写，中间的排空可能正好抢走这一行，结果提示词要么跑两次、要么直接丢失。</p>
+<p>修复与效果：网关新增两个所有者动词，都在所有者自己的写事务里消费仍未开跑的准入。prompt.steer_queued 只在这一轮已经领走 agent 时可用（否则返回 steer_unavailable，此时这一行完全没被碰过，仍然按 FIFO 顺序排队执行）：这一行从 queued 变成终结态 steering 并绑定该轮的栅栏，排空逻辑就不可能再领取它，文字交给该轮仍在运行的 agent；转移在该轮自己的终结写里结算——文字送达记 steered，这一轮以其它原因结束记 interrupted（绝不重放），文字根本没送到就退回它原来的 FIFO 位置自己跑一轮；所有者重启会把未结算的转移结算为 interrupted。prompt.replace_queued 则在继任者的准入写里取消旧行，新文本以新的准入身份排到队尾 - 98efa9dfad。</p>
+<p>边界修复（一期里补齐的十条）：</p>
+<ul>
+<li>这一轮的排空没有消费到的引导文本要退回它原来的 FIFO 位置、作为自己的一轮再跑一次，不能记成已投递 - bafd32849b、94458ebba1。</li>
+<li>结算不能靠「在合并后的引导缓冲里搜索这段文字」来撤销转移：缓冲里的换行符也出现在别的提交里，撤销一段被消费的 alpha 会把它从后面的 alpha\nbeta 里剥掉，于是被消费的那条又排队跑了一遍、真正没读到的反倒记成已送达 - 0b5cf74487。</li>
+<li>转移中的引导要在排队快照里以 steering 出现：桌面端会把「更新的快照里没有列出」的准入永久退休，于是稍后再回到 queued 的那条会被判成比退休更旧、提示词照跑但没有卡片可编辑或删除 - 8196fbc124。</li>
+<li>引导写有可能已经提交却报错，此时要保留这一轮的栅栏，否则这一行会停在终结态 steering 且无人认领，客户端一直读到 started，直到下次重启才被标成 interrupted - 5fdcf870f5。</li>
+<li>与引导竞争的取消要明确拒绝（stale_generation）：过去取消把转移中的行当成普通终结无操作、返回成功，而转移继续并最终结算为已引导 - 4725b95e11。</li>
+<li>排队行的编辑要保留自己的身份并重试：过去每次保存都用新的 UUID，回复丢失时回车会用新身份再发一次，两版都可能跑 - f36b073fe1；保存回复只结算自己那一次保存、保留更新的输入（过去只比对行 id，接受回复会把编辑前的草稿覆盖回来）- 44c3fd1e2b；引导没被消费而退回队列的提示词要按所有者给的 FIFO 顺序显示，不能被当成新卡片追加到队尾（A 排在 B 前面时桌面端会显示成 B、A）- f96673cc12。</li>
+<li>从旧主分支迁移过来的桌面端聊天带着旧的 desktop 来源标签，交互式本地来源判定把它漏掉，升级后的用户队列行只有「删除」，现在 desktop 算作交互式本地来源 - 2d665f9f4b。</li>
+</ul>
+<p>桌面端：掉线丢回合的卡片、群聊房间与澄清卡片</p>
+<p>问题（丢回合看不见）：网关在轮次中途被杀死后，恢复会把该轮标记为 unknown 并把这个会话的 FIFO 暂停在后面。桌面端本来就有正确的卡片（「Turn lost during restart」加 Discard 按钮），但它挂在队列区里面，而队列区默认是折叠的——屏幕上只显示「1 Queued」，再发一条跟进就变成「2 Queued」，既没有原因也没有操作入口。</p>
+<p>修复与效果：丢回合的行成为折叠区的预览内容，恢复一报告该轮，卡片和它的 Discard 就可见，标题也写明暂停（「N Queued — paused」）；健康的排队行仍然留在折叠区里 - 6f397ca74f。</p>
+<p>群聊与其它桌面端修复：</p>
+<ul>
+<li>网关群聊显示发言人名字与消息时间 - e887f0cb36；规范群组在桌面端呈现为「房间」 - 255e99f4f7；房间文本改走共享消息渲染器 MessageTextContent（媒体置为 false），不再用裸 Streamdown，这样在另一台机器上写的 MEDIA: 路径不会被当前网关解析、大消息的防护也回来了 - ce2391cf1f。</li>
+<li>重新进入会话时恢复待处理的澄清卡片 - 5d8cd4d56f。</li>
+<li>后端归到 Home 的聊天即使带着 cwd 也要显示在 Home 里：10 月 15 日 canary 起，规范会话创建路径会给桌面端聊天打上启动目录（通常是家目录），后端树把这个 cwd 当作「从来不是工作区」而归入 Home，但全档案树到达渲染器时没有水合——Home 车道里没有行、只有行 id，而渲染器的 Home 覆盖层只接收没有 cwd 的活行，于是这条聊天哪里都不显示 - 798b8bf52b。</li>
+<li>首屏的 onboarding 到期检查与 onboarding.start 会刻意传 timeout 0（由退出入口限制等待、共享的 JSON-RPC 通道对 0 不设定时器），但规范路径把它算成 deadline = now + 0，还没发出去就抛「Hermes gateway request timed out」，于是每次规范启动都立刻失败、provider-setup 覆盖层在已经配置好的 home 上盖了 5.3 到 11.4 秒 - 50e50484f8。</li>
+<li>桌面端源码构建：带架构参数的 npm run builder -- --win --x64 会把原生产物放到 build/native-deps-&lt;platform&gt;-&lt;arch&gt;，而产品守卫只接受不带架构后缀的目录，于是每次显式指定架构的源码构建都在暂存前直接失败 - 91e27b6c09。</li>
+</ul>
+<p>平台插件：公开接口正式整理，第三方平台与内置同权</p>
+<p>问题（能力拿不到）：群聊白名单与配对抑制两个鉴权行为过去硬编码在 Platform.QQBOT / TELEGRAM 等枚举上（_GROUP_CHAT_ENV、_ALLOWLIST_SUPPRESSES_PAIRING），插件注册的平台根本拿不到；一旦移除内置的 QQ 适配器，QQ_GROUP_ALLOWED_USERS 的门禁与配对行为就会被静默改掉。</p>
+<p>问题（接口是私有的）：平台插件要用到的接口全是私有名字——OwnAccessPolicyMixin、tools.approval.resolve_gateway_approval、澄清按钮 API、SSRF 客户端组件、安装向导辅助函数——hermes plugins validate 会对每个平台插件报警。</p>
+<p>修复与效果：PlatformEntry 新增 group_allowed_chats_env 与 allowlist_suppresses_pairing 两个字段，鉴权层通过 authz_field 读取（活的条目，否则回退内置的 gateway_env.AUTHZ）；所有原本在旧表里的内置平台都在自己的 AUTHZ 里声明了这两个字段，行为完全不变 - 47d9efe490。随后评审发现一处缺陷并修掉：群聊白名单的环境变量被追加到抑制配对的键之外，导致只声明群聊白名单的插件在群组列表设置之后把未知私聊从「给配对码」变成静默忽略；现在只有显式选择加入的平台才抑制配对 - e6cf2a9b1e。</p>
+<p>接口公开化：那些名字进入 _PUBLIC 清单，并在 adding-platform-adapters.md 里新增「平台插件公开辅助函数」一节（含两个新的 PlatformEntry 鉴权字段）- 14508f97f7。SSRF 安全的 HTTP 客户端把重定向守卫、create_ssrf_safe_async_client 与 platform_httpx_limits 合并成一个公开帮手 gateway.platforms.helpers.platform_http_client()，QQ Bot 与企微已经切过去 - 914737a811；安装向导的五个辅助函数（print_setup_header、confirm_reconfigure、offer_home_channel、save_env_values、prompt_csv）去掉下划线，内置 QQ 安装流程也不再使用私有 facade - 952666501f；澄清按钮改为公开的 get_pending(clarify_id) 查询，适配器不再去读私有的 _entries 加 _lock - 53de7ff326。</p>
+<p>Windows：提权更新后的目录权限与网关拒绝原因（本期 11 条）</p>
+<p>问题：在 Windows 上以管理员身份运行安装或 hermes update（或者从管理员提示符启动网关）时，用 mode=0o700 建出来的目录会带上 CPython 的受保护 DACL（SYSTEM + Administrators + OWNER RIGHTS，属主是 Administrators），同一个用户的非提权桌面端、网关、命令行进去就报 WinError 5。#139845 记录了这个现象，更新后的修复步骤还有一批更细的坑。</p>
+<p>修复与效果：</p>
+<ul>
+<li>恢复提权之后的 Windows 用户 ACL - 665ccdfebb。</li>
+<li>提权期间建出来的目录要一直可用；不可用的令牌锁目录只停一次。make_user_dir 只在 Windows 且进程确实提权时给它建的每个目录（以及已存在的叶子）加一条可继承的完全控制 ACE，网关锁目录、机器人邮箱、gateway.lock、待发消息、媒体与附件等路径全部走它 - 1237193f46。</li>
+<li>修复已有目录时也要修它里面已经存在的东西：pywin32 的授予用 SetKernelObjectSecurity、不传播，早先提权运行留下的旧文件（例如旧的 gateway-locks/*.lock）会保持「仅管理员」的 DACL，而 icacls 回退路径会传播，两条路径于是不一致；现在 pywin32 路径报告是否真的写了，写过的已有目录会照树修复的方式给当前条目授予，且绝不经由链接、每个目录对象只走一次 - 2b53b7c933。</li>
+<li>HERMES_HOME 本身是符号链接或交结点时，提权后的修复沿着链接路径行进、把它当成重解析点跳过，最后什么都没修却把这一步记为完成；grant_tree_user_access 新增 pin_root，先解析根再在真实目录下遍历，一个都没授予就抛错、让这一步保持未完成并说明原因 - 5c33314187。</li>
+<li>提权运行留下的已有目录过去在授予之前就报 WinError 183，现在在重新抛出之前先给这个已存在、非链接的叶子授权 - f92f834a00。</li>
+<li>按路径名记的授予备忘录会把「媒体释放删掉后又重建」的同名目录跳过，导致新对象对非提权用户不可用；现在本次调用新建的目录始终授予，已有叶子的备忘录改为按 lstat 的 (路径, 卷序列号, 文件 id) 记录 - e336eaaca4。</li>
+<li>icacls 回退要在任何重解析点或硬链接文件上拒绝：过去的预遍历在生成器循环里检查链接，而遍历会把最后遇到的链接追加到最后一个 yield 之后，只有根下挂一个链接这种情况会被放行，硬链接文件的链接计数也从来没看过 - 5f4defcad0。</li>
+<li>提权授予绝不能顺着交结点或链接跑出家目录：GetFileSecurity/SetFileSecurity（或没有 /L 的 icacls）作用在交结点与符号链接的目标上，包括已存在的叶子，于是同一用户的中等完整性代码可以把 cache/images 换成指向 C:\Program Files\X 的交结点、下一次提权运行就把它的完全控制权交给用户 - b6cfdb1059。</li>
+<li>媒体采集的授权要保留存储的「家目录来源」：native_inputs_root() 会解析存储路径、抹掉家目录下被植入的链接，现在改为把未解析的存储路径交给 make_user_dir（同一个对象、链接可见），植入的链接会被拒绝 - 026088848e。</li>
+</ul>
+<p>问题（网关拒绝原因一律报授权失败）：同一用户的网关因为控制管道或进程拒绝客户端时，过去报「Gateway inaccessible (authorization)」，读起来像凭据错误。实际有两类原因：#139845 的网关以提权方式运行、非提权的桌面端 OpenProcess 打开它的 PID 失败；#140252 的一个会话 0 S4U 启动任务网关抢到了控制管道，交互式桌面端永远够不到。</p>
+<p>修复与效果：discover/ensure 在拒绝时会去探测所有者 PID（gateway.pid / gateway.lock）的会话 id 与提权状态，分别报 gateway_other_session 与 gateway_elevated，并各自在 detail 里给出处置建议（桌面端会在启动错误里显示），其它情况仍是 authorization，退出码不变 - eecaa7af9a。拒绝时只点名由进程身份证明过的网关：PID 记录必须活着、记录的开始时间与当前一致、记录的家目录不属于别的档案、并且命令行确实是一个网关，过不了就继续看下一条，一条都证明不了就保持通用的 authorization - b8ea5196e4。</p>
+<p>插件目录：一次新增 33 个条目</p>
+<p>问题（前情）：插件目录是社区提交、团队审核的目录文件集合，条目一多，一个采集窗口内就会涌进大量新增与补图提交。</p>
+<p>效果：本期涉及目录的提交共 129 条（subject 提及 catalog 的提交）；按「新增了 plugin-catalog/*.yaml 文件」核对，32 条提交新增了 33 个插件目录条目（90438e9e71 一条提交同时加入 pay 与 pay-cli 两个条目），另有 14 条提交给已有条目补横幅或列表图。值得单独点名的：官方 X Chat 插件（Hermes 以你连接的那个账号身份运行）- 5195b5d7bc；hermes-xai，提供桌面端 Grok 语音加只读的 xAI Collections 检索 - 9ba1890163；Nextcloud Talk 接入自建 Nextcloud 的聊天 - e8d376fb95；Unraid - 1a6c6a961d；Hermes Fleet Connector - f7be3f4de8；blackbox（Agent 黑匣子）- 1e5f0e6a5a；hermes-jina - 40d91f2805；ample - aabc57cbd9；personae - 4401ddd918；pay 与 pay-cli - 90438e9e71；hermes-gensyn-ree、hermes-gensyn-delphi、hermes-wslc-sandbox、hermes-federated-search、hermes-muse、deadbolt、field-academy、deepseek-search-fetch、usage-guard、voice-ledger、stop-ledger、comment-scraper、jp-reinfolib、machine-spirit、quote-ask、wallpaper-theme、hermes-artifacts 等。补图提交举例：给 shodan 加横幅图 - 54ab4b21f9。</p>
+<p>本地模型与模型目录：Nemotron 3.5 Bolt 与 deepseek-v4.1-flash-1017</p>
+<p>效果（本地模型）：新增 NVIDIA Nemotron 3.5 Bolt，74B-A9B 混合专家、24 GB 的 2 bit 构建、支持图片输入、带 LiLiCorr 草稿模型，作为可选项列出，被标为 recommend: false，所以永远不会成为推荐项或快速开始的选择，用户要自己在「本地模型」里挑它 - 737bd8adf6、e5ee444e66。llama.cpp 钉到 b11671，该版本能加载 Bolt 与其草稿模型，GGUF 读取器学会 40~42 类型（NVFP4、Q1_0、Q2_0）的块大小 - bc293c40b0。草稿模型装得下时在单槽上运行 DFlash - 30b94a5ad6；从 GGUF 头读取循环状态大小 - 89b09c2918。作者给出的实测数字：RTX 5090 上 Bolt 解码 110 到 116 tok/s、256K 窗口下预填充约 4,600 tok/s，开 LiLiCorr 后 12 个两轮 agent 任务比不开快 27.8%。</p>
+<p>效果（模型目录）：新增 deepseek/deepseek-v4.1-flash-1017 这个带日期的快照，OpenRouter 与 Nous 门户都已上线（1M 上下文、支持工具调用），按快照排序放在基础 slug 之下 - 868b9f244f。</p>
+<p>工具链与命令行</p>
+<p>问题（终端尾部的 &amp;）：前台终端命令以单独的尾部 &amp; 结尾会被直接拒绝，提示改成 background=true 重发。工具其实已经知道正确做法，模型唯一能做的就是原样重发——实测一位用户在 30 天里踩了 488 次，每次都白烧一整轮模型。</p>
+<p>修复与效果：当尾部 &amp; 是这条命令唯一的后台化方式时（单行、单条 and-or 列表或管道、没有分号、没有行内 a &amp; b、没有 nohup/disown/setsid、引号或 heredoc 里的 &amp; 不算），&amp; 会被剥掉，调用按 background=true 继续执行，生命周期、工作目录、自仓库与危险命令审批守卫都作用在真正执行的东西上；结果里带一条 auto_backgrounded 说明并点名 process_manage，notify_on_complete 保持关闭 - d5c74fc185。转换过程不再建议模型重新启动进程（390b1e38d2），并且拒绝命令替换、保留审批身份与转义空格 - c8be4526d6。</p>
+<p>问题（Ctrl+D 丢掉整轮）：连接到网关的经典命令行里，工具执行中按 Ctrl+D（EOF）会从关闭路径发出 session.interrupt，工具行返回「Command interrupted」（退出码 130），这一轮直接丢失。</p>
+<p>修复与效果：Ctrl+D 在轮次执行中只把退出标记为脱离，退出路径对网关持有的 agent 跳过中断，end_session 让观看者脱离，网关把这一轮跑完再关闭行；Ctrl+C（含连按两次强制退出）仍然中断 - ff2bf493d7。</p>
+<p>问题（流式工具调用被炸成多条）：LM Studio、Kimi 与部分 MiniMax 路由会在每个流片段上重发新的调用 id（LM Studio 与 Kimi 的续包不带名字，部分 MiniMax 每个片段都重发同样的名字）。旧的 Ollama 规则「复用的索引上出现新 id 就是新调用」给每个片段开一个槽，于是一次调用被炸成一批无名、参数是垃圾的调用，事后被清洗成空对象、什么都没执行。</p>
+<p>修复与效果：复用索引上的新 id 只有在片段带名字、并且换了工具或跟在完整的 JSON 参数之后才开新槽，Ollama 的并行批次（包括同一工具的两个调用）仍然会正确拆开 - 3f3bdf3ee2。同名调用改为按括号深度增量判断是否结束：严格 json.loads 会把可修复的首次调用（尾随逗号）当成未完成，把索引 0 上的第二次同名调用粘上去、两条都丢；旧实现还会在每个重复名字的片段上重新拼接解析整个参数前缀（256 KiB 的 write_file 用 3 字符片段要 17 秒），现在只扫描上次检查之后新增的片段 - 27edc417d7。</p>
+<p>会话与状态</p>
+<p>问题（浏览会话直接 503）：运行时新增了 runtime_epoch、session_admissions、worker_executions、worker_receipts 四张表和三个列，但没有提升 SCHEMA_VERSION。自更新以来没有被可写打开过的 state.db（任何没有运行网关联的闲置档案）会在只读浏览探测时报「no such table/column」，每个界面都答 503「schema 不可用或已损坏」，侧边栏把它列进 profiles_failed，而且永远不会被修复——会话其实还好好躺在磁盘上。</p>
+<p>修复与效果：只读浏览把「no such table/column」归类为声明式漂移而不是损坏；在没有网关持有存储时，它会取该档案的运行时锁（exclusive_maintenance），在一个 BEGIN IMMEDIATE 事务里补齐缺失的表与列（只做增量 DDL，不做数据迁移、不碰 FTS、不提升版本号）- 1eda335ae0。追赶过程本身也加了真实预算：过去的 2 秒只是锁等待超时，完整性扫描与 DDL 在 gateway.lock 下没有期限，慢存储会把锁持有超过网关启动的 5 秒等待、启动直接退出；而且 quick_check 会放过「条目数对但键错」的索引，于是在损坏的存储上写 DDL。现在一个单调预算（3 秒）覆盖完整性检查与 DDL 事务，超时会被 sqlite 进度处理器打断、DDL 回滚、浏览返回可重试的 503 并说明什么都没改 - 4220faa556。</p>
+<ul>
+<li>清理扫描退休的派生会话标记不能在重试地平线之后老去：派生 id 的代际遍历会在第一个没有被围栏的 id 处停下，标记老化之后下一轮会走回已释放的代际 0，把一个恢复的派生对话劈成两个会话 - e1b52559b3。</li>
+</ul>
+<p>性能（3 条）</p>
+<ul>
+<li>每次本地轮次认领都会跑 restore_local_session，它会读两次存储的会话行，即使没有未跟踪的步骤、回执原样返回；现在只在追赶真的重读了回执时才复检 - c128ab432b。</li>
+<li>记忆工具调用每次都要解析两个 profile home 键（调用方的与绑定的）并对提供方的 handle_tool_call 跑 inspect.signature；绑定 home 与提供方对某个管理器永不变化，现在初始化时记下绑定 home 的键、按提供方缓存可接受的关键字，每次调用只解析调用方自己的 home - efe5751584。</li>
+<li>网关的终局准入墓碑扫描（带每行 json_extract 的 GLOB 范围）过去对每个 API 准入都在写事务里跑；只有客户端 Idempotency-Key 才可能点名一个被删会话的准入，无 key 的轮次 uuid 与 /v1/runs id 由服务端生成、永不匹配，这些准入现在跳过扫描 - dedd8f258b。</li>
+</ul>
+<p>其它</p>
+<p>不安全网关控制路径的说明 - a738f521fc。</p>
+    </section>
+    
     <section id="2026-10-17" class="day">
       <h2>Hermes 日报 2026-10-17：插件目录新增认证分级与三十个目录条目</h2>
       <p><strong>本期覆盖 10 月 16 日 ~ 10 月 17 日合入 main 的提交，共 704 个 commit（不含 merge），另有 20 个 merge（raw 元数据口径，即 subject 以「Merge 」开头的合并节点；git log --merges 为 22，另 2 个是 bookkeeping 合并节点）。新增 29 个功能、372 个修复、2 个性能优化。</strong></p>
