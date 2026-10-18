@@ -22,9 +22,256 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 82 期 · 35177 个提交 · 每日自动更新 ·
+<p class="meta">共 83 期 · 35507 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-19" class="day">
+      <h2>Hermes 日报 2026-10-19：桌面端 /usage 补齐，插件系统新增三个能力</h2>
+      <p><strong>本期覆盖 10 月 18 日 ~ 10 月 19 日合入 main 的提交，共 330 个 commit（不含 merge），另有 15 个 merge。新增 17 个功能、190 个修复、3 个性能优化。口径：按「合入 main 的时间」统计，不是 commit 作者时间；commit date 分布为 10-17 共 68 条、10-18 共 254 条、10-19 共 8 条。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端 /usage 面板：发出第一条消息之前就能显示提供商账户限额与 Nous 额度。</li>
+<li>统一会话总数不再重复计数，深层归档列表改为 500 行分页。</li>
+<li>插件系统三个新能力：post_message 原地发帖并编辑、post_compaction 钩子、on_session_delete 覆盖桌面端删除与归档。</li>
+<li>插件目录新增 11 个条目：WhatsApp 语音通话、ESP32 硬件 Gadget、Ollama Cloud 错峰队列、Tsubasa 模型提供商等。</li>
+<li>更新流程说清「更新后该重启谁」；Docker 沙箱补两条提权逃逸修复，certifi 安装环境轮换后的 TLS 失效修了一整批。</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端 · /usage 面板与会话统计</p>
+<ul>
+<li>d37c120263|2026-10-18|Teknium|fix(desktop): /usage shows provider account limits before the first message</li>
+</ul>
+<p>问题：桌面端和 TUI 的 /usage 走 slash.exec，其「活会话」捷径在没有 agent 可用时直接回一句「No active agent -- send a message first」。提供商账户限额和 Nous 额度只需要 profile 配置与凭据，却因为这句话在新会话里完全显示不出来。修复：改成从会话所在的 profile 作用域直接渲染，有 token 计数时排在计数前面；同时删掉旧 session.usage RPC 上的 account_lines 额外字段（当前没有客户端会读它）。效果：新开一个会话，不发消息也能看到账户限额与额度。</p>
+<ul>
+<li>37176f14d2|2026-10-18|Teknium|fix(desktop): /usage reads the session pick and the profile Nous login</li>
+</ul>
+<p>问题：首条消息之前，/usage 取的是启动 profile 的默认模型，Nous 额度也在启动 profile 里读。修复：改为取输入框里选中的模型（model_override 的 provider）并优先于 profile 默认值，Nous 额度在同一个 profile 作用域里读；session.usage 辅助函数折进 /usage 这条唯一调用路径。</p>
+<ul>
+<li>6d69fa8c55|2026-10-18|Teknium|fix(desktop): count unified session totals once per backend install_id</li>
+</ul>
+<p>问题：第一轮 RT-42 修复只在「主行带同一个 connection_id」时才判定 registry 源与主源重叠，而生产环境的主行从不打标，判定从不生效——一台 650 会话的主机被算成 975，两条 registry 连接加 100 个本地会话被算成 1300，主源与 registry 读同一台主机时会多算一个前缀外的 profile（750 算成 850）。修复：总数按每个 profile 的「后端 install_id」归组——同一个已知 install_id 只计一次（取较大的总数），不同的已知 install_id 相加，未知身份（旧后端、探测慢、远端覆盖的 profile）只把该 profile 抬到它自己的总数、绝不累加。效果：可能少算，但绝不重复计算。</p>
+<ul>
+<li>8d0f814d2d|2026-10-18|Teknium|fix(desktop): page a deep Archived load in 500-row pages</li>
+</ul>
+<p>问题：Electron 合并路径（远端 profile 或 registry 网关）上每一页归档都由重读主前缀来回答，旧的 200 行游标每 200 行就重读一次主前缀，开销按 N²/200 增长——650 行归档要 6 次主调用、往渲染进程送 2000 行。修复：listEveryArchivedSession 按后端上限 500 行分页。效果：650 行只需两次渲染请求、三次主读取。</p>
+<ul>
+<li>6737076f9a|2026-10-18|sryimnoob|fix(desktop): keep &quot;All profiles&quot; across a boot-time source restore</li>
+</ul>
+<p>问题：selectConnection 用「$activeConnectionId 为 null」判断这是否是静默的启动恢复，但主进程在连接注册表就绪之前就先打开了本地后端，于是真正执行的那次恢复看到的是活数据源、被当成用户主动切换，「全部 profile」浏览模式被折叠并写回 false；下次启动又会先闪一下全部 profile 再掉回单个网关。修复：启动路径显式传 restore: true，selectConnection 据此识别，null-id 推断保留作首轮兜底。</p>
+<ul>
+<li>976ac86132|2026-10-18|Teknium|fix(desktop): reopen a gateway group by name after a restart, never fork it</li>
+</ul>
+<p>问题：群组绑定只存在内存里、按 room_id 索引，桌面端重启后按名字（roster 行或恢复的标签页）打开会找不到绑定，落到唯一动作是 groups.create 的 GroupExecutionGate，每次点击都造一个同名新房间、而原房间仍留着历史。修复：未命中时先把名字（或恢复的 canonical: key 对应的 room id）拿去 groups.list 解析并采用已有房间；查不到就失败关闭并给重试按钮，「启动网关群组」只在权威方答过且确实没有同名房间时才提供。</p>
+<p>插件系统 · 三个新能力</p>
+<ul>
+<li>a2eab1f45c|2026-10-18|Teknium|feat(plugins): ctx.post_message — post one message to the current conversation and edit it in place</li>
+</ul>
+<p>新增 ctx.post_message：插件可以往「它正在服务的那个对话」发一条消息，并在之后原地编辑同一条消息，任何渠道都不需要写平台代码。对话就是绑定到这次工具调用、斜杠命令或钩子的会话，插件从不指定聊天。没有绑定会话（定时器、插件线程、cron）或没有活的网关时返回 ok=False 加错误码，绝不抛异常。消息平台走应答适配器的 send/edit_message；适配器不支持编辑、或编辑被拒时改成新发一条，句柄跟随新消息（edited=False, fallback=True）。本地 CLI/TUI/桌面端得到带 key 的 notification.show，桌面端与 Ink TUI 会原地替换。进程外插件宿主里禁止使用（句柄绑定事件循环）。每一次 post/edit 都记录成 plugin_message 日志。</p>
+<ul>
+<li>35948f22ad|2026-10-18|Baophan00|feat(plugins): add post_compaction hook (#118382)</li>
+</ul>
+<p>新增 post_compaction 钩子：一次成功的上下文压缩之后触发一次，让插件和提供商能跟进（重新注入上下文、更新索引等）。按 has_hook 门控，没有监听者时零开销；只观察，返回值忽略。</p>
+<ul>
+<li>aab0dc72cf|2026-10-18|Teknium|feat(plugins): on_session_delete covers Desktop deletes and deliberate archives</li>
+</ul>
+<p>问题：on_session_delete 漏掉了桌面端真正走的路径——单条删除和归档走的是规范变更回执（mutate_runtime_session），不是 SessionDB.delete_session，插件对两者都收不到通知；「归档」这个「这件事做完了」的信号（#132639）一处也不触发。修复：mutate_runtime_session 在写入提交后，对 operation &#x27;delete&#x27; 和真实的「未归档→已归档」翻转各触发一次，重复重放回执保持静默；set_session_archived 在真实翻转时带 reason=&quot;archive&quot;，于是 TUI 的 session.archive、`hermes sessions archive` 和延迟的 TUI 归档都能从一处覆盖。重复、反归档、空闲自动归档与 profile 采用（notify=False）保持静默。载荷统一为 session_id + reason + profile，多行时带 deleted_ids。</p>
+<ul>
+<li>0975937593|2026-10-18|Teknium|feat(plugins): pass the calling session to plugin slash commands on every surface</li>
+</ul>
+<p>插件斜杠命令在所有界面都能拿到调用会话：注册 ctx.register_command 的处理器只要声明 session_id / session_key / platform / source 任一个（或 **kwargs）就能收到；单参数处理器保持 `handler(raw_args)`。消息平台上的插件命令会去查该聊天的当前会话条目（从不新建），于是 HERMES_SESSION_ID / session_id 是之后 /new 会报成 old_session_id 的那个 id，而不是空串。网关（消息平台与本地 CLI/桌面端会话）、TUI/桌面端 RPC 与经典 CLI 的网关外回退共用一个调用边界。</p>
+<ul>
+<li>06e8c5bc70|2026-10-18|ewtillman|feat(plugins): expose gateway source to slash handlers</li>
+</ul>
+<p>把网关来源（gateway source）暴露给斜杠命令处理器，插件在消息平台与本地会话上都能识别这次命令来自哪一种界面。</p>
+<ul>
+<li>93fafc4d6f|2026-10-18|Teknium|feat(plugins): public names for the skills tool&#x27;s discovery and lookup helpers</li>
+</ul>
+<p>技能工具的七个辅助函数从私有改名为公开：find_all_skills、sort_skills、skill_search_dirs、locate_skill、skill_lookup_path_error（tools/skills_tool.py）、dir_hash（tools/skills_sync.py）、read_skill_name（tools/skill_usage.py）。插件做技能目录视图、「打开这个技能」、与已安装副本比对漂移时，现在可以用与 skills_list / skill_view 工具相同的遍历、顺序、搜索根与查找门控。没有保留下划线别名；新名字进入私有导入检查的公开清单，并写进插件开发者指南。Closes #129696。</p>
+<p>插件目录 · 新增 11 个条目</p>
+<ul>
+<li>1d5438664f|2026-10-17|Ashwanth Balakrishnan|feat(plugin-catalog): add hermes-whatsapp-voice plugin</li>
+</ul>
+<p>WhatsApp 语音通话。在「已关联设备」（个人号码）这套多数 Hermes 用户本来就有的设置上做实时语音通话，不需要 WhatsApp Business 账号。你可以拨打机器人的号码跟 Hermes 通话：语音使用 Hermes 自己的 persona（通话前拉一段简短简报），并在通话中把真实工作交给 Hermes。也可以让 Hermes 主动打给你：whatsapp_call_owner 只拨打配置好的机主号码（它没有目标参数），回报「已接听 / 无人接听 / 已拒接」，便于 agent 回退到别的渠道，包括从 cron 触发。每通电话的简短小结会发到 WhatsApp。语音跑在 Gemini Live（默认 gemini-3.8-live），复用你已经配好的 Gemini key；Live 的每个设置项都可配，还带一个语言锁。设置方式是仪表板标签页（配对二维码、设置、测试通话）或 agent 的 runbook 技能。披露：会运行一个独立的 sidecar 进程（Rust，基于 whatsapp-rust），由用户自行启动或装成 systemd/launchd 用户服务；二进制从该仓库的 GitHub Release 下载，带发布工作流的构建证明与仓库内固定的校验和。</p>
+<ul>
+<li>694c1fbc8f|2026-10-17|Adolanium|feat(plugin-catalog): add gadget (Hermes Gadget hardware platform)</li>
+</ul>
+<p>Hermes Gadget 硬件平台。用带屏幕、麦克风、扬声器的 ESP32 小设备跟 Hermes 对话：按住按钮提问、听回答。新增一个网关平台（每台设备是一个聊天），加上列出设备、在屏幕上显示卡片、以及执行设备动作（LED、继电器）的工具。披露：网关在一个 WebSocket 端口（8765，默认所有网卡）监听设备，未配置 tls_cert/tls_key 时为明文 ws://；新设备需要 Hermes 配对码，除非列进 GADGET_ALLOWED_USERS（GADGET_ALLOW_ALL_USERS 可跳过配对，仅供开发）。已配对的设备可以为自己的聊天应答 agent 的命令审批。不是 WAV 的语音回复用本地 ffmpeg 转换。`hermes gadget update --latest` 会从该仓库的 GitHub Release 下载固件、按发布清单校验大小与 SHA-256 后发送给设备。独立社区项目，与 Nous Research 无关联。</p>
+<ul>
+<li>3fc7eab632|2026-10-17|onkanat|feat(plugin-catalog): add offpeak-bekci — Ollama Cloud off-peak window + approval-gated work queue</li>
+</ul>
+<p>offpeak-bekci：Ollama Cloud 错峰窗口 + 审批门控的工作队列（社区、桌面端）。提供错峰窗口标签（Ollama 自己的规则）、把工作搬进便宜时段的用户审批闸（/offpeak-onayla）、以及需要 plan_hash 的 opt-in cron 安装（/offpeak-kur 会先打印计划并要求 plan_hash）；另有一个 llm_execution 中间件，以「只测量」模式发布（kuru_kosu: true，20 次请求实测平均多 0.023 ms 延迟）。无网络调用、无遥测，条目描述里做了完整披露。提交时 hermes plugins validate 通过（EXIT=0）。</p>
+<ul>
+<li>848df47961|2026-10-17|cenab|feat(catalog): add Tsubasa model-provider plugin</li>
+</ul>
+<p>Tsubasa 模型提供商插件（OpenAI 兼容，暂不支持工具调用）。披露：提示词与你的 TSUBASA_API_KEY 会发往 api.tsubasa.sh（由 PalmAndWand 运营）；该 API 目前只服务加拿大地区，其它地区返回 HTTP 451。</p>
+<ul>
+<li>6fcc61bfa9|2026-10-17|Saif Shines|feat(plugin-catalog): add scalekit (#140032)</li>
+</ul>
+<p>Scalekit：从 Hermes 调用任意 Scalekit 连接器——500+ 连接器、20000+ 工具。模型可以请求一条审批链接、运行指定工具、或代理一次 HTTP 请求；提供商 token 留在 Scalekit 侧。无 shell、无后台进程、无遥测。</p>
+<ul>
+<li>222e61628f|2026-10-17|gradia64|feat(plugin-catalog): add hermes-lang-it-full — Italian Desktop language pack</li>
+</ul>
+<p>hermes-lang-it-full：意大利语桌面端语言包。</p>
+<ul>
+<li>ddb7767368|2026-10-17|atbrace|catalog: add hermes-jetstream</li>
+</ul>
+<p>hermes-jetstream：NATS JetStream 事件总线。agent 可以发布事件（nats_publish）、拉取一批（nats_fetch）、按 subject 匹配被唤醒——实时会话 watch 或配置声明的唤醒路由，带持久消费者、手动 ack、幂等唤醒账本与限速；一个可选的 lifecycle tap 会把 Hermes 事件镜像到 hermes.&gt; 主题。只连接你自己配置里的 NATS 服务器，无第三方调用、无遥测；token/nkey/用户密码从 ${VAR} 引用读，凭据文件只读不改。唤醒路由会把事件载荷渲染成提示词、启动网关回合或触发已有 cron 任务（可选在另一个具名 profile 下）。</p>
+<ul>
+<li>cad8eb9088|2026-10-17|olric3015|feat(plugin-catalog): add edit-ledger</li>
+</ul>
+<p>edit-ledger：本地账本，记录 agent 用 write_file 或 patch 改过文件的那些回合。/edit-log 可以查看改文件的回合数、文件总数、每回合中位数、改动最多的文件类型、以及上次改动距今多久，可按模型、平台或日期分组，支持最近 24 小时、任意小时/天数、最新会话或全部记录；/edit-log recent 列出最新回合（默认十条，/edit-log recent 50 最多一百条）。只订阅 pre_verify 作观察者，永远返回空、从不改变回合；只写回合元数据（模型、平台、文件数、按扩展名的文件数、session id 的 12 位哈希，绝不写路径、文件名或回答文本），写到 plugin-data/edit-ledger/edits.jsonl，超过 2 MB 裁剪到 5000 行；无网络。</p>
+<ul>
+<li>8affca6467|2026-10-17|olric3015|feat(plugin-catalog): add interim-ledger</li>
+</ul>
+<p>interim-ledger：本地账本，记录模型在一个回合中途、最终答复之前写下的那些消息（随工具调用一起输出的文本，在聊天平台上可能各自成为一条消息）。/interim-log 显示每个模型写了多少条、跨多少个回合、每个这样的回合平均几条、长度中位数、距上次多久，可按模型、提供商、界面或日期分组；/interim-log recent 列出最新消息。即使 display.interim_assistant_messages 把它们隐藏起来也照样计数。只写消息元数据（模型、提供商、界面、回合内的第几步、字符数、session 与 turn id 的 12 位哈希，绝不写消息文本）；只观察，不能延迟、改变或隐藏消息；无网络。</p>
+<ul>
+<li>1414622eea|2026-10-17|olric3015|feat(plugin-catalog): add the edit-ledger catalog card</li>
+<li>ff0e6ad591|2026-10-17|olric3015|feat(plugin-catalog): add the interim-ledger catalog card</li>
+</ul>
+<p>上面两个账本插件各自的目录卡片条目。</p>
+<ul>
+<li>4d7bb667e7|2026-10-18|yuzushi-dev|plugin-catalog: add hermes-seo</li>
+</ul>
+<p>Hermes SEO：Claude SEO 2.4.2 的原生 Hermes 移植版——45 个 SEO 工作流与专家技能、一个凭据作用域的 hermes_seo_run 工具、一个隔离的 Python 运行时，以及 JSON-LD 建议反馈。披露：hermes_seo_run 在 Hermes 宿主进程里起本地子进程（不是 Docker 终端沙箱），模型提供的脚本参数可以指向宿主路径，因此能读宿主文件（Gemini 图片编辑工具会把指定文件上传到 Google，IndexNow 工具会读一个 URL 列表文件）；`hermes seo setup` 会在版本范围内从 PyPI 下载 Python 包到私有环境、并可选通过 Playwright 装 Chromium；审计会抓取用户选定的网站；分开配置的 provider（Moz、Bing Webmaster、Keywords Everywhere、Google APIs、Matomo、DataForSEO、IndexNow、Google Gemini）会收到发给它们的数据并可能产生费用；技能会在付费或会改动数据的调用前询问，但工具本身不强制审批；Gemini 生成的图片存到 ~/Documents/nanobanana_generated，其余运行时状态留在 Hermes 插件数据存储里；provider key 从当前 profile 读取、只传给需要它的脚本；Google OAuth 工作流被禁用。无遥测、不带凭据、无后台进程或自更新。平台：Linux / macOS。</p>
+<ul>
+<li>fabeefdee6|2026-10-17|Chooooo|plugin-catalog: add completion-sound</li>
+</ul>
+<p>Completion Sound：挑一个桌面端在一个回合结束时播放的提示音——14 个内置预设之一，或你自己的音频文件（mp3、wav、ogg），夜间时段还可以换另一种声音。文件留在插件自己的本地存储里。仅桌面端（插件 SDK 里的 desktop/plugin.js），不带 agent 工具、钩子、中间件或环境变量。已知问题：在 Hermes 提供关闭自己提示音的开关之前，Hermes 自带的完成音会和插件的一起播（PR #140350）。</p>
+<p>更新流程 · 更新后该重启谁</p>
+<ul>
+<li>3752497cc4|2026-10-19|kshitijk4poor|refactor(update): one deferral core, shared reason prefix, per-line Desktop hint; review folds</li>
+</ul>
+<p>折入 #141070 最终评审与 /simplify-code 的结果：defer_manual_serve 与 defer_unit_serve 共用一套 _defer_identified（pid/创建时间守卫、死 pid 结清、提醒写入），单元行写提醒失败时的告警改说「unit restart reminder」而不是「manual」；fleet 循环新增正向的 _is_serve_or_dashboard_unit 名字门控并组合进 _is_hermes_gateway_unit，_SERVE_SKIP_REASON 也点名 hermes-dashboard* 单元；SERVE_ONLY_REASON_PREFIX 与那句关于网关的措辞提为模块常量，让产出方与桌面端判定共用同一份拼写，测试也把产出方自己的理由喂给两个脚本；桌面端交接脚本（posix.sh、windows.ps1）只在确实该提网关时才加网关提示。</p>
+<ul>
+<li>3c23e52ae3|2026-10-19|kshitijk4poor|fix(desktop-update): add the gateway hint only when the follow-up blames gateways</li>
+</ul>
+<p>问题：posix.sh 和 windows.ps1 只要 gateway_restart 步骤欠着就追加「运行 hermes gateway restart」；但这一步现在也可能只为一个 serve/dashboard 单元而欠着（比如更新器没有 root 的系统级 hermes-dashboard），那条提示会把用户引到一个根本不碰该单元的命令。修复：两个交接脚本只在欠的原因是「serve/dashboard 专属」时去掉提示（理由以 serve/dashboard 开头且不提 hermes gateway restart），其它 gateway_restart 理由一律保留提示，包括重启阶段自身崩溃时 update_finish 欠下的原始异常文本。仅欠 dashboard 重启时改为指向更新日志，日志里写了该单元自己的命令。修 #141071。</p>
+<ul>
+<li>fb4e9fd222|2026-10-19|kshitijk4poor|fix(update): classify a systemd-owned serve/dashboard as systemd, not manual-serve</li>
+</ul>
+<p>问题：_collect_ledger_runtimes 认识 launchd、desktop-ssh、desktop 和 manual-serve，但单元启动的后端既不设 HERMES_SPAWN 也不设 HERMES_PARENT_PID，于是 hermes-dashboard 单元的 MainPID 被读成 manual-serve，更新会告诉用户「让所有者重启 hermes dashboard」——而那个进程其实是 systemd 的；_warn_stale_serve_runtimes 里的 systemd 提示又以 supervisor == &quot;systemd&quot; 为前提，这条路径从不产生它。修复：把「PID 是该单元活的 MainPID」的行归类为 systemd（与 _get_systemd_service_for_pid 同一套归属规则，仅凭 cgroup 归属仍算手动），记录单元与作用域，并在幸存者告警里打印该单元自己的重启命令。桌面端 spawner 检查仍优先于单元检查。</p>
+<ul>
+<li>bece51b3f5|2026-10-19|kshitijk4poor|fix(update): name what is actually owed in the gateway_restart follow-up</li>
+</ul>
+<p>问题：只要校验没走完，后续提示一律说「网关可能仍在跑更新前的代码、或被停掉而没有继任者；用 hermes gateway restart 恢复」。当所有网关都已验证为新版、唯一欠的只是一个更新器没有 root 权限的 hermes-dashboard 单元时，那条命令什么都不做。修复：校验期间记录欠的是网关族还是 serve 族（网关侧：陈旧的或已停的 fleet 行、没有行、未记账的网关、更旧的欠债网关、未映射的停止、重启阶段错误、失败的非 serve 单元；serve 侧：失败的 hermes-serve*/hermes-dashboard* 单元、清理没能拉回的 dashboard、未记账的 serve），据此生成理由；步骤 id 仍是 gateway_restart，因为桌面端交接脚本要解析它。</p>
+<ul>
+<li>5165b6624f|2026-10-19|kshitijk4poor|fix(update): never settle the host obligation on an incomplete run</li>
+</ul>
+<p>问题：在上一次折叠之上做第二轮评审时发现，一次失败的 dashboard 单元已让运行不完整，此时对宿主义务跑「仅标记」的必要性判断（_marker_only_restart_obsolete）可能在校验中途把它清掉，随后 _record_owed_gateway_inventory 又只带本次计划的网关与当前 SHA 重新武装、丢掉原有的 expected_sha 与基线。修复：恢复原来的门控——只在运行本来完整时才做这个判断。不完整的运行保持义务武装，启动告警仍会点名更旧的欠债网关。Refs #141021。</p>
+<ul>
+<li>b65ad0c115|2026-10-19|kshitijk4poor|fix(update): keep a reminder for an unrestarted unit dashboard; review folds</li>
+</ul>
+<p>问题：把单元的 MainPID 行归类为 systemd 之后，一个陈旧的系统级 dashboard 丢掉了它唯一的跨运行提醒——以前那条 manual-serve 行会写 serve_restart_pending/&lt;pid&gt;.json，而 fleet 义务只记录网关行，于是网关一旦都新了，这个陈旧单元再也不会被提起。修复：校验阶段会为幸存的 systemd 托管的 serve/dashboard 写一份按实例的提醒，带上该单元的重启命令；启动时打印该命令、进程退出后清除。另外 report_unaccounted_runtimes 在知道单元时打印该单元的命令，而不是硬编码的用户级 hermes-serve 提示。</p>
+<ul>
+<li>3382072401|2026-10-19|kshitijk4poor|fix(update): unit-owned serve reminders ride the receipt-backed flow; linux markers</li>
+</ul>
+<p>问题（#141070 评审）：单元提醒过去是一条只写、只在重启后校验阶段跑的独立路径，而回执流程（retain_receipt_manual_serves、carried_manual_serves）会跳过所有 systemd 行。若更新在校验之前就停住、带 --no-gateway-restart 跑、或写提醒失败，后面 CLI 启动时什么都恢复不了——而它在 main 上还是 manual-serve 时本来有这套恢复。修复：扩展已有回执流程——is_reminder_row 覆盖手动与单元托管的 serve 行，defer_unit_serve 是 defer_manual_serve 的单元版孪生（写上该单元的重启命令、结清已消失的实例），retain_receipt_manual_serves 与回执的结转都改用它们；只在校验阶段跑的 remind_unit_serve 路径被删除。</p>
+<ul>
+<li>5ddafd2546|2026-10-19|kshitijk4poor|fix(update): don&#x27;t retry a dashboard unit the fleet loop already declined</li>
+</ul>
+<p>问题：系统级 hermes-dashboard 单元在没有 root 或免密 sudo 时，fleet 重启循环会正确地跳过它（没有非交互式提权路径）并打印手动的 `sudo systemctl restart` 命令；随后更新后的 dashboard 环节却会再试一次同一单元——因为校验只把已重启的单元转过去当 already_restarted_units，于是 _restart_managed_dashboard_service 跑了一次普通的 systemctl restart（没有 --no-ask-password）和 sudo -n，抛出 polkit/tty 报错和第二份重复建议。修复：把失败的单元也转过去，dashboard 环节在调用方已处理时跳过 hermes-dashboard；fleet 循环从未见过的 dashboard 单元仍照旧在这里重启。回归自 #125314（把 hermes-dashboard* 加进 fleet 循环时没有告知后面的 dashboard 环节）。</p>
+<p>安全与沙箱</p>
+<ul>
+<li>b0be65c30a|2026-10-18|Teknium|Docker sandbox files can no longer carry setuid/setgid or file caps back to the host, persistent sandboxes included (#141086)</li>
+</ul>
+<p>问题：上一版「teardown 时把 root 写的文件交还宿主用户」会做 chown（chown 本身会清掉 setuid/setgid 与文件能力），但仍有两条路径能把提权文件留在宿主的绑定目录里（在真实 Docker 上验证过）：① 那次遍历只选 root 属主的条目，于是「宿主用户属主 + root 组属主」的 setgid 文件、或通过 docker_extra_args 拿到 SETFCAP 的宿主用户属主文件从不被碰；② 默认的 docker_persist_across_processes 模式下容器从不移除，交还（以及剥离）从不执行。修复：每一轮 root 处理都先把沙箱挂载点下每个 setuid/setgid 普通文件重新 chown 给它自己所属的 uid（同一属主的 chown 会清掉这些位与 security.capability，且不改属主）。</p>
+<ul>
+<li>220270d10e|2026-10-18|Teknium|Docker sandbox files written as root are handed back to your user at teardown (#141033)</li>
+</ul>
+<p>问题：Docker 后端默认以镜像的默认用户（root）运行，除非设置 docker_run_as_host_user；持久文件系统模式会把 &lt;sandbox&gt;/docker/&lt;task&gt;/home 绑到 /root、workspace 绑到 /workspace，容器写在里面的东西在宿主上就是 uid 0——用户删不掉，这正是 scratch 清理被搞坏的原因；光是一个提示后端探测容器就会在每个临时 HERMES_HOME 里留下 root 属主的 home/.hermes 树。修复：容器内仍默认 root（很多镜像的 apt 与 s6 需要）。Hermes 停止并移除 root 容器时，teardown worker 先在仍运行的容器里跑 `docker exec -u 0 find /root /workspace -xdev -user 0 ... chown uid:gid`，并剪掉嵌套在其下的其它绑定挂载（只读技能、凭据、缓存、用户卷），沙箱目录之外的宿主数据绝不触碰。这一步有 10 秒上限、尽力而为、只在 debug 级别记日志。</p>
+<p>稳定性 · TLS 轮换与 worktree 归档</p>
+<ul>
+<li>6bd9c10e32|2026-10-18|Pedro Relvas|fix(ssl): re-resolve certifi&#x27;s CA bundle after an install-environment rotation</li>
+</ul>
+<p>问题：一个在包管理器替换其安装环境之前就 import 了 certifi 的进程，会终生持有那个已删除的目录路径——certifi.where() 由被导入模块的 __file__ 推导，没有任何东西会重新推导它。httpx 的每个 SSL 上下文都走这个路径，于是 httpx.Client(verify=True) 在构造时抛 FileNotFoundError，OpenAI 兼容客户端工厂把它变成 `RuntimeError: Failed to initialize OpenAI client: [Errno 2]`，该进程拥有的每个 TLS 工具都失效直到重启。requests 更靠外一层：它的 DEFAULT_CA_BUNDLE_PATH 是 import 时冻结的字符串，轮换后每次调用都抛 `OSError: Could not find a suitable TLS CA certificate bundle`。修复：agent/ssl_verify.py 的 certifi_bundle_path() 会在包消失时对着活的 sys.path 重新执行一次导入，记录一条 WARNING 点出死路径与恢复路径；确实无从恢复时返回 None，并把平台上下文交给 httpx，而不是那个会被解析到死路径的裸 True。</p>
+<ul>
+<li>17200116d4|2026-10-18|kshitijk4poor|fix(ssl): requests gets the OS store as a bundle when no CA file exists</li>
+</ul>
+<p>问题：轮换后 certifi 无法恢复时，requests_verify() 会回退到 OpenSSL 的 cafile/capath，再回退到 True；Windows 两者都没有，True 又把 requests 送回它在已删除环境里冻结的 DEFAULT_CA_BUNDLE_PATH，于是每次浏览器 / Keenable 调用都抛「找不到合适的 TLS CA 证书包」。修复：最后一步改为把系统证书库的 CA 一次性写入 $HERMES_HOME/cache/platform-ca-bundle.pem 并把该路径交出去；只有证书库本身为空时才用 True。</p>
+<ul>
+<li>17724f1f33|2026-10-18|kshitijk4poor|fix(ssl): an unwritable HERMES_HOME keeps the requests TLS fallback</li>
+</ul>
+<p>问题：_platform_store_bundle() 会让一个写满或只读的家目录把异常抛出 requests_verify() 之外——它被当作 requests 调用的参数求值，于是浏览器 / Keenable 调用会以磁盘错误失败，而不是回退到 verify=True。修复：保留 requests 的 TLS 回退。</p>
+<ul>
+<li>30bc849c3d|2026-10-18|kshitijk4poor|fix(auth): keep the Nous credential context&#x27;s certifi pin on macOS</li>
+</ul>
+<p>把认证与平台侧的 certifi 固定改走同一套重新推导，并在 macOS 上保留 Nous 凭据上下文的 certifi 固定。同批还有 f162c82ac4（certifi 重新解析真的到达 certifi、requests 保留自己的 CA 覆盖）、77db8c51f9（重新导入 certifi 的包树让轮换修复到达核心）、e681d6fae5（认证与平台的 certifi 固定走共用重新推导）。</p>
+<ul>
+<li>f162c82ac4|2026-10-18|Teknium|fix(ssl): certifi re-resolution reaches real certifi; requests keeps its CA overrides</li>
+<li>77db8c51f9|2026-10-18|Pedro Relvas|fix(ssl): re-import certifi&#x27;s package tree so the rotation repair reaches core</li>
+<li>e681d6fae5|2026-10-18|Pedro Relvas|fix(ssl): route the auth and platform certifi pins through the shared re-derivation</li>
+<li>3882113085|2026-10-17|Teknium|feat: archive stale dirty worktrees before removing them, sweep every repo, ask on dirty exit</li>
+</ul>
+<p>问题：worktree 清理器在任何年龄都不删脏的或未推送的树，于是完成车道的残留（散落的探针文件、已关闭 PR 上的 WIP 提交）无限堆积——一台机器上 658 棵树、约 1 TB，其中 553 棵是 lane 树。修复（Teknium 2026-10-17 批准的设计）：先快照再删除——超过档位（hermes-*/subagent-* 24 小时、具名树 72 小时）且有空改动或未推送提交的空闲树，先归档到 refs/hermes/archive/&lt;tree&gt;（HEAD + staged + unstaged + 非忽略的未跟踪字节，用临时索引构建；过大的未跟踪文件跳过并列出）再删除，归档失败就保留该树；分支在远端已发布时保留分支，否则由归档锚定其提交。任何年龄任何预算都不碰：活的 hermes 锁属主、任何 cwd 或打开的文件描述符落在该树内的活进程（Linux 用 /proc，其它平台用 psutil cwd）、最近有文件/引用活动的树、Kanban 的 t_&lt;hex&gt; 树。没有数量上限；可选的 worktrees.max_total_gb 会优先驱逐最老的空闲树。另按 profile 维护注册表（&lt;HERMES_HOME&gt;/worktree_repos.json）记录 Hermes 造过 worktree 的每个仓库（hermes -w、/worktree new、subagent 隔离、桌面端 git 面板），6 小时 cron 扫描会把它并入既有来源、按 profile 限定并限速。带提交或编辑的 subagent worktree 在子任务结束时归档并删除（保留分支）。</p>
+<ul>
+<li>06671b7075|2026-10-17|Teknium|fix: worktree removal treats ignored files as disposable</li>
+<li>44f60d70bc|2026-10-17|Teknium|fix: worktree ignored-file scan falls back to status --ignored</li>
+<li>ab1c29d8bb|2026-10-17|Teknium|fix: worktree sweep keeps any tree holding work an archive cannot restore</li>
+<li>d413d8b1b7|2026-10-17|Teknium|fix: worktree sweep never archives or removes a tree with a submodule</li>
+<li>ccb3c9a4e8|2026-10-17|Teknium|fix: worktree archive keeps submodule work and late staged edits, reports retained trees</li>
+<li>71a83d74d5|2026-10-17|Teknium|fix: worktree sweep honours --older-than, re-gates each tree, archives exact bytes</li>
+</ul>
+<p>配套六条：被忽略的文件视为可丢弃（06671b7075）；忽略文件扫描回退到 `status --ignored`（44f60d70bc）；保留任何还压着「归档也恢复不了的工作」的树（ab1c29d8bb）；带 submodule 的树绝不归档或删除（d413d8b1b7）；归档保留 submodule 的工作与晚到的已暂存编辑、并报告保留下来的树（ccb3c9a4e8）；sweep 遵守 --older-than、对每棵树重新门控、归档精确字节（71a83d74d5）。</p>
+<p>性能（3 条）</p>
+<ul>
+<li>c6961c62af|2026-10-18|Teknium|perf(state): a display read hashes only rows a removed copy could match</li>
+</ul>
+<p>问题（RT-39 实测）：30k 行会话的热恢复比 main 慢约 12%（真实 tui_gateway 走 WS、进程内 uvicorn，各 8 次热运行：中位 1.837s vs 1.634s）。原因是热路径的显示读取 get_messages_as_conversation(include_compacted) 从 0.30s 涨到 0.47s——自 7e31a901123 起，_dedupe_display_generations(drop_removed=True) 会对每一行活行计算 sha256(repr(display key))，一次恢复就是 30k 次 repr+sha256。修复：血缘里没有被移除行时完全不哈希；有的话只哈希时间戳落在那几个被移除行上的活行。</p>
+<ul>
+<li>3a3a168db8|2026-10-18|Teknium|perf(cli): keep a turn&#x27;s streamed-delta buffers linear</li>
+</ul>
+<p>问题：_Turn.shown / _Turn.spoken 用属性上的 `+=` 增长，CPython 无法原地扩展列表，于是每个增量都复制整段——本机实测 20k 增量 0.19s、100k 7.8s、200k 52s。修复：改成 part 列表、只在读取（段边界或结算）时 join。测试：200k 增量在 10 秒内完成，在改动前的 head 上是红的。评审发现来自 @kshitijk4poor。</p>
+<ul>
+<li>f8b359e22f|2026-10-18|Teknium|perf(gateway): parse a policy&#x27;s follow flag once, not on every read</li>
+</ul>
+<p>问题：follows_profile 一个回合在事件循环上被读 8~10 次（activate_policy、read_profile、current_toolsets、effective、run_turn 与 side agent）；MSG-22 给它加了 json.loads(config_json)，而冻结会话的 config_json 是一整份 profile 配置——每次读约 435 us（main 上约 2 us）。修复：策略是冻结 dataclass，结果按实例缓存，replace() 产生的新实例自带自己的缓存。</p>
+<p>其他值得一提</p>
+<ul>
+<li>6b1c09691a|2026-10-18|Teknium|fix(terminal): stop idle per-workspace persistent containers instead of leaving them running</li>
+</ul>
+<p>终端：空闲的按工作区持久容器现在会被停掉，而不是一直留着运行。同批还有 2b8cd0519b（delegate 留在父级的工作区容器里、key 做成幂等）、d8835ab3a8（每个网关会话把自己所属的工作区挂进它的 Docker 容器）。</p>
+<ul>
+<li>2b8cd0519b|2026-10-18|Teknium|fix(terminal): keep delegates in the parent&#x27;s workspace container; make the key idempotent</li>
+<li>d8835ab3a8|2026-10-18|Teknium|fix(terminal): mount each gateway session&#x27;s own workspace into its Docker container</li>
+<li>3d5cf0cc58|2026-10-18|Teknium|fix(kanban): bound kanban.run&#x27;s admission wait by the board lock budget</li>
+</ul>
+<p>Kanban：kanban.run 的准入等待按 board 锁预算限界（3d5cf0cc58）；macOS 上从内核 birth 读进程启动指纹（377be426fd）；等待 kanban.run 的准入答复可以超过 RPC 默认超时（07506d8de4）。</p>
+<ul>
+<li>377be426fd|2026-10-18|Teknium|fix(kanban): read process start fingerprints from the kernel birth on macOS</li>
+<li>07506d8de4|2026-10-18|Teknium|fix(kanban): wait for kanban.run&#x27;s admission answer past the RPC default</li>
+<li>de7c17d6a2|2026-10-18|Teknium|fix(tui): never tell the user an unconfirmed forwarded prompt was not sent</li>
+</ul>
+<p>TUI：转发出去但未确认的提示词不再对用户说「没有发送」（de7c17d6a2）；被拒的图片发送不再卡住该聊天后续的文本发送（9b14af7764）；转发后丢失的提示词标记为未确认，而不是「什么都没发」（c2c767cf32）；被拒通知按指数退避，且只在会被重新排队的地方（475d18ea5d）。</p>
+<ul>
+<li>9b14af7764|2026-10-18|Teknium|fix(tui): a refused image send no longer wedges later text sends on an owned chat</li>
+<li>c2c767cf32|2026-10-18|Teknium|fix(tui): a forwarded prompt lost after send is unconfirmed, not &quot;nothing was sent&quot;</li>
+<li>475d18ea5d|2026-10-18|Teknium|fix(tui): back a refused notice off exponentially, only where it is requeued</li>
+<li>be22525da4|2026-10-18|Teknium|fix(secret-scope): .env memo notices a same-size .env edit inside one timestamp tick</li>
+</ul>
+<p>.env 备忘现在能注意到「同一个时间戳刻度内、大小相同」的 .env 编辑（过去按大小加时间戳判断，这类编辑会被漏掉）。</p>
+<ul>
+<li>81d4f8d3c1|2026-10-18|Teknium|fix(cli): only chat/rl may prompt for hook consent; cron tick and mcp serve never do</li>
+</ul>
+<p>钩子同意提示的边界：只有 chat/rl 会征求同意，cron tick 与 mcp serve 从不弹窗（81d4f8d3c1）；记下同意之后立即注册 shell 钩子、不需要重启（5a18d0f5f4）；前台 CLI 之外绝不弹 shell 钩子同意提示（ec2fe8c43e）。</p>
+<ul>
+<li>5a18d0f5f4|2026-10-18|Teknium|fix(gateway): register a shell hook once its consent is recorded, without a restart</li>
+<li>ec2fe8c43e|2026-10-18|arcabotai|fix(gateway): never prompt for shell-hook consent outside a foreground CLI</li>
+<li>3b332359da|2026-10-18|David Dudok de Wit|fix(desktop,gateway): never aim Desktop /undo, /retry or /rollback at an archived row</li>
+</ul>
+<p>桌面端：/undo、/retry、/rollback 绝不指向已归档的行（含网关侧，3b332359da）；只跳过「纯模型合并」时保留后续行的 id（cd9c67297e）；Capabilities 草稿保留去抖期间被编辑的字段（9e01b44dd2）；新建 Bot 的 Capabilities 标签页在名字后到时会加载并拿到真实空间（b421302b16）。</p>
+<ul>
+<li>cd9c67297e|2026-10-18|Teknium|fix(desktop): skipping a model-only merge keeps later rows&#x27; ids</li>
+<li>9e01b44dd2|2026-10-18|Teknium|fix(desktop): the Capabilities draft keeps fields edited during its debounce</li>
+<li>b421302b16|2026-10-18|Teknium|fix(desktop): New Bot&#x27;s Capabilities tab loads when the name comes later, and gets real room</li>
+<li>2db665614c|2026-10-18|Teknium|fix(plugins): post_message review round 2 — no loop block on pending edits, canonical first-message route, failed-edit fallback</li>
+</ul>
+<p>post_message 的两轮评审修复：待编辑时不阻塞事件循环、规范化首次消息路由、编辑失败的回退（2db665614c）；中间态发送、完整绑定路由、待处理超时、抛出式编辑的回退（3e4f28ee8a）。</p>
+<ul>
+<li>3e4f28ee8a|2026-10-18|Teknium|fix(plugins): post_message review fixes — interim sends, full bound route, pending timeouts, raised-edit fallback</li>
+</ul>
+<p>说明：本期另有大量网关（gateway）内部修复、重构与测试共 106 条，以及 state / webhook / api / profiles / 日志等内部改动，均不涉及用户日常可见的操作变化，这里不逐条展开。</p>
+    </section>
+    
     <section id="2026-10-18" class="day">
       <h2>Hermes 日报 2026-10-18：桌面端排队消息可以引导和编辑，插件目录新增 33 个条目</h2>
       <p><strong>本期覆盖 10 月 16 日 ~ 10 月 17 日合入 main 的提交，共 560 个 commit（不含 merge），另有 23 个 merge。新增 40 个功能、270 个修复、3 个性能优化。</strong></p>
