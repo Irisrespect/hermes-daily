@@ -5,8 +5,61 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 19 Oct 2026 06:55:18 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 20 Oct 2026 06:47:50 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-20：桌面端命令补完、CLI 新 glyph 布局与插件 OAuth</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-20</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-20</guid>
+      <pubDate>Tue, 20 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 2026-10-18 ~ 2026-10-19 合入 main 的提交，共 464 个 commit，其中 merge 23 个</strong></p>
+<p>本期统计 10 月 19 日 06:30 ~ 10 月 20 日 06:30（北京时间）合入 main 的提交，共 464 个 commit（不含 merge），另有 23 个 merge。新增 21 个功能、257 个修复、2 个性能优化。提交日期分布：10-18 共 213 条、10-19 共 251 条（日期列是各 commit 自身的 committer date）。</p>
+<p>📌 今日要点：</p>
+<p>桌面端：/save 改走 Electron 原生保存对话框，/export、/import、/timestamps、/palette 接线，/rollback、/agents、/config、/history 全部改走 owner 已有的 verb；消息会话未读标记补了一整批。</p>
+<p>CLI：新增 glyph 布局（display.cli_layout 默认 modern），每条滚动行一个符号、不再依赖终端宽度，状态栏移到输入框下方。</p>
+<p>插件：可移植插件的设置表单真正可用、插件可声明自己的 OAuth 客户端、hermes plugins update 不带名字即可一键更新全部。</p>
+<p>会话导出：网关新 owner verb session.export 只返回渲染好的存档，写盘交给客户端，桌面端与 Ink 都能把 /save 落到自己机器上。</p>
+<p>其他：插件目录新增 10 个条目；memory 与 browser 各有一整批多 profile 隔离与卡死修复；桌面端子代理模型改成下拉选择器。</p>
+<p>重点条目：</p>
+<p>桌面端 · 斜杠命令补完</p>
+<p>/save 走 Electron 原生保存对话框（44d0526689）。过去桌面端的 /save 只能在网关主机上写文件，远端连接时网关的磁盘不是用户的磁盘。现在渲染在 owner 侧完成（session.export），随后由 Electron 主进程在用户选了目录之后写盘，渲染层只能提供一个裸文件名；老网关没有 session.export 时回退到 session.save，并明确提示文件在网关主机上。同一批还接完了剩下的命令：/export 与 /import 走现有的 profile 分享流程，本地网关直接弹保存/打开对话框，远端网关改为具名拒绝并指向该主机上的 hermes profile export|import；/timestamps 切换本窗口的时间戳显示（窗口状态，不进会话状态）；/palette 打开桌面端命令面板；/worktree 改成具名拒绝，提示去终端或直接用它已有的项目侧边栏，因为 worktree 必须移动网关主机上的 cwd；/snapshot 同样保持终端拒绝，因为快照作用于网关主机的状态。</p>
+<p>/rollback、/agents、/config、/history 改走 owner 的 verb（80d2db927c）。这四个命令在共享网关上要么被拒绝（走 slash.exec 通道），要么在注册表里被标成 desktop=&quot;terminal&quot; 干脆不提供，桌面端用户只能撞到一句拒绝或者根本看不到。现在分别映射到 owner 本来就有的 rollback.list / rollback.diff / rollback.restore、subagent.list + process.list（限本会话）、config.get key=full（只给展示用的投影）、session.resume 的 transcript 快照，没有新增任何网关 verb；/config 还会引导用户改设置去 Settings，而不是在对话里改配置。</p>
+<p>/config 不再打印凭据（c5b6671c1f）。规范 owner 收到 config.get key=full 时返回的是投影，但桌面端的 URL / Cloud / SSH 模式后面可能是一个独立的 hermes serve，它返回的是原始生效配置，于是渲染层把 model.api_key、providers.*.api_key 这类键全打了出来。现在无论哪个服务器作答，渲染层都丢弃凭据类键，以及 model、providers、custom_providers、mcp_servers 这几个段。</p>
+<p>回滚与保存的收尾修复（9620bffbf3、3683fc9575）。回滚把历史倒回去之后桌面端仍显示旧 transcript，现在 restore 返回回卷标记时会重新载入；Linux 上 Electron 的保存对话框不会自己问覆盖，同名文件会被直接写掉，现在先查文件是否存在再弹确认。</p>
+<p>桌面端 · 未读标记与语音</p>
+<p>带工具调用的回合读不出最终回复（9cb34e9e28）。自动朗读按 speak:&lt;turnKey&gt; 抢语音所有权，而 arbiter 把所有权的保留期设成 10 分钟。一个回合里如果有工具调用，先是进度更新被念出来，等这段播完、最终回复要念时申请的仍是同一个回合级所有权，被拒后静默返回，而这条消息已经被标成&quot;念过了&quot;，所以既不重试也不发 TTS 请求——表现为工具调用后的最终回复永远不出声。现在按消息（用文本指纹区分）而不是按回合抢所有权，并加入正在播放的会话；为防止两个窗口重复念，最先空闲的那个窗口念。指纹取气泡的最后一段文本，因为水合会把工具回合的助手行折成一个气泡（进度 + 最终回复拼在一起），只有最后一段在两边的计算方式一致。</p>
+<p>消息会话未读点的整批修复（ad7c5a1d88、e569eea1ba、fea668999e、4b12ad037e、fb4a4e2ba5）。活会话轮询现在带上每个会话的来源，消息会话的 settle 不再在它那一行加载出来之前就点亮未读；读消息会话或 cron 会话的任意一段，整条对话都算已读；回执迟到时不再按&quot;到达时的焦点状态&quot;重放，而是比对完成时间与该会话最后已读时间，标记也写到该行自己的 profile，避免另一个 profile 的同 id 行抢走；桌面端自己发进消息会话的回合过去完全跳过未读点，现在记录自己提交并被接受运行的 admission id，回合完成时匹配且对话不在屏幕上就点亮，而 busy→idle 边沿仍然不为消息会话点灯；完成回执的行归属改用运行时自己证明的 owner profile，另一个 profile 的同 id 消息行不再掩盖后台 profile 的本地完成。</p>
+<p>rewind 与 steer 的可视性（703b4753c8、da8015feba、6d71467ba1、eae7106348、f14699a137）。具名 profile 的会话重拨后会忘掉 info.profile_name，重放的 /undo /retry 探针在 default 下找、找不到就答&quot;没有&quot;，现在 localAnswer 挪到 attach 与第二次 routeCanonicalParams 之后执行，重复操作时按丢失的那次 rewind 自己的条数切视图、并在推导前先解析出来。steer 方面，工具运行时发出的 steer 只在 transcript 尾部画一行，没有封住正在流式的回复气泡，于是模型的回答继续往气泡里写、把 steer 挤到成品回复下面，用户看不出 steer 落在哪、模型有没有反应；现在 steer 被接受时就在原位封住活动气泡，之后的输出流进下面一个新气泡，被等的工具行留在封住的气泡里，模型之后给出的回答不会跑到 steer 上面。封印前还会先刷出该会话的流式缓冲，工具完成帧丢失时被封印的气泡也不会无限转圈。</p>
+<p>语音停止的结算（554162543a、ff0698f3f0）。本地会话里另一个窗口（Ink）开着语音、桌面端打一个裸 stop 时，owner 会结束语音、不返回 admission 而返回 {voice_stopped: true}，admissionReceipt 过去抛&quot;destination mismatch&quot;，submit 报失败但其实语音确实停了。现在把这个变体当白名单通过（只有 voice_stopped、session_id 和提交 id，且不存在 ref 或 admission_id 时），submit 管线当作已结清、不挂回合：乐观气泡撤掉、busy 释放、不报错。老 submit 回退路径也做了同样处理。</p>
+<p>子代理模型改成下拉选择器（19d32c83d7）。设置 → 高级里的 delegation.model 与 delegation.provider 过去是两个裸文本框，要手打模型名和提供商。现在换成配对的下拉选择器，数据来自 getGlobalModelOptions()，与主模型、备用模型下拉的写法一致，并把&quot;从主 agent 继承&quot;与&quot;自定义模型（用父级凭据）&quot;做成两个一等状态，两个键原子写入。</p>
+<p>CLI · glyph 布局</p>
+<p>新的滚动区语法（e2bb757eba）。经典 CLI 的滚动区是按宽度切帧的（推理框、回答框、每条消息上下各一条 40 列分隔线），终端一改宽度，已经打印出来的内容就会被重新折行、糊成一片；状态栏还压在输入框上方，spinner 一动输入框就跳。新增 display.cli_layout（默认 &quot;modern&quot;）：每条滚动行以一个符号开头、完全不依赖宽度——❯ 用户消息、∴ 推理折叠成 &quot;Thought for Ns · title&quot;、● 工具行带目标与耗时、✗ 失败调用用红色并带退出码、│ 行下挂 diff、☤ 回答标签不再带框、─ 回合摘要带时间。依赖宽度的部分移进 prompt_toolkit 的活区：输入框上沿左边是 spinner、当前活动和耗时，右边是会话标题；状态栏移到输入框下方，左边是模型、上下文仪表、活徽章（stash、后台工作、goal、YOLO）与 cwd/分支，右边是此刻真正可用的按键。没有设置 busy_input_mode 时，现代布局用 steer（Tab 入队），classic 仍然打断；display.cli_layout: classic 原样恢复旧外观。</p>
+<p>布局的逐项回填（9dd4a23bbc、2aef21193c、e1ac43a4cc、50d5dbf834、fa10b9cb24、c5a4a20bcd）。glyph 布局第一版把回合之间的分隔条删了，用户消息、推理、回答连成一片，现在用户消息与回答上方恢复强调色横条、推理块上方恢复暗色横条，仍是 40 列宽、改宽度不重排；状态行曾只渲染一小部分字段（上下文详情、缓存命中、延迟、tokens/s、耗时、提示与空闲计时都没了），输入框上沿丢了颜文字与工具表情、也丢了流式 token 计数，推理还不再流式，这三处都与经典版对齐了；启动横幅（logo、工具、技能、会话）属于 CLI 的身份标识，两种布局都恢复原样打印，两行标题被去掉；skin 的欢迎行是 PTY 测试等待的就绪标记，保留；工具行恢复 📖 读、💻 终端、🐍 exec 这套经典表情（皮肤 tool_emojis 的覆盖也生效），失败换成红色 ✗；批量调用会标出真正失败的那一条，快速失败立刻带原因（只让计时等 0.1 秒），Tab 入队直接以 mode=&quot;queue&quot; 提交而不是重放 Enter（粘贴与反斜杠续行规则可能把它变成换行），页脚保留电量与 vim 模式标签，非流式回答改成软换行以便终端改宽度时重排。</p>
+<p>插件系统 · 设置表单、OAuth 与一键更新</p>
+<p>可移植插件的设置表单真正可用（2d35f6184b）。可移植的 Agent Plugins v1 包（plugin.json）过去进不了 设置 → 插件：读 schema 的代码只认 plugin.yaml，而 v1 又禁止未知顶层字段。现在改为从 extensions.com.nousresearch.hermes.config_schema 读表单——那个厂商命名空间本来就承载 server trust 与超时——并覆盖保存、加载器的 schema 告警与目录准入。表单出现之后，任何带设置的插件都会撞上两个洞：插件的桌面端一半拿不到&quot;保存发生了&quot;的通知，现在每次 plugins.manage 设置保存都广播 plugin.&lt;id&gt;.settings.changed（只存密钥也算一次，会发一次空的 settings 调用让事件照常触发）；表单存进去的密钥到不了正在跑的 MCP 服务器（它的 env ${VAR} 在 spawn 时就渲染好了），现在保存后只要某个服务器的解析启动输入变了（identity digest，按连接路径同样的方式渲染），Hermes 就重连它，只改开关的保存不碰服务器。</p>
+<p>插件可以声明自己的 OAuth 客户端（b1b4effe51）。插件要调第三方 API、并且用用户自己的 OAuth 客户端（Google、Microsoft、Notion）时，过去得自己跑同意流程、自己保管 refresh token。现在在 plugin.yaml 的 oauth: 段声明即可：hermes auth add|status|refresh|logout &lt;plugin&gt;:&lt;id&gt; 走 PKCE 登录，授权存在当前 profile 的 auth.json 里（plugin_oauth 段，按插件的 key 索引）；credentialed_provider_request(&lt;id&gt;, ...) 只对条目声明的主机附带 bearer（https、443 端口），并在 auth-store 的锁里刷新；调用插件自己的条目在 _PROVIDERS 之前解析，后注册的同名核心提供商抢不走；每份授权都存一份条目指纹，插件新版本若改了 token URL、主机、scope 或客户端变量，就要用户重新登录；client secret 在每次 token POST 之前才用 get_secret 取，不落在冻结配置里；grant 已死的错误码会直接退掉授权，invalid_client、unauthorized_client、invalid_scope 作为 AuthError 暴露，用户实际拿到的 scope 比声明的少则不保存。</p>
+<p>re-pin 改动授权主机要先问（c3d3b15cc5）。授权 URL 是用户浏览器打开的登录页，目录 re-pin 把它指向别的主机时，现在会出现在同意差异里，与 token 主机、hosts、scope 并列；同一主机只换路径只改指纹，用户重新登录一次。</p>
+<p>一键更新全部插件（ced2a39350）。hermes plugins update 不带名字时，先跑检查更新探针，列出更新路径真的能推动的插件（目录 re-pin、git pull），逐个说明跳过原因（已 pin、需要先修、未知、Hermes 从不升级的 pip 分发），只问一次，然后每一个都走 cmd_update，因此逐插件的同意提示仍然生效。一个失败不阻断其余，摘要里引用每个失败的原因。没有终端时不动手，除非加 --yes，而 --yes 以 interactive=False 跑，同意仍然是 fail-closed。</p>
+<p>OAuth 与批量更新的安全收尾（be46373c5b、fe78f95bbb、349e4f7e62）。被撤销的授权过去把已失效的 access/refresh token 留在盘上，现在只留标记与指纹；hermes plugins remove 会清掉该插件的授权，同 key 重装的新插件不会继承登录态，插件已删时 hermes auth logout 仍能清掉；hermes auth add 拒绝在网关、cron 或 agent 会话里运行，并先说明 code、client secret 与 token 会先去哪几个主机。设置保存引发的 MCP 重连被串行化，第二次保存与第一次的连接比较而不是跳过正在启动的服务器；借用另一个 profile 相同连接的 profile 改密钥时自己断开重连，不碰宿主。批量更新里，feed 超时或 update_plugin 内部非法 YAML 抛的普通异常现在在逐插件边界被捕获（traceback 记日志），记录失败后继续。</p>
+<p>会话导出 · /save 打通三端</p>
+<p>网关只渲染不写盘（2ab3c98c44）。共享网关上的 /save 过去把导出写在网关主机上（session.save），而且不接受格式与脱敏参数：本地 Ink 能用，远端桌面端就不行，因为网关的磁盘不是用户的磁盘。新 owner verb session.export {session_id, profile?, format?, redact?} 按经典 CLI 的 /save 渲染存档（format 走 normalize_save_format：json 默认、md/markdown、html、snapshot；redact 为真时强制脱敏），返回 {format, filename, content} 而自己不写任何文件，写在哪里由客户端决定；session.save 保留给已发布的客户端。它没有 sidecar handler，所以契约声明成 owner-only 并重新生成了共享产物；测试走真实 owner 派发与契约解析，并断言网关主机上没有文件被写。</p>
+<p>Ink 的 /save 落到本地（4eb2eea6b0、88071fa550、3b23b5bf2b）。Ink 的 /save 改成 /save [json|md|html] [filename] [redact]：向 owner 要渲染好的存档，自己写文件——给了文件名就按 cwd 解析，否则写到 &lt;HERMES_HOME&gt;/sessions/saved/hermes_conversation_&lt;ts&gt;.&lt;fmt&gt;。随后的修复解决了三个问题：相对文件名过去按 process.cwd() 解析，而启动器把 Node 起在安装目录里，文件落在那里、或在只读安装上直接失败，现在运行命令时就固定用户目录（本地连接用会话 cwd，显式远端用启动时的 HERMES_CWD，与图片附件的拆分方式一致）；文件写入不再放在 ctx.guarded 里，紧随其后的斜杠命令不会把它打断；文件名用 owner 的名字。另外，session.export 返回前另起一个斜杠命令时，过期守卫会把成功与失败一起藏掉，现在只藏过期的成功提示，失败一定显示。</p>
+<p>插件目录 · 新增 10 个条目</p>
+<p>本期由 feat 提交新增 10 个目录条目（另有 agent-station 的 v3.0.3 pin 与一批 review disclosure 提交）：</p>
+<p>rea-captcha（8c755b43c8）——随后更新到 0.2.4，同窗口内继续升到 0.3.0、0.3.1，并修了安装同意流程（c3908d7ccd）。</p>
+<p>agent-station（296c947326）——随后 pin 到 v3.0.3（c4995c216b）。</p>
+<p>runbox（6d1807d4a8）——离线的按对话 Python run/check/test 沙箱。</p>
+<p>post-cortex（27ebb9be26）——memory provider。</p>
+<p>hermes-wsl-terminal（48f46987be）——终端环境 provider，注册 terminal.backend: wsl，命令跑在已有的 WSL 发行版里、走 Windows 在 /mnt/&lt;drive&gt; 看到的同一份文件，不需要 Docker Desktop、镜像或容器；作者在 Windows 11 + WSL 3.0.3.0 / Ubuntu-24.04 上跑了 68 个测试（59 单测 + 9 个走 BaseEnvironment.execute 的实机端到端），并通过 pinned SHA 上的准入校验、终端工厂派发检查与目录校验器。</p>
+<p>kokoro-tts（8db7514ea4）——语音合成 provider。</p>
+<p>Blogwatcher（d1750995ed）。</p>
+<p>anyapi（0cc34d1a2c）——模型 provider。</p>
+<p>proofable（ccdf3f865b）。</p>
+<p>平台 · 稳定性 · 性能</p>
+<p>memory：一次卡死的调用不再让 provider 整个进程报废（b6c8ed0ba5、d3e7573ba0）。两个进程级闸门（外部 prefetch、后台 sync_turn/queue_prefetch）只要某个 (home, provider) 有调用超时就立刻关闭，直到它返回为止——而永远不会返回的调用正是这两个闸门存在的理由，于是该 profile 该 provider 之后所有写入与召回都被丢掉，即使后端已经恢复、新 manager 拿着健康连接也一样，只能重启。现在每个键容忍最多 4 个超时调用（_MAX_STUCK_CALLS）之后才跳过：坏后端每个闸门每 (home, provider) 最多钉住 4 根线程，恢复了的照常工作（实测：一个挂死的 sync_turn + prefetch 之后，5 个新 manager 由 0 写 / 0 召回变成 5 / 5；10 个挂死的 manager 时每个登记表保留 4 个卡死调用与 4 根 prefetch 线程）。另一半是线程增长：永不返回的 sync_turn/queue_prefetch 会把这根 mem-sync 线程钉到进程结束（Python 停不了线程），而 manager 每个 agent 重建，于是每个新 manager 又对着挂死的后端开一个调用、再钉一根线程，在网关缓存抖动下无限增长；现在按 (Hermes home, provider 名) 维护进程级在飞登记表，同键调用超过 30 秒就跳过后续 sync/prefetch（首次跳过与每 100 次记日志），代价是该回合不写不预取，换来线程数有界。内置的本地 provider 不过闸。</p>
+<p>browser：每个 profile 驱动并回收自己的守护进程（b71c73ea0f）。harness 只按 BU_NAME 命名守护进程（未命名的 browser_exec 就叫 &quot;default&quot;），并在同一个 runtime 目录里复用同名活进程，于是在多路网关上 profile B 的未命名 exec 直接接管了 A 在 /browser connect 时起的守护进程、驱动了 A 那个已登录的浏览器；owner map 又是 last-writer-wins，A 的回收要么什么也没停、要么杀掉 B 正在用的那个。现在在 served-profile 作用域里把 BH_RUNTIME_DIR 指向按 home 的 sha256 命名的子目录（BH_RUNTIME_DIR_SHARED=1，名字保留 bu-&lt;name&gt; 词干），_driven_daemons 按（runtime 目录、是否 shared、BU_NAME）索引，stop_harness_daemons 回到每个守护进程自己的目录里回收；不在 served-profile 作用域时环境不变。测试里 A、B 的未命名 exec 各得一个守护进程、A 的回收只停 A 的、B 保住了自己的浏览器。</p>
+<p>性能两处（be4164bb8b、fe2a47c7f2）。CLI 监视器的详情视图在 before_render 里调 subagent_tail()（每次按键加每秒一次滴答都会重绘），每次都把缓存的网关尾巴（最多 16 KB）整段跑一遍可打印字符过滤，而这段文字一秒最多变一次；现在在 spinner 线程取到时就过滤并缓存，渲染路径直接返回（保留的字符集合不变，_poll_tail 的变化检测仍比较缓存文本）。另一处是 /reasoning、/fast、/personality、模型与路由切换时的 _retire_agent：release_clients() 会排空并关闭 memory provider，内联等待有界排空（最多 5 秒）加每个 provider 的写线程 join；现在先脱离 cli.agent，再在携带上下文的线程里跑 release_clients()，线程非 daemon，正常退出仍会等它，app-server 子进程不会变成孤儿。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-19：桌面端 /usage 补齐，插件系统新增三个能力</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-19</link>
