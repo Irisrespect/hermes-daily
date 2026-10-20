@@ -5,8 +5,65 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 20 Oct 2026 06:47:50 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 21 Oct 2026 06:58:07 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-21：桌面端能力目录重做、Krea 3 默认出图与网关危险操作确认</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-21</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-21</guid>
+      <pubDate>Wed, 21 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 10 月 20 日 06:30 ~ 10 月 21 日 06:30（北京时间）合入 main 的提交，共 517 个 commit（不含 merge），另有 17 个 merge。新增 55 个功能、237 个修复、14 个性能优化。提交日期分布：10-14 共 17 条、10-15 共 5 条、10-16 共 5 条、10-18 共 3 条、10-19 共 31 条、10-20 共 456 条（日期列是各 commit 自身的 committer date；tip 增量口径下早提交晚合入属于正常情况，例如能力目录那批 10-14 的提交）。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端能力目录整体重做：插件按 Official / Verified / Community 三档分级并带徽章筛选，每个分类一张 shelf、行行填满，卡片与 hero 都用条目封面图，精选在多条时变成可滑动轮播；Tools 也改成目录页，四个页签共用同一个搜索框。</p>
+<p>画图：Krea 3 成为付费订阅的默认出图模型，走托管网关，支持把 image_url 当待编辑的图，并新增 thinking（fast / high）与 resolution（1K / 2K）两个档位。</p>
+<p>网关与 CLI：stop / restart 这类生命周期命令要打断活跃会话时改为先列清单再问 y/N，脚本与 cron 场景仍必须显式 --yes；单 profile 启动的网关在新建第二个 profile 后原地转为多 profile 托管，不再重启。</p>
+<p>桌面端插件：git 安装的插件出现新提交时行内给「Update to &lt;commit&gt;」按钮，安全扫描评为 caution 时弹确认框列出发现，dangerous 只报告不给更新。</p>
+<p>其他：压缩会话恢复与导出不再重复消息，/resume 带回 todo 快照，MCP 工具的 notifications/progress 转成实时 tool.progress 事件，插件目录新增 37 个条目。</p>
+<p>能力目录：从平面列表改成三档分级 + shelf 布局</p>
+<p>这部分是本期最大的一块，从组件层到页面层整体换掉。feat(desktop): redesign capabilities catalog（adcea47191，10-14 合入）落地了新的目录结构：catalog-browser、catalog-card、catalog-detail、catalog-detail-dialog、catalog-filter-bar、catalog-data、catalog-discovery、catalog-artwork 等一批组件，插件页（plugins-tab.tsx）与技能页（skills-tab.tsx）都改成同一套目录浏览界面，页面搜索外壳（page-search-shell）跟着调整。</p>
+<p>信任分级（ec5deb9cce / d08b187cf1 / de44b64dd3 / 36400de0e8）：插件按 Official、Trusted / Verified、Community 三档分组——Official 来自 feed 的官方档，Trusted 一开始是 catalog-curation.json 里的精选白名单（在信任策略与 feed 档位定稿前的占位），Community 保留原有分类 shelf；等目录 feed 加上 tier: verified 之后，发现页的 Verified 档直接读 feed，标题统一成 Verified Plugins。插件页筛选栏的第二个维度换成 Tier，顺序 Official &gt; Verified &gt; Community，已安装项的 bundled / user / git / desktop 类型通过 pluginTier 折进这三档；卡片与详情徽章按信任档上色（Official 用主色，Verified 用成功色加对勾），技能页仍保留 Source 维度。选中档位筛选时列表保持分组、不拍平；所有 chip 都打开时按「全部」处理。</p>
+<p>布局（47057a9e4d / 68de2c251d / 3357b095fc）：每条 shelf 先解好自己的磁贴组合（2×2 带图橱窗、两格宽卡、单卡），保证每行刚好填满，不留空洞也不用整行填充；小分类共用最后一条 shelf；页脚标签靠左、星标靠右；筛选 chip 原地展开；所有目录共用一个开发者横幅。同时选两个以上分类时仍保持 shelf 布局：每个分类一节，小分类也单独成节、不再折进「More to explore」，不拆 tier、不出 hero；只选一个分类则是扁平的下钻网格，搜索、标签与 Installed 视图照旧拍平。shelf 顺序按星标数排（3357b095fc）。</p>
+<p>封面图与精选（13851f7d18 / 6a962f76ef / 93600451dd / d8a4b51c35 / abd4136c6b）：插件卡片开始显示条目自己的封面图；featured hero 过去即使条目有图也不显示，现在图片以 cover 铺满右侧 42%、左侧渐隐进 hero 底色，星标与操作按钮留在文字栏、不被图压住，没有图的条目保留纯底色。精选也改了数据来源：featuredPicks 从本周轮值开始返回所有精选，官网与桌面端共用同一份（官网的 /skills 与 /plugins 也展示它）；于是 hero 单条时裸展示、多条时变成 scroll-snap 幻灯片——滑动或触控板切换、带前后按钮和圆点，7 秒自动前进，悬停、聚焦、页面隐藏或系统开了减少动效时暂停，屏外 slide 保持 inert。</p>
+<p>Tools 与搜索（abb80a4544 / 80c1ab31e7 / 5e5869311e）：Tools 页改成目录页，工具集有自己的 feature row 与主题化两栏列表、共用目录卡片和开发者横幅，工具集设置改为弹对话框而不是侧栏。Skills、Plugins、Connectors、Tools 四个页签共用同一个搜索框（带页签作用域徽章，页签操作放在末尾），Tools 从页头撤掉自己的搜索，Skills 拿到按数据生成的提示；page.css 统一了搜索→筛选、筛选→首节、标题→内容、节→节的间距节奏。目录卡片的悬停弧光扫过动画抽成同一个组件（5e5869311e）。</p>
+<p>画图：Krea 3 成为付费订阅默认模型</p>
+<p>feat(krea): Krea 3 edits and generates through the managed gateway, with thinking and resolution controls（693777d4fa）：Krea 3（krea-3）通过托管网关出图与编辑，新增两个创作参数——thinking（fast 默认 / high，用于复杂的多步编辑）与 resolution（1K 默认 / 2K，用于小字和细节）。选 Krea 3 时 image_url 的语义变成「要编辑的图」，最多 4 张参考图，本地文件内联进请求、总量上限 3 MB（Krea 2 仍是 reference-guided 生成、最多 10 张）。</p>
+<p>feat(image_gen): Krea 3 is the default image model for paid subscribers（ad4533d9b6）：付费订阅的模型选择器里 Krea 3 顶到默认位置，Krea 2 的 krea-2-medium / large / medium-turbo 三个型号仍在，选哪个型号决定走哪个网关；免费工具池账号依旧只看到 FAL 模型。</p>
+<p>配套三条修复：1107163931 让价格表按分辨率显示参考图计价、不再套用 Krea 2 的一张表；d1400be1f3 让编辑保留原图取景、schema 跟随存下来的模型、统一 Krea 3 的价格文案；2b9846ffe8 让直连 Krea（自带 key、不走网关）时 schema 也按存下来的模型描述参数，而不是按默认型号。</p>
+<p>网关与 CLI：危险操作先问一句</p>
+<p>feat(gateway): ask y/N before a lifecycle verb interrupts live sessions（9e6360a009）：过去活跃会话保护直接拒绝，必须加 flag 才能继续。现在在终端里会先列出活的回合、cron 任务与委派，然后问 y/N（默认 no），-y / --yes 跳过提问；没有终端时（脚本、cron、桌面端、更新流程）仍然只在传了 --yes 时放行。--interrupt 保留为别名，更新恢复与 dashboard 的调用方都不受影响。同一批还收紧了作用域：生命周期命令不再对另一个 home 的 unit 动手、会话活着时一律拒绝（9248d847d0）；对 host 托管的 profile 执行 -p 停止 / 重启时，只要它的回合还在跑就拒绝（76e8208d19），-p 停止把 /bg 后台 agent 也算进活跃工作、host 不应答就拒绝（f5acc7a4ed），host socket 断了时仍能把 profile 正常置为 parked（bd3cbe91a9）；删除 / 改名 profile 不再顺手删掉另一个安装的网关服务（f6718a57c4）。</p>
+<p>新建 profile 不用再重启网关（2919595040 / ae601a7632，#141623）：单 profile 模式启动的网关在出现第二个 profile 后原本会重启进 multiplexer，而这次重启会让无人看守的容器网关直接死掉（exit 75 且无替换）、用 runtime_draining 排干所有 profile 的新回合、还会把一个临时的 preflight 阻塞锁死、导致新 profile 永远不被托管。桌面端侧的表现是：新建 Bot（或 hermes profile create）之后，host 通过 control socket 发出的每个 ticket 都被拒成「Invalid gateway ticket response」，该 bot 的会话、聊天（profile_mismatch）和删除 profile 全部失败，直到手动重启网关。现在不再重启：当记录到的启动结论是「只有一个 profile」、且新 profile 没有 preflight 阻塞时，同一个进程在创建方的 rescan（或 30 秒 watcher tick）里直接开始 multiplexing——冻结启动环境、让未限定作用域的密钥读取 fail closed，新 profile 读不到默认 profile 的凭据；启动 home 成为预留项的第一条，会话权威注册表转为 multiplexed，主适配器的 handler 重新接到 routed-scope 版本。桌面端也同步在每次 rescan 与 watcher tick 时重新判断。</p>
+<p>桌面端插件：git 安装的条目可以点 Update</p>
+<p>feat(desktop): git-installed plugins get an Update button and a security-scan override dialog（17aab768ec）：git 安装的插件，上次检查发现有新提交时，行内显示「Update to &lt;commit&gt;」，点击后走共用后端路径更新。若安全扫描给新代码的评级是 caution，会弹一个有破坏性的确认框：按严重程度列出发现（最坏的在前、有上限），给「Update anyway」按钮带 force 重试；取消则什么都不改；评级 dangerous 只报告、不提供更新。更新流程（先目录同意、再扫描覆盖，各最多问一次）从 plugins-tab.tsx 抽到 plugin-update.ts，更新文案移到独立的 i18n 文件，de / es / fr 已翻译。</p>
+<p>会话与状态：压缩后不再重复，/resume 带回 todo</p>
+<p>fix(state): resuming a compressed conversation shows each message once（a59ed658aa）：原地压缩会把受保护尾部的一条消息装进「摘要载体」里带下去（先是上一回合的原文，然后是压缩摘要）。载体保留原消息的 message_uid 但换掉内容，于是显示读取把归档的原文和载体里的同一段文字都投影出来——/compress 之后与恢复会话时，那条回复的每个字都渲染两遍。现在摘要载体与原行共用显示身份、由最新的一份胜出；规则只作用于载体，被裁剪的工具存根仍保留完整输出。这个问题是 v0.22.3 发布尝试中 TUI 的 resume / compress E2E 抓到的。</p>
+<p>fix(state): exports and the transcript list show a carried reply once too（c8aa61b788）：同一套规则补到 SQL 侧的读取（get_messages、export_session、桌面 / REST 的 transcript），导出与列表也去重，并加断言让三条读取路径结果一致；5a282c6c3b 把这条显示规则收进一个 helper。</p>
+<p>fix(cli): /resume and -c restore the session&#x27;s todo list（b342119d77）+ feat(gateway): session.resume carries the session&#x27;s todo snapshot（98159a3200）：/resume、/branch 或启动时的 --resume / -c 之后，经典 CLI 的 todo 存储是空的，要等下一次 todo.updated 才填上，于是恢复后的第一个回合丢失「计划已完成」的提示。根因是 CLI 侧只保留 todo.updated 帧、切换会话后又换了一个新 store。现在 session.resume 的返回里带整份 {todos, revision} 快照（null 表示清空），CLI 用同一套 restore() 重建、revision 也保留；/new 落到没有快照的会话，store 保持空。</p>
+<p>MCP：工具进度变成实时事件</p>
+<p>feat(mcp): forward MCP notifications/progress as live tool.progress events（60affe7fe2）：MCP 工具调用现在会带 _meta.progressToken，发 notifications/progress 的服务器（Meshy refine、creative-lab）因此能报实时进度。执行器为每次调用绑一个中继，MCP handler 把通知转成节流的 tool.progress 事件（最多每 500 ms 一条，最后一条必发）：网关事件流与 legacy TUI gateway 收到 {tool_id, name, progress, total, percent, message}；桌面端运行中的工具行在计时器旁显示「42% · 消息」；CLI 的 spinner 显示同样的文字；插件可用 ctx.onEvent(&#x27;tool.progress&#x27;) 订阅，桌面插件 SDK 文档已写。bcb054ccc1 补齐归属：进度按对话归属，CLI 只显示自己那次调用的进度，回调存储及时释放。</p>
+<p>插件目录：新增 37 个条目</p>
+<p>本期目录提交很密，由 feat / catalog 提交新增 37 个条目。值得单说的几个：</p>
+<p>hermes-board（4a3938a24a）：一块类 Miro 白板。agent 用自己的工具画（board_apply 一次按有序操作建整张图——节点、连线、自由线、分组、便签、说明、分层自动布局、总线主干），用户在桌面端 pane 里改，两边操作同一份 JSON 文档；board_render 出 PNG 供聊天或交互式 HTML 编辑器用，board_watch 把用户自己的改动报回 agent。v1.9 起直线锁 45 度步进（Shift 解锁角度），删除控件挪到名字行。社区档。</p>
+<p>hermes-memory-pane（83bbc5ad72）：桌面端内置记忆的面板，看当前对话记住了什么、更新了什么、忘了什么，并且不离开对话就能编辑、删除、撤销条目；它是旁路面板、不是记忆后端，与内置记忆并存。披露写明中间件在每次记忆调用前后读 MEMORY.md 与 USER.md、把条目级变化记到插件数据目录，只在用户改条目时通过 Hermes 自己的记忆存储改写，无网络、无凭据、无 shell。</p>
+<p>cua-spaces（7058601bf5，认证档 verified）：Cua 官方插件，把终端、文件和代码工具跑进 Cua Space ——一台能实时观看的隔离 Linux 机器，配置成终端后端（terminal.backend=cua）。默认每次会话新建一个 Space、Hermes 结束时删掉，因为是可抛弃沙箱，Hermes 会跳过危险命令提示；你自己命名的 Space 不会被删、提示照旧。插件不读不存 token，并把 CUA_API_KEY / CUA_DAEMON_TOKEN 挡在 Space 之外。</p>
+<p>Context Overview（a7d8eebb90，随后连打到 1.2.4）：只读的桌面端上下文检查器——100 格模型预算、提供商与估算来源、按类别的 token 估算、上下文文件加载信息，复用 session.context_breakdown，不额外起采集器、无凭据无遥测。</p>
+<p>world-clock（d94cf7d29d）：状态栏世界时钟，显示一个时区，点开是其余启用时区的弹层，可编辑 IANA 时区并显示实时 UTC 偏移；纯桌面插件、无网络。</p>
+<p>model-picker（2cfb5e3cda）：按回合成本的模型分类器，把每个回合路由到三档模型之一，工具失败时自动升级（escalate_model 工具 + pre_llm_call 钩子）。</p>
+<p>主题与状态栏：Asgard（3f0131b491）与 Kemet（0c298828c5）各十二个桌面主题，安装后用 /skin 切换，字体与插画都打包在插件里；hermes-token-speed（28a22bdae5）在状态栏显示实时解码 tokens / 秒。</p>
+<p>引用与账本：unicode-ref（5e4bf939eb）新增 @unicode: 上下文引用，@unicode:&quot;文本&quot; 会附上每个字符的码点、Unicode 名称与类别，并指出屏幕上不可见的东西（隐藏字符及位置、文本方向控制符、非普通空格、Unicode 标签字符、混进西里尔 / 希腊 / 全角的形近字母、私用区与未分配码点），@unicode:U+200B 描述最多 20 个码点；reaction-ledger（3afca236f8）是 Telegram 表情回应的本地账本，/reaction-log 每条消息只数一次、按表情统计并可按天看当天最多用的表情，只以观察者身份订阅网关平台事件，只写表情、自定义表情计数与 12 位哈希。</p>
+<p>提供商与工具：web-deepseek（8409cfc5ef，DeepSeek 搜索 + 抓取）、web-local（88e46727fd，免 key 的本地网页抽取）、bharatcode-provider（e3a9a4bd44）、Requesty（edf2177598）、cursor-acp（c811f3c20b，把 Cursor 当 ACP 后端）、safeailabs-provider（7b0c61ef75）、abstract-provider（6765df50e4）、aistupidlevel（c768f77120）、yandex-search-api（a0df389ed4）、orquehelx（1339461391）、wireguard（fb933630a5）；hermes-wincred（c70440ca0c）与 hermes-dpapi-secrets（7abe049647）是 Windows 侧的凭据 / 密钥存储；degeneracy-guard（96eb7fe427）与 provenance-gate（d21713a1be）是输出退化守卫与来源校验门；greyridge-token-safety（324c6582f2）是 Base 链代币交易前安全检查技能；game-dev（179c0a4df3）是只读项目检查与资源审计，带可玩切片、资源生产与验证三个技能。</p>
+<p>其余：git-review（51de13c376，随后连打到 v0.1.18，含不可信 checkout 加固）、office-desk（ef633bbbb8）、hermes-bot-hq（3302c2a974）、burnclock（5d4ab861e6）、pending-queue-monitor（4d60d8dee2）、Promoat（4bad37bd20）、bg-review-watch 0.5.0（78f4dfe556）。</p>
+<p>其他用户可见的修复</p>
+<p>终端插件后端（e166392fec）：TerminalEnvironmentProvider 新增两个可选能力——default_cwd（terminal.cwd 未设、或被容器守卫丢弃时命令从哪开始，可以是沙箱内绝对路径或 &quot;~&quot;，记录下来的 home 之后的命令与文件工具的相对路径都锚在同一个 home）与 supports_streams（后端环境实现 exec_prefix 后，Bot Desktop 的放置把它当 docker / ssh / singularity 一样对待，屏幕、computer_use 与浏览器跟着终端一起进去；plugins.isolation: host 下环境只是不透明占位符，放置会带原因拒绝）。两个都不设的插件行为不变。</p>
+<p>经典 CLI 的连接卡片（54455f3ec1，#142039）：经典 CLI 的 agent 跑在网关里（GatewayAgent），而它没有处理 gateway 的 connection.request / connection.update 事件，CLI 卡片又去驱动一个这边已不存在的进程内 ConnectionOperation——于是 manage_connections 在 CLI 里从不画卡片，登录链接没人看见，直到 5 分钟超时把它标成 not_connected。现在两个事件都转发给 CLI 卡片，并暴露 connection_respond / connection_retry，走与 Ink TUI、桌面端相同的 connection.respond / connectors.connect。</p>
+<p>Telegram 编辑（6483c39f84 / 84b480d38e，#140845）：编辑同一条消息会带同一个 message_id 重发，准入账本把它当原发送的变更重放拒绝，用户看到「Sorry, I encountered an error (RuntimeStoreError)」。现在适配器用编辑自己的 edit_date 盖 MessageEvent.edit_revision，准入键改成 &lt;message_id&gt;:edit:&lt;revision&gt;：重投的同一次编辑仍算同一次，第二次编辑算新输入。随后发现按整秒的 edit_date 做键仍会在同一秒内的第二次编辑上复用第一次的请求 id，于是改用 Telegram 为每次编辑分配的 update_id（没有时用 edit_date 加编辑文本摘要）。</p>
+<p>桌面端机器人创建与群聊：New Group Chat 过去按整个 roster 计数启用，弹窗里却只列 groups.create 会安排的 bot，于是名单里有 parked / 不可安排的 bot 时打开只有不到两个复选框、Create 永远点不动——现在菜单项与弹窗共用同一套可座位判定（768cb78868 / ad5d16236b）。新建 Bot 的草稿流程只在 await profiles.configure 之前检查一次代号，这期间点取消会删掉草稿、流程恢复后却仍给已删除的 profile 写 bot meta——现在 configure 之后再检查一次，卸载时也把代号推进（bb0db1352b）；草稿只在创建它的那台机器上丢弃（93c66cd188）。</p>
+<p>桌面端渲染（601491feb3）：指令折叠把一段里所有链接节点重新拼起来，于是 ::example{ ... [docs](https://x) ... } 即使没有插件认领 example 也会丢链接；现在只折叠 GFM 字面自动链接（文本本身就是 URL），作者写的 [标签](url) 保持可点。</p>
+<p>指标（0c864cebfb）：Microsoft Store 安装在可选指标里过去和普通桌面安装分不开（detect_install_method 只会答 unknown）。安装方式枚举新增 microsoft-store，从安装戳的 updateMechanism 报告；映射放在 detect_client_install_method 而不是 detect_install_method，避免更新与卸载分支学到新值。</p>
+<p>性能</p>
+<p>内存回收（b7e987909a）：没有 glibc malloc_trim 的平台（macOS）以前在 gc.collect() 之前就返回，长命进程永远不跑这个限频的循环回收；现在每个平台都跑，macOS 上 serve 的物理内存 5 分钟从 380.6 MB 降到 368.9 MB。</p>
+<p>签名缓存（92e0717a3a）：osx-sign 每条 mac 腿要花 2.1~3.3 分钟、对 610~836 个 payload 二进制逐个 codesign，而 837 个 arm64 名字里只有 321 个不同（多数 Python 扩展在 venv、uv wheels、uv archive 里各存一份）。现在先自己签散装 Mach-O 并缓存（键是无符号字节加文件名，策略哈希含身份、团队、flags 与继承的 entitlements），每个不同输入只签一次、复制给重复项，恢复前必须通过 codesign --verify --strict。</p>
+<p>其余：关闭的 agent 的消息正文从 token 估算缓存里释放（1b6877e2aa）；被拆除的会话释放事件重放环（e6653e1c9f）；发布用的 checkout 改用 blobless 历史（1ca75fe472）；Windows 打包组装拿到真正能命中的缓存（93196b8c83）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-20：桌面端命令补完、CLI 新 glyph 布局与插件 OAuth</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-20</link>
