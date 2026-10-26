@@ -22,9 +22,137 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 90 期 · 38151 个提交 · 每日自动更新 ·
+<p class="meta">共 91 期 · 38610 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-27" class="day">
+      <h2>Hermes 日报 2026-10-27：桌面端修掉丢草稿和打字卡顿，新增预备压缩与 ElevenLabs 自选音色，Copilot 改为插件</h2>
+      <p><strong>本期覆盖 10 月 26 日 ~ 10 月 27 日合入 main 的提交，共 459 个 commit（不含 merge），另有 17 个 merge。新增 13 个功能、311 个修复、7 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端：输入框草稿不再因为关窗、开多窗口而丢失，打字时主线程成本降到原来的三分之一左右。</li>
+<li>桌面端：Stop 与「立即发送」不再杀掉后台进程，仍在跑的后台子 agent 也不会从面板里消失。</li>
+<li>上下文压缩：新增可选开启的预备压缩 compression.prepare_ahead，接近阈值时后台先做摘要，默认关闭。</li>
+<li>TTS：接 ElevenLabs 时，agent 可以自己挑音色，也能分页搜索账号音色和公共音色库。</li>
+<li>模型 provider：GitHub Copilot 从核心移除，改成一个 github-copilot 实验室插件。</li>
+<li>Webapp：多个 profile 的文件夹与偏好不再互相串，SSH 和终端的长连接问题也修了一批。</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端 · 草稿与输入</p>
+<p>a950eff764 打字后马上关窗不再丢草稿</p>
+<p>问题：合并后的 composer 写盘（180ms 合并）把草稿暂存的排程挡在后面——每会话的暂存只由运行时订阅触发，而输入中待写的状态会让这个订阅被跳过，于是落盘要 180 + 400ms，最后一个按键之后 400~580ms 内关窗就丢稿。</p>
+<p>修复：打字路径在自己这次 store 写被推迟时直接排一次暂存，订阅端对同一个 scope 和文本复用已排的定时器，窗口回到按键后 400ms 的防抖。另外 Electron 在 pagehide 的 localStorage 写之前就把渲染进程拆了，原有的同步 flush 现在也在 beforeunload 上跑。</p>
+<p>效果：实测第 0 毫秒关窗也能保住草稿。</p>
+<p>e3d5e8c559 关窗只保存本窗口自己的未保存改动</p>
+<p>问题：关窗时的 flush 把输入框当前显示的东西一律写回草稿区，第二个窗口还停在会话 S 的稿上，第一个窗口已经把它发出去了，这时第二个窗口一关窗就把已发内容写回成 S 的草稿。</p>
+<p>修复：hook 记录自己这个 scope 最后加载或暂存过的文本，beforeunload/pagehide 只在输入框与它不同时才暂存。</p>
+<p>效果：刚打完字就关窗仍然会保存，已发出的内容不会再被复活。</p>
+<p>512d8513b7 多窗口草稿按 key 合并，新的覆盖旧的</p>
+<p>问题：两个写入方都改共享草稿区，却不带自己上次写过什么的记录，于是后面的保存把编辑器里的文本当成「没变」跳过。发送的延迟确认会清掉整个会话条目，把用户已经打好、防抖也存过的下一句一起清掉；每个窗口又按自己那份 localStorage 写整份草稿列表，而 localStorage 的更新要晚几毫秒才到别的窗口，用旧副本写回就会丢掉或回滚别的窗口最新的草稿，受害的那份还被标成「在别处发出去了」。</p>
+<p>修复：草稿带保存时间，清掉的草稿留一个带时间戳的标记一段时间，每次写入和重载按 key 合并、新的赢；看到存储里比自己保存的更旧时把自己那份写回去；上限 50 条保留最近保存的。</p>
+<p>效果：多窗口同时打字不再丢稿，也不会把已发消息复活成草稿。</p>
+<p>3a818997d7 别的窗口保存草稿不再删掉本窗口的图片草稿</p>
+<p>问题：reloadPersistedDrafts 把共享草稿区里没有的 key 都当成「已发送到别处」。附件只存在内存里，一张只有图片的草稿（或者超过 50 条上限被挤掉的草稿）永远不在共享区，于是任何一个窗口的草稿写入、以及每次 HUD 关闭，都会把它删掉，连图一起没。</p>
+<p>修复：窗口记住自己最后读到或写过的那些文本；重载时只应用共享区真正变过的文本，看到某个 key 消失就清文本但保留本窗口的附件，从没落过盘的 key 完全不碰。</p>
+<p>2406af9920 只在真改过草稿时才写回</p>
+<p>问题：关窗保存已经按「编辑器文本与上次加载/保存的不同」来判定了，但还有两条路径会写回：窗口里切换会话（换场清理把编辑器显示的东西全暂存了），以及加载草稿时排的 400ms 防抖（另一个窗口在加载后 400ms 内发送，定时器又把刚加载的文本写回）。</p>
+<p>修复：基线改成窗口拥有的整份草稿状态（文本 + 它加载或暂存的附件出现次数），防抖、切换会话（含排队编辑前的 pre-edit 草稿）和 HUD flush 只在状态真的不同时暂存。</p>
+<p>dc23156e1e v3 草稿镜像只在升级后首次启动读一次</p>
+<p>问题：两个窗口同一瞬间写入时，v3 镜像可能比 v4 草稿区落后一版（实测 45 次同毫秒竞争里出现 1 次），每次启动都读它就可能把清空标记已过期的旧稿复活。</p>
+<p>修复：镜像只在这个版本升级后的首次启动给草稿区做种子。</p>
+<p>e03c9c668b 性能：打字不再每键重渲染整个会话</p>
+<p>问题：每次按键的合并 flush 都把草稿写进 assistant-ui 的 composer store，这次写入会重渲染会话的 client resources，并重算每个已挂载消息的 useAuiState selector，于是每键的主线程成本随已加载历史增长——会话读得越久、写得越多，打字越慢，只有重载或切会话才恢复。</p>
+<p>修复：按键路径改写一个小的写入器，先立刻发一次边沿翻转（空/非空、?、steer 与斜杠、硬换行这些「app 从 composer.text 推导出的事实」），同一阵连打的其余部分合并成打字停顿后的一次尾写；Enter、compositionend、提交、切换 scope、程序化 paint/clear 仍立即写并顶掉待发的按键写，运行时镜像在有未见的输入时忽略 store。</p>
+<p>效果：真实 Electron + hermes serve、1800 条消息、整段历史都读上去让 300 轮全挂载，主线程每键 33.9 → 9.6ms，store flush 18.0 → 1.3ms，新开会话 12.1 → 6.0ms；132 次切换会话、25 轮流式、12 次重载后监听器、堆、每键耗时都平，成本只跟已加载的会话有关，不跟运行时长有关。</p>
+<p>桌面端 · Stop 与后台任务</p>
+<p>cffe11a42b Stop 不再杀后台进程，regenerate 时才回收</p>
+<p>问题：cancelRun()（Stop，以及忙碌时对排队消息点「立即发送」）会调 resetSessionBackground()，对会话里每个在跑的后台进程发 process.kill。普通中断是保留时间线的，网关的 session.interrupt 也刻意让 terminal(background=true) 的进程继续跑，渲染层却在杀后端契约说必须存活的工作，比如几轮之前起的 dev server。另一个方向是 regenerate：reloadFromMessage 通过 prompt.submit 截断历史，跟 restore/edit 一样，但从不清后台状态，被丢弃轮次起的进程就一直活着。</p>
+<p>修复：cancelRun 去掉 resetSessionBackground()；reloadFromMessage 在重跑前清 todos、重置后台（杀掉在跑的进程）、清掉预览产物，与 restoreToMessage / editMessage 对齐。</p>
+<p>效果：普通中断后 dev server 等后台任务继续跑；regenerate 时回收干净。</p>
+<p>5c1484f759 Stop 保留仍存活的后台子 agent 行</p>
+<p>问题：cancelRun 会 clearSessionSubagents，把所有子 agent 行都清掉，前提是 Stop 会取消它们全部。Stop 现在只结束这一轮，于是跑完的行该剪、还在跑或在排队的行该留。</p>
+<p>修复：只剪掉已结束的行，仍在跑/排队的保留；被停的这轮自己的子 agent 随下一份名单快照离开。</p>
+<p>效果：还在跑的后台子 agent 不会从 Subagents 面板消失（以前要等下一次 5 秒轮询才回来）。</p>
+<p>2cf5948986 触屏下长提示气泡折叠，带展开箭头</p>
+<p>问题：触屏布局（平板或手机上打开的浏览器版桌面端）用户气泡跳过了折叠，因为触屏没有 hover，点击又不打开编辑器；长提示就以全高钉在会话上面，读回复时大半屏被挡住。</p>
+<p>修复：触屏气泡也折叠，Edit 旁加一个箭头，点开保持全高直到再点一次；鼠标行为不变。</p>
+<p>8da9e0b432 Linux 上隐藏的半透明项按关闭生效，旧配置自愈</p>
+<p>问题：设置里在 Linux 上隐藏了半透明那一行，但渲染层仍然解析平台默认值（29% 色调，玻璃不可用时退成 Clear），为它画 Clear 遮罩、发给主进程并写进 translucency.json。主进程现在拒绝把这个值给 Linux 窗口，但一个被隐藏的设置本来就不该有任何效果。</p>
+<p>修复：渲染层在那一行被隐藏的地方把它解析成关闭，解析后的 off 通过 IPC 给主进程，主进程重写早期 build 留下的 29%，受影响的 profile 在首次启动这个 build 时自愈。顺带纠正注释：Electron 44 在 Linux 上是支持 setOpacity 的（X11 的 _NET_WM_WINDOW_OPACITY 和原生 Wayland 都是）。</p>
+<p>b5868c1f62 不支持半透明的平台不再设置原生窗口不透明度</p>
+<p>上下文压缩 · 预备压缩 prepare_ahead</p>
+<p>32a636bc8d 新增可选的预备压缩 compression.prepare_ahead（默认关闭）</p>
+<p>功能：打开这个开关（默认 false）后，当 provider 报告的 prompt 大小进入距压缩触发点 12% 以内的窗口，轮次循环会在工具批次执行前和轮次结束时起一个后台任务：它规划 compress() 会规划的同一条窗口，在压缩器和窗口行的副本上跑同一个摘要器。这个任务本身从不改写实时会话、系统提示或 prompt cache，会话期间记录照常增长。</p>
+<p>拼接：下一次自动阈值压缩时，如果头部边界没变、边界不晚于新的尾巴切割、边界之前的记录没变（不算 no-LLM prune 会重写的东西），compress() 就把完成的候选拼进去；候选边界之后的消息不进摘要区，走原来的尾巴处理。其余情况（还没跑完的任务、手动/聚焦压缩、溢出恢复、memory-provider 摘要上下文）仍按原来的内联方式压缩。一个在跑的任务从不等它，一旦被压缩或会话边界超过就失去发布权；失败的任务会退避后续任务，不动真实的失败冷却。</p>
+<p>范围：状态按压缩器存在内存里；插件上下文引擎、Codex app-server、原生 Responses 压缩、micro-compaction、后台审查分支不做预备。开关关闭时不建任何状态，compress() 走原路径。</p>
+<p>c2383a6806 一次压缩只用一个预备摘要，新消息留在尾巴</p>
+<p>内容：维护者定案 + 复审发现（自己的和 Greptile 的）——一次压缩只用一次任务；删掉「每增长约 8k token 再来一次摘要」的扩展任务和「一个尾巴预算后就过期」的检查，摘要按自己的边界拼接，之后无论多少消息都原样留在尾巴，不会为同一段历史付第二次摘要费。拼接检查比结构不比文本（role、工具调用 id/名字、工具结果 id，双方都有 message_uid 时也比它），就地改写文本的插件（脱敏、压缩前备注）不再让摘要作废；丢掉/插入一条消息或者回卷进窗口（新 message_uid）仍然会失配。摘要模型失败后主模型恢复的任务在拼接时像内联调用一样交接：summary_model 粘到主模型，并且「配置的压缩模型失败」的提示会送到用户；尝试遥测带上这个任务的辅助调用（模型、token、时长、回退）和新的 prepared_summary 标记。第一次需要 memory-provider 上下文的压缩会停止后续任务（每个都会被丢弃还要付两次钱）。cron 运行和委托子 agent 的轮末任务会被跳过，它们的会话随轮次结束。</p>
+<p>d2d1824fdf 阈值处等正在跑的预备任务，不再重复付费</p>
+<p>问题：自动压缩触发时没有完成的候选、但有一个任务还在写摘要并且窗口还合适，压缩什么都没等就自己又写了一遍同样的摘要，用户付了完整的摘要延迟，后台那次调用白扔掉。</p>
+<p>修复：压缩现在会等这个任务。任务每一段流式输出都会碰压缩线程的辅助进度钩子，宿主的空闲看门狗把这次等待当成一次内联摘要流；等待在宿主的流超时（没装钩子时就是压缩辅助超时）或宿主取消时结束，然后照旧内联总结。窗口已经不适配的在跑任务不等。</p>
+<p>9c9345bf45 性能：候选还新鲜时不再重规划整个窗口</p>
+<p>问题：完成的候选还新鲜时，maybe_prepare 在每个工具批次前和每次轮末都重新规划整条压缩窗口、重算记录指纹，结果只是保留这个候选。实测在轮次线程上：180k token 时每次约 23ms，540k 时约 31ms。</p>
+<p>修复：候选记住自己规划时的 provider 报告 prompt 大小，只要之后增长没超过扩展阈值，钩子立刻返回；prompt 缩了或增长过大才走完整规划，压缩仍然跑权威的指纹和间隙检查。另外摘要模型连续两次回退摘要在场期间跳过任务——内联压缩那时也不会调它，每次都等于付一次钱。</p>
+<p>765933299d 预备摘要不再因为尾巴切割移动而作废</p>
+<p>问题：开着预备压缩时，只要新的尾巴切割落在摘要边界之前（no-LLM prune 让尾巴行更便宜、工具组对齐会移动切割），compress() 就重规划尾巴切割、把已经完成的摘要扔掉，然后在用户等待时又内联写第二份，破坏「一次摘要」规则。</p>
+<p>修复：拼接检查完全不看新的切割，摘要只在它覆盖的消息变了（回卷、形状变化、别的会话、头部移动）时才丢弃；任务规划自己的窗口时带满尾巴，所以尾巴不会为空。</p>
+<p>4501b3f80b 遥测：记录每一次预备压缩任务与拼接结果</p>
+<p>4ea24baeb1 共享指标：统计预备压缩的采用率与结果</p>
+<p>TTS · ElevenLabs 自选音色</p>
+<p>c975831fbc 让 agent 自己挑 ElevenLabs 音色</p>
+<p>功能：当 tts.provider 是 elevenlabs 时，text_to_speech 多一个可选 voice_id，并新增 tts_voices 工具：搜索用户账号里的音色（/v2/voices）或公共音色库（/v1/shared-voices），支持 query / gender / age / accent / language 过滤和一个不透明的 next_page 游标。两个都按 ElevenLabs provider 门控（动态 schema 覆盖 + check_fn），其他 provider 的接口完全不变；单次指定的 voice_id 从不改写配置，在别的 provider 下传了旧 voice_id 会被忽略并给一条警告。</p>
+<p>f219708926 音色搜索收进 text_to_speech 的 ElevenLabs schema</p>
+<p>内容：评审定案——音色搜索属于 text_to_speech 的 ElevenLabs 变体，不该是一个独立的 tts_voices 工具。ElevenLabs schema 现在带 voice_id 和一个 find_voices 对象（那里的 text 可选），其他 provider 的 schema 与 main 逐字节一致。实搜发现也折进去了：公共音色库是默认来源，按一年的使用量排序（最常用的在前），支持 use_case（如 characters_animation）和排序过滤，自定义计费倍率的库里音色会显示 credit_rate；描述里告诉模型库里是按字面匹配词的，所以查不到的角色词（如 dwarf）要退回到描述声音（gravelly old + 过滤条件）。</p>
+<p>模型 provider · GitHub Copilot 转插件</p>
+<p>1da2eb42dc 从核心移除 GitHub Copilot，改成 github-copilot 实验室插件</p>
+<p>内容：删掉内置的插件 plugins/model-providers/copilot/（provider copilot：通过 GitHub→Copilot token 交换走 Copilot API）和 plugins/model-providers/copilot-acp/（provider copilot-acp：通过 ACP 跑 Copilot CLI）。两者合成一个插件 github-copilot，放在 NousResearch/hermes-labs-plugins；这条之前加的 LEFT_CORE 行会给每个用 copilot / copilot-acp 路由的 profile 装上它，所有「unknown provider」的提示都改为写 hermes plugins install github-copilot。核心不再留任何 Copilot 代码，插件要填的通用接缝保留，agent/copilot_acp_client.py 留作 kimchi-acp 目录插件继承的弃用别名（公开基类是 agent.acp_client.ACPClient）。这个 commit 可以单独 revert：revert 之后恢复内置 provider，而 labs 插件在内置了它们的核心上是惰性的。只测这两个插件的测试文件迁到 labs 插件的测试里。</p>
+<p>9b904dcc22 插件目录收录 github-copilot</p>
+<p>889d753725 left-core 迁移：provider 搬家到插件后的迁移行</p>
+<p>给用过 copilot / copilot-acp 的 profile 自动装上 github-copilot 插件，升级后不断档。</p>
+<p>Webapp · 多 profile 隔离、终端与 SSH</p>
+<p>8295aae6ee 旧 build 存在 default 下的文件夹改为复制不移动</p>
+<p>问题：旧版本同时把「没带 ?profile= 的标签页」的文件夹（在网关被作为另一个 profile 服务时）和「显式 ?profile=default」的文件夹都存到了 default 下，所以分不清是哪个的。移动它可能把 default 自己的文件夹抢走。</p>
+<p>修复：这个 build 的首次读取把它复制给被服务的 profile（那个 profile 还没有文件夹时），default 自己保留；标记只在复制读回成功后才写，存储拒绝的写入保留旧值并在下次读取重试。</p>
+<p>a3928dfca6 被服务的 profile 保留旧 build 存在 default 下的文件夹</p>
+<p>没带 ?profile= 打开的标签页不指名 profile，旧 build 就把被作为另一个 profile 服务的网关的文件夹存到 default 下。这个 build 首次读取时把它移动给被服务的 profile（除非那个 profile 已经有），并标记升级完成，之后以别的 profile 启动永远不会拿走 default 自己的文件夹。</p>
+<p>5d9ce70cd6 / 07aa617860 / 6f2ec72cf7 重名 profile 不再继承残留偏好</p>
+<p>导入 profile、Bot Mode 新建和复制、以及统一的启动 profile 读取，都会清掉同名留下的旧偏好，不再把上一个同名 profile 的设置带过来。</p>
+<p>cd4f55a593 / 514b95b451 文件夹偏好跟着所属 profile 走</p>
+<p>浏览器端新会话读目标 profile 的默认文件夹，而不是最后一次同步的缓存；重命名把文件夹和启动 profile 一起搬，删除时一起丢掉。新会话的文件夹按拥有它的 profile 读取。</p>
+<p>252dbe786d 大粘贴不再让 keepalive 关掉活着的标签页</p>
+<p>问题：按字节限制的输入队列在排满 1MiB 时就把读端挂起，于是超过 1MiB 的粘贴后面还跟着 34 个或更多按键时（WebSocket 库里 32 条未读消息加上它自己持有的那条），pong 处理停了，keepalive 把一个活着的标签页关掉——64 帧上限下的旧行为是留着的。</p>
+<p>修复：队列只在「64 帧且合计 1MiB」时算满，一个大粘贴不再让 pong 停摆。</p>
+<p>0cb2f60ac0 / eda711a5e2 终端 socket 与输入拼接</p>
+<p>底层 socket 在等待写入时继续读，keepalive 的 pong 不再漏收；输入按整段 join 一次，不再逐帧增长字符串。</p>
+<p>2db4a5262b 共用同一 SSH 端点的 profile 不再互拆控制 socket</p>
+<p>问题：SSH workspace 连接对每个 user@host:port 共用一个控制 socket，而拨号锁是按 profile 的，一个 profile 的清理（ssh -O exit 然后 unlink）可能和另一个 profile 在同一端点上的拨号重叠，删掉对方刚建好的 socket。</p>
+<p>修复：每次拨号和每次清理也持有该端点的锁（清理拿旧配置的端点，拨号拿新配置的，在 profile 锁内一次一个），其他端点的宿主机仍然各自拨号。</p>
+<p>140560affc 一台 SSH 主机宕机不再拖住其他 SSH profile 的文件请求</p>
+<p>问题：get_ssh_workspace_fs 在整个 SSHEnvironment 拨号和旧 env 清理期间都持有模块级缓存锁，于是一台 profile 的主机连不上时，其他所有 SSH profile 都要等它的拨号超时。</p>
+<p>修复：缓存锁只保护 dict，拨号按 profile 串行（同一 profile 的并发请求仍只拨一次），重新拨号失败时丢掉已被替换的过期条目而不是留在缓存里。</p>
+<p>302fd07584 / 11cbd54d50 / cedc564279 连接与票据</p>
+<p>替换 SSH workspace 连接时先关旧连接再拨新的；下载票据按单次使用次数和签发时 TTL 双重限制，一次重试还能再兑一次；断连时决定哪些暂存的帧要丢。</p>
+<p>命令行 · sessions 存储与退出码、scratch 清理</p>
+<p>b9e5df60fd Ctrl-C 在 sessions 确认处退出码 130</p>
+<p>问题：共用的提示把 KeyboardInterrupt 转成了「拒绝」，于是 hermes sessions optimize-storage &amp;&amp; next 会在用户中断之后继续跑 next（main 上内联的 optimize-storage 提示是放 Ctrl-C 通过的）。</p>
+<p>修复：中断现在说「什么都没改」并在每个 sessions 确认处退出 130，显式输入 n 仍然是 0。</p>
+<p>46adcf7d40 / 30c096abcd Windows 上 stdin 是 NUL 时按无人值守处理，不算用户拒绝；没人能回答的确认按失败退 1，导出的拒绝和失败也非零退出。</p>
+<p>32494cdf03 / 9a2fa5e406 optimize-storage 进度与分块</p>
+<p>每个阶段都显示进度、不在块之间空转，按行切块、死块就停、--force 下也限速；回填行数用索引统计，活跃写入时不做 VACUUM，运行中途有写入打开 state.db 会等它。</p>
+<p>eefd03b3ee / 94bb62ac47 scratch 清理不再阻塞启动</p>
+<p>本该跑的 scratch 目录清理放到 detached 子进程里跑，进程启动和系统提示构建都不再等它。</p>
+<p>网关、配置与开发者向</p>
+<p>9c1a75e56f Discord 的 allow_from 也管 guild 频道。</p>
+<p>65cac9a4c8 Kanban 唤醒、心跳和 cron 结果能投递进本地会话</p>
+<p>本地会话适配器是个桩：没有 gateway_runner、没有消息处理器，send() 只是确认这一轮自己的输出。三个生产者都把它当普通消息适配器用，结果投递丢在桌面端/TUI/CLI 的会话里：唤醒因为没有 runner 跳过 admit_route_wake 落到缺失的处理器（WakeNotAccepted）；心跳轮询器在缺消息处理器时提前返回，而 authority 分支根本不需要它；cron 的本地目标落到桩 send()（算投递了但什么都不显示），或者在没有恢复本地会话时报「platform local not configured/enabled」。现在本地目标会被收进会话的 FIFO 队列。</p>
+<p>2352d1d22c cron 结果写进本地会话时按 note 记录，不占一个 turn。</p>
+<p>5c0370c975 所有平台启动即失败时网关保持 degraded 在线，而不是退出；最后一个平台在运行中非重试失败时同样保持降级在线。</p>
+<p>ff56731030 Windows 的 .vbs 启动器改写为带 BOM 的 UTF-16，查找已有安装时也按 UTF-16 读。</p>
+<p>871900df63 config.yaml 的所有读写统一走 ConfigBackend 接缝（配套 9909c4f7f9：没有后端文件工具的场合拒绝文件复制类工具）。</p>
+<p>d74fe78713 插件 provider 的缺失凭据引导接缝（配套 91ecc88b71：公开的模型设置辅助函数和 secret_source_label）。</p>
+<p>3b73d82ec8 / f79cb0a6df provider 解析性能：重复的 profile miss 等插件目录时间戳 TTL 不再反复扫；内置 provider id 直接回答，不触发 profile 扫描。</p>
+    </section>
+    
     <section id="2026-10-26" class="day">
       <h2>Hermes 日报 2026-10-26：桌面端可以在浏览器里用了：Web Access 面板、hermes webapp 与一次性票</h2>
       <p><strong>本期覆盖 10 月 25 日 06:30 ~ 10 月 26 日 06:30（北京时间）合入 main 的提交，共 632 个 commit（不含 merge），另有 6 个 merge。新增 38 个功能、316 个修复、3 个性能优化。日期列是各 commit 自己的 committer date，本期多数是 10-25（435 条），另约三成是 10-23 和 10-24 的早提交晚合入（94 条和 99 条），还有 4 条更早的（9-30、10-03、10-09），这是 tip 增量口径的正常现象。</strong></p>
