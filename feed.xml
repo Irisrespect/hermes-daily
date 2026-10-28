@@ -5,8 +5,99 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 28 Oct 2026 07:14:41 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 29 Oct 2026 06:54:57 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-10-29：桌面端启动失败不再白屏，远程配置后端合入</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-29</link>
+      <guid isPermaLink="false">hermes-daily-2026-10-29</guid>
+      <pubDate>Thu, 29 Oct 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 10 月 28 日 06:30 ~ 10 月 29 日 06:30 合入 main 的提交，共 300 个 commit（不含 merge），另有 1 个 merge。新增 10 个功能、219 个修复、1 个性能优化。（另有 41 个测试、18 个重构、5 个杂务、2 个文档、1 个格式、3 条其他。）</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端：渲染进程启动失败不再是一片白屏，改为显示带品牌字标的提示和重新加载按钮。</p>
+<p>桌面端：草稿在系统时钟回拨、降级再升级后不再被自己挤掉或误判清空。</p>
+<p>新增远程配置后端：HERMES_CONFIG_BACKEND=remote，配置从配置平面读写，不再落本地 config.yaml。</p>
+<p>纯令牌部署的仪表盘认证打通：REST bearer 与 WebSocket 升级两条路认同一个会话令牌，令牌还可以从文件读。</p>
+<p>网关 29 条修复集中在同一件事：会话被 /new 之后，旧会话的提醒、后台结果、Stop 该回流到哪里。</p>
+<p>网页抓取把源站 4xx/5xx 真实报成错误，缓存命中与重定向都按最终 URL 重新过站点策略。</p>
+<p>重点条目：</p>
+<p>桌面端启动失败提示（2 个提交）</p>
+<p>问题：渲染进程改成用一次动态 import 加载整个应用之后，生产构建里每份应用样式表都是它的依赖。只要其中一份或者应用代码块有一次加载失败（比如请求被丢掉），import 就被 reject，而入口是 `void` 调用、把这个 reject 直接丢弃，React 永远挂不上——页面停在空白，什么按钮都没有。</p>
+<p>修复：b573af6a13 让入口记录失败原因，并在 #root 仍为空时显示一条短提示加一个重新加载按钮。透明窗口（桌宠浮层、语音唤醒指示器）只记日志不显示提示：它们要么点击穿透、要么太小，提示只会盖住桌面。它不会自己重载，和仪表盘的代码块恢复一样，同一份构建上的失败不循环重试。</p>
+<p>效果：ee987d9885 把这条提示做成品牌页：以 HERMES AGENT 字标开头（用打包的 Collapse 字体，字体加载失败时回落到系统粗体大写），字标和主按钮使用主题强调色。applyTheme 把背景、前景、强调色、按钮内文字四种颜色作为一个快照存起来，写失败时不存，避免一个主题的背景配另一个主题的文字；提示页自己有快照时连背景一起画，没有时继承页面配色并保留描边按钮。</p>
+<p>桌面端草稿：时钟回拨与降级重装（2 个提交）</p>
+<p>问题：草稿时间戳在时钟往回跳之后会乱序——新开的草稿盖的戳比所有跳变前的草稿都旧，在 50 条容量上限下，它自己保存一次就把自己挤掉，重载后消失。降级到旧版本时，旧版本写入的草稿列表也不被采纳，反而可能被当成&quot;旧版本清空了草稿&quot;。</p>
+<p>修复：7c18f4893f 让所有草稿的盖章统一走一个规则：取「当前时间」和「草稿库里最高戳 + 1」的较大值。降级再升级时，v3 列表与 v4 草稿的差异被当作旧版本在降级期间写的：新增和编辑被采纳，旧版本里被删掉的键变成&quot;已清除&quot;标记，于是在旧版本上已经发出去的消息不会再回来（否则按回车会重发一次）。列表写失败时把 v4 标成 mirrored:false，避免采纳一份过期列表。</p>
+<p>效果：8387c81da1 补上另一半——v3 列表读不出来（损坏或不是对象）时，以前会被当成空列表，从而把所有 v4 草稿标成已清除；现在读不出来就证明不了任何事，不做采纳，等下一次 v4 存储事件重写它。</p>
+<p>桌面端 clarify 提问卡片（2 个提交）</p>
+<p>问题：会话切换、重连会重新投递一次 activate，一次 clarify 调用因此被画成好几张一模一样的交互卡片，中间还夹着重复的推理过程。另一个问题是聊天栏答完一题后，卡片仍停在已经答过的那一题上。</p>
+<p>修复：988d26b569 让渲染层的 request latch 只在卡片自己的参数覆盖了当前提问时才跟随活动提问，其余一律折叠回普通工具行；overlay 合并改成按 toolCallId 逐项胜出，不再把缓存行和新抓的行拼在一起。</p>
+<p>效果：448b319f33 让网关发下一题时卡片跟着切到下一题，聊天栏答的问题和卡片显示的问题不再对不上。</p>
+<p>桌面端其他修复</p>
+<p>392c6f7d9e：新建会话的「+」改成单飞——以前连点几次会因为草稿标签要等网关回答才存在而各自发起一次创建；现在同一窗口内按住这次创建，期间的点属于那个草稿，成功或失败后释放。同时只有 owner 与新默认目标匹配的空白草稿会被复用。</p>
+<p>9473c214e2：标签栏的「+」和 Ctrl+T 连点不再堆出多个一模一样的空「新会话」标签，未触碰过的空白草稿会被前置而不是再造一个。</p>
+<p>3f3e0e4850：Web Access 设置页以前只在打开时读一次状态，用 `hermes config set` 或另一个窗口改的 webapp 配置看不到；现在窗口重新获得焦点、重新可见时重读，可见期间每 10 秒轮询一次。</p>
+<p>7c18f4893f、8387c81da1：见上「草稿」一条。</p>
+<p>7d3ec73e85：过期目标重试的第二次深度确认改为读会话切片（此前拿切片和镜像数组比引用，永远不相等，于是每次确认都被当成&quot;对话变了&quot;而取消编辑）；取消时保留刷新后的历史而不是回滚到编辑前快照。</p>
+<p>05af6caef0：扩展过的编辑重试需要再次确认。</p>
+<p>bccf27cc44：手指滚动又回到起点时不再弹出键盘。</p>
+<p>b8ac495fa1、a33a7ac953：www. 开头的本地路径在&quot;仅显式链接&quot;模式下保持原样；工具报错标题里的裸域名不再被自动变成链接。</p>
+<p>748ee7e990：标签取消菜单按标签文字命名，而不是按它的 DOM 元素。</p>
+<p>55c8ec01f0：只有清单文件（manifest-only）的插件被当成一个包，而不是&quot;仅桌面端仓库&quot;。</p>
+<p>ee7e0f5172、91832ef012、c9c343c379、3380ab0ddf：过期目标重试相关一组修复——不发内容的空重试会给期间启动的轮次留下状态、没有存储会话时恢复原始历史、运行时恢复后编辑失败要让输入框回到空闲、以及轮次已移动时给出提示并报告重新绑定的运行时。</p>
+<p>以上均来自提交说明，未经二次源码核对的部分只按标题口径描述。</p>
+<p>远程配置后端（1 个功能 + 22 个修复）</p>
+<p>问题：配置只存在每个 profile 的 config.yaml 里，多机部署、托管环境、容器化场景没有统一的配置来源，也没有并发写保护。</p>
+<p>修复：69d037b349 新增 plugins/config_backends/remote，用 HERMES_CONFIG_BACKEND=remote 启用，把每个 profile 的用户层配置交给配置平面：启动时在 load_hermes_dotenv 里拉取（有限重试，失败则 fail-closed 退出）、每进程一个 ETag 轮询器、按键级 diff 写回（CAS + 一次冲突重试）、客户端侧的锁与密钥字面量检查、内存内迁移、托管环境下忽略本地 config.yaml、配置平面的凭据只来自 auth.json 或 IdP 客户端凭据，绝不从 secrets: 源取。</p>
+<p>效果：随后 22 条 fix 都在补这套 seam——配置后端故障只结束一次请求/一次触发/一轮对话而不是结束进程（f4c54cd3cc）；凭据只发给配置好的 https 源、绝不跟随重定向（55805716e7）；`hermes config set/unset` 的提示改说 Remote Config 而不是一个永远不会被写的 config.yaml（2e36106171）；显式设置与继承值相同也要真正写下去（714eab92e9）；IdP client secret 轮换后重新取 token（e3d0046203）；轮询间隔改成常量而不是环境变量（f292c4c357）；`hermes config edit` 在后端没有配置文件时以 1 退出（fd44f481ef）；配置 URL 里的用户名密码不再被回显（748b71cef7）；另有 review round 1~9 的一批 CAS 意图保留、迁移可见性、dashboard 保存时保留凭据掩码、响应式发布等修正（23b346f6cb、99e5ea1796、6dd799b30a、fd059c01f4、f15b518b25、b1bbb51e21、b8a41f7bf2、60c215db4c、d70ad6d86d、afb8c9a1a7、c0c74d20e4、b8fc674b55、f0def49876、e4374020bd 等；另外配套的 e402afa783 属 fix(config)，让 config get/set 认得运行时读取的选择和插件声明的键）。</p>
+<p>以上均来自提交说明，未经二次源码核对的部分只按标题口径描述。</p>
+<p>纯令牌部署的仪表盘会话令牌（4 个提交）</p>
+<p>问题：用 nix/agenix 把会话令牌挂进部署（backend.sessionTokenFile → HERMES_DASHBOARD_SESSION_TOKEN=file:&lt;path&gt;）时，没有任何办法满足 2026 年 6 月的 fail-closed 门禁：门禁要求注册一个 DashboardAuthProvider，而交互提示会写进部署从没要求过的 basic-auth 凭据，令牌本身在每条受控路径上都被拒（REST 401、/api/ws 403）——就是桌面端遇到的&quot;HTTP 通但 WebSocket 失败&quot;。</p>
+<p>修复：2edfd0d369 内置 session_token 插件：只要部署了会话令牌就注册（可用 dashboard.session_token_auth.enabled: false 关掉），verify_session 做常数时间比较；客户端用到的两条路（REST bearer 和 /api/ws 的 ?token= 升级）走同一个 seam，一个令牌同时授权两边。</p>
+<p>效果：它不是交互登录——新加的 interactive_login 能力标记让它不出现在登录页、/api/auth/providers、自动 SSO 跳转和原生 provider 选择器里；令牌门控的 /login 会显示一条说明凭据通道的提示。轮换语义有测试固定：secret 重新部署前保存的客户端副本必须 fail-closed，而不是半可用。配套的 de4a083d6c 让 hermes 直接从文件读令牌（HERMES_DASHBOARD_SESSION_TOKEN_FILE，优先级低于环境变量，文件不可读或为空则启动失败并指名变量），省掉每个 secret-file 部署都要写一层 shell 读取再 exec 的包装脚本；c90b27e8e3、7c8d7b9cf3 把令牌以路径形式接进 nix 的 unit 环境。</p>
+<p>网关：旧会话的回流路径（29 个修复）</p>
+<p>问题：一个聊天（或桌面端）用 /new 换到新会话之后，旧会话上挂着的东西——app 在它上面设的提醒、heartbeat、排队中的后台结果、Stop——会被当成&quot;某个本地会话&quot;处理，于是以 storage_unavailable、permission_denied 之类被拒，或者干脆落到聊天窗口里。</p>
+<p>修复：这一批按同一思路修：路由索引之外再加一条 detached-aware 的查法，让旧会话的事件找到它真正的 live conversation。6ed6ad73be 修了提醒触发时被拒的 local-receipt 恢复、进程事件源只从有界缓存取（被淘汰后就重建成本地源而被拒）、liveness tick 只查路由索引导致残留&quot;仍在运行&quot;、以及排队结果在被 /resume 后以 permission_denied 被拒；d92f074b1d 让 app 在旧会话上设的提醒在被 chat 恢复或任意重启后仍会触发（此前后者会静默死掉）；4196427e40 让 app 在旧会话上建的提醒和订阅不再错误指向聊天；c66bf2c5e4 让聊天或 app 发的 Stop 都能到达 app 的轮次；584f6e5dd1 让 app 在旧会话上的轮次重新打开被 /new 关掉的行；29abd70464 让旧会话仍能从 app 使用，但回复不再漏进聊天；226c9bffd8 让脱离的会话不动聊天的 topic、不伪造 reset、重启后补跑排队 prompt；58eeea143e 让每次路由变化（含上下文耗尽的自动复位）都把旧会话移出聊天。</p>
+<p>效果：这一圈修复的共同点是&quot;会话换过之后，后台状态不再丢也不串门&quot;。</p>
+<p>网关：启动锁、群聊与 /compress</p>
+<p>4c53f64a80：客户端的 lock probe 碰到网关启动时不再让启动以 exit 1 结束；24479b4529：热服务一个新 profile 不再把它停在客户端 lock probe 之上；839415bd11：取消掉的 hot-serve reserve 在清理后不会再去抢那个 profile；b5168b7f7e、da844cc547：非托管 daemon 丢掉 systemd 的 notify socket 与 watchdog，launchd 网关的标记不再进非托管 daemon。</p>
+<p>2023f6cc4d：成员唤不醒的群聊只报一次，并给一个 Retry；fc73d80567：网关路由也能列出并执行卡住房间的 Retry；90c2fbaf0d：从独立后端交接过来的群聊重新接受 Send；857d224808、fde4219745：缺失的 RPC 方法明确报&quot;不可用&quot;，收据重试与文件前置拒绝的错误文案补齐；63307153bb、6ed94e3f6d、bf1f89b08a、29e10792b9、b730be9fac、95762e286d、cefb38724e、c4b5266ba4：群聊在交接、解散、命名 profile 视图下的可见性、删除入口等一组修正。</p>
+<p>05025ee96e、601b368267、aad60e1ac6：手动 /compress 走配置里的上下文引擎、冷会话也能拿到 compression.model_thresholds、插件版 /compress 拒绝增长、使用配置窗口并释放一次性引擎；29abd70464 之外的 f57628bcb2 让恢复的查看者拿到它重放之后会话发布的增量。</p>
+<p>网页抓取：源站错误不再伪装成成功（抓取相关 11 个修复，fix(web) 共 13 条）</p>
+<p>问题：抓取厂商（Firecrawl、Parallel、Exa 等）遇到目标站 4xx/5xx 时会自己返回 200，把目标站的状态码放进 payload 的 metadata 里。Hermes 从来不读它，于是 web_extract(&quot;https://httpbin.org/status/403&quot;) 返回一个占位错误页、error 是 null——agent 分不清&quot;被拦了&quot;和&quot;页面本来空的&quot;，keyless 降级救援也不会触发，错误页还会被当成内容缓存下来。</p>
+<p>修复：f7dde7f56d 在 plugins/web/_common.py 加一个共享助手，把源站状态 &gt;= 400 变成 &quot;HTTP &lt;code&gt; from origin[: 原因]&quot;，同时保留错误页正文当内容；覆盖 Firecrawl 的 SDK/网关/keyless REST 两种键名、Parallel 的有 key 与 keyless（此前是裸 http_error、payload 里的状态码被丢掉）、Exa 的 keyed（Exa 抓不到的 URL 以前直接从结果里消失）、以及 Keenable。</p>
+<p>效果：配套修正包括——源站自己的 429 不再走 keyless 降级环（85af2bb438，那是页面给的答案，厂商侧 429 仍然会切换）；源站 4xx/5xx 不再触发 keyless 救援（76911b77f2）；Exa/Keenable 的源站状态不再被读成厂商限流（6696c7b0a4）；错误页正文仍受 char_limit 预算约束（2699663a64）；缓存正文要和它自己的最终 URL 配对（f7641ace78，keyless Firecrawl 也要报告它被重定向到的目标）；缓存命中的内容要按重定向后的最终 URL 重新过站点策略与 SSRF 检查（6778ad5559），否则一个被缓存的重定向页在目标被加进 website_blocklist 后仍会继续供货；Firecrawl 与共享 dispatch 里每个 provider 的重定向目标都要重新门禁（6fc7c7dbf2、5c5db1a061）；跳过的缓存写入不再把旧缓存页重定向走（b02099ef0e）；缓存摘要对 CRLF/BOM 页面与读回内容一致（74195d3680）；懒加载代码块失败只在同一构建上重载一次（6da3e5641e、640b2c21d3）。</p>
+<p>Webapp 与移动端（23 个修复）</p>
+<p>968d55b526、5ba3243fc4、664394605e：浏览器标签页里 Ctrl/⌘ + N、T、W 会被浏览器先吃掉，Hermes 的「新会话/新标签/关闭标签」根本按不出来。先一版改成 Ctrl+Shift+F7~F9，最终版改为 Windows/Linux 上的 Alt + 同一个键（Alt+N / Alt+T / Alt+W，左侧 Alt 不输入字符，AltGr 会以 Ctrl+Alt 或 AltGraph 到达），macOS 上是 ⌃⌘ + 同一个键，覆盖所有被浏览器保留的默认键；原生桌面端默认值与用户自定义映射保持不动，macOS 上提示显示为 ⌃⌘N。另外 ⌃⌘W 在交互式终端里关闭标签而不是被当成 readline 的 ^W，macOS Firefox 的 Option 重映射、Alt 组合键不走 PTY 也一并处理。</p>
+<p>d7ef3d91e6：iPhone Safari 上单击输入框没反应（只能长按放光标），聚焦的编辑器又把自动大写、自动纠错、拼写检查全关了。现在触摸浏览器环境下，编辑器设置 autocapitalize=&quot;sentences&quot;、autocorrect、spellcheck，并在短促静止的轻点（≤10 像素、≤500 毫秒）的 touchend 里自己 focus，光标落在点击位置；滚动、拖拽、长按、以及已经聚焦的编辑器里的点击仍交给浏览器。</p>
+<p>820967473d：/api/status 是公开的，所以登录门禁不会在它上面刷新令牌；一个访问令牌过期的标签页会读到&quot;未登录&quot;的裁剪版返回，而桌面端的每个读取方都把它当真实答案——被服务的 profile 集合被重置成&quot;全部&quot;，未服务 profile 的保护失效，状态栏丢字段、共享 profile 警告被关掉、Command Center 面板丢掉完整状态、共享网关重启确认不问就重启。现在各处保留上一次快照，重启确认改为发一次受控请求（/api/auth/me，会轮换 cookie）再重读。</p>
+<p>fd9ff2a0cd：未登录的 /api/status 不再显示 profile 名与 install id。</p>
+<p>8497ce9318、c5270d2fbb、2a8413a52e：登录的 Webapp 标签页就是机器 owner（Hermes 单用户，登录只决定浏览器能否打开网页版，不产生第二个身份），所有登录方都按主机的 OS 主体（uid/sid）处理，两条路由都统一；旧构建存下的登录戳在读取时按 owner 处理，不重写。</p>
+<p>538ed6c02a、e0a3c60055、764fa746ae、bd78ca4afa、07f075c291、a48dc5d241：Webapp 页面下发 CSP、预览文档与渲染器策略隔离、脚本化 SandboxedFrame 的 data: HTML 在页面 CSP 下继续运行、桌面半边的源文件 mtime 按 Node 的方式打戳、损坏的时间戳标记算过期元数据而不是故障。</p>
+<p>3f945df636、26ba38a098、8c3c61dbb9、69da2d7c96：插件安装对话框在浏览器宿主里没有 Electron 的 probePluginRepo，以前一律停在&quot;此环境无法检查插件&quot;；现在走网关的只读 inspect（用安装器自己的规则解析来源、应用 kill list、克隆到 profile 之外的临时目录、只读清单文件，不导入也不运行插件代码），重试能收上次超时的慢克隆，清单读取 BOM 容错、git 输出按 UTF-8 解码。</p>
+<p>5c6592118a、a1215e645e、bdfd425a32、6140f2dec9：Local/custom endpoint 向导修了一组密钥来源问题——同名主机的 providers.custom 块仍然提供它的 key_env、custom 条目不把自己的密钥借给向导提交的 endpoint、校验向导提交的 endpoint 而不是已保存的路由、存在命名 custom provider 时也能保存新 endpoint。</p>
+<p>b3bfb3779a：单独启动的仪表盘重新转发已登录 owner 的会话编辑。</p>
+<p>Kanban：worker 掉线改为重连（12 个修复）</p>
+<p>问题：Kanban worker 的提交客户端把轮次中途的传输丢失当成 exit 1——轮询 prompt.receipt 抛 GatewayClientError，重试循环只捕 GatewayUnavailableError，_submit 的 (KeyError, ValueError, OSError) 又把它当普通拒绝吞掉；owner 的 _watch_submitter 看到提交进程没了，就用 os._exit(1) 结束在飞的轮次，卡片被记成 crashed 且没有 worker_result。单台主机上实测 93 次这样的运行，其中 80 次已经准入并绑定，0 次有结果。</p>
+<p>修复：c480d67e5f 把准入 id 和 session id 当成持久句柄——owner 跨连接保留准入、仍然回答 prompt.receipt，于是可以重拨并重读同一个 attempt，而不是重新提交；重拨用 OWNER_WAIT_S 设上限，owner 真没了仍然诚实失败；runtime_draining 这种&quot;什么都没提交&quot;的拒绝在同一循环内重试。</p>
+<p>效果：89f13590e0 让任何传输丢失都续同一个 attempt，并从 owner 最后一次回答起算上限；f4e042e944 让 owner 重启时 control socket 或握手失败也重试；51f18d738a、db48f91211 让重拨预算在收到进度或重连成功之后才重置；e62c15e667 把丢失 worker 的&quot;干净退出&quot;算成 crash 而不是再叠一条协议违规；c777ba429f 重新记账时保留 worker 最后输出；2432f9c29a、b2e0171c29、f10386a58f、c91bd232c0、0431192d69 让丢失的托管 worker 在一个 tick 内被处置、所有权拒绝只有一条规则和一个放弃文案、绑定中的运行仍属崩溃清扫、去掉多余的 adopt 握手重试、协议违规计数不再匹配 worker 自己引用的输出。</p>
+<p>Cron：手动运行是额外一次触发（5 个修复）</p>
+<p>问题：`cronjob run` / `hermes cron run` / 仪表盘的 Run 打在 `in 30m` 这类一次性任务上时，会把任务标成已完成（repeat 1/1、next_run_at 置空），真正的提醒因此永远不触发；repeat.times=N 的周期任务也会少跑一次。</p>
+<p>修复：f656543e03 让触发认领在 jobs 锁下判断这次是不是离槽（存储的槽还在未来时的 run-now），并把待定槽盖在 fire_claim 上；claim_dispatch 和 mark_job_run 读这个戳，repeat.completed 不动、next_run_at 留在原槽；网关转发的 trigger_job 记住它覆盖的槽，同一次保存里恢复，所以认领到完成之间崩了也不会丢。到期或之后的运行仍然算定时触发，不会双触发。</p>
+<p>效果：f799cf71d9 让额外触发只由显式 run-now 意图决定；481b6fe144 让排队中的 run-now 意图在第二次触发和 tick 推进后仍然保留；af0d245b3a 让手动运行期间排队的 run-now 在它完成后不丢；f101b0f7b7 让手动运行被配额挡住时排队的 run-now 延后而不是失步。</p>
+<p>浏览器工具、审批卡片与其他</p>
+<p>5abbff9d0f：Chrome 不为隐藏标签页绘制合成帧，Browser Use 云浏览器对一个隐藏标签页的 png Page.captureScreenshot 永不回应，而 harness 又是在后台创建标签页的，于是 capture_screenshot() 会卡满 60 秒。现在 browser_exec 用一个薄启动器包住 harness：把隐藏标签页提到前台、png 带 10 秒超时、失败后一次 jpeg 回退并按 png 保存；云浏览器上 new_tab 会激活标签页。模型代码原样从 stdin 进入。9194256d01、9c6d155a16、42448157b1、c9ffc6e960 把&quot;只在真的驱动云浏览器时激活&quot;、&quot;捕获它能抛的错误&quot;、&quot;jpeg 回退接受 pathlib.Path&quot; 补齐。</p>
+<p>8acb7f6580、e776cdff18、50f57a131f、8654f1a684、ac50e08b54、b5caaf7b44、39b2158afc、aecf04f3d8、一组 Discord 审批卡片修复：leader 在 follower 找到它之前发布超时、合并的 follower 等 leader 捕获的超时、过期的点击留给请求自己的观察者、已应答提示释放视图、发送中途结算的卡片显示它怎么结束的、审批按钮与请求超时对齐。</p>
+<p>7a0908c3b1、f8b0a91e77、428809549a：Memory 页面以前只显示 provider 选择和内置开关，一个在用的外部 provider 读起来像&quot;没生效&quot;；现在 Settings &gt; Memory &amp; Context 和 Command Center &gt; Maintenance 都显示当前生效的 provider 及其就绪状态，并把 MEMORY.md / USER.md 标成常驻内置层（&quot;Always on&quot;）；未保存的 provider 不再被当成 active。</p>
+<p>afe3a9111f、41010b6fef：hosted-rooms 的讨论预算可配置，读取走 effective loader，配置里写错拼写时保留默认值。</p>
+<p>190c0b7f65：Windows 上固定的 Python 现在也响应 python3。98a953afa9、37351b6a6f：工具子进程保留它所属网关的 profile pin，supervisor 的身份留在它启动的进程上。</p>
+<p>ba48bbcd8b、cdbcbe86ea、ec6704a584、d9bdc49612、c5d1f0ff87：缺失 checkout 的依赖状态在 14 天未使用后回收，保留策略从拥有 installs/ 的 home 读、最终删除用非递归 rmdir、每次删除都在 install 锁下复核、等待回收状态的启动器重试活文件、lock_path 不再重试一个永远不会成功的 open。</p>
+<p>1733a4a653、0b62510eb3、3d304a2816：桌面端更新的 hand-off 日志在每次退出时 flush、只有打开时编码，多个写者之间的追加被串行化，撞上另一个持有者的日志行会等待而不是消失。</p>
+<p>f88e83e903、0d9afb4109：插件目录新增 severian（记忆 provider，社区 tier），随后重 pin 到 0.3.13（PyPI 发布、secret-scope 凭据、requires_env）。</p>
+<p>性能</p>
+<p>7828ab375b：桌面端在旧后端上的深度确认拒绝会被记住整个提交过程。runRewindSubmit 之前在同一提交的每次后续发送里都再发一次 confirm_deep_truncate，遇到不支持该字段的旧后端，一次深度裁剪要么在忙会话上每 150 毫秒重试最多 6 秒、要么碰上恢复过的运行时，每次真实尝试前都要先付一次被拒的往返，prompt.submit 调用数大约翻倍。现在第一次拒绝就在 runRewindSubmit 作用域里立标记，后续发送不再带这个字段，旧后端一次用户操作只多一次调用；跨提交不缓存，桌面端运行期间后端升级了，下一次仍会再问。</p>
+<p>口径说明：本期统计按「合入 main 的时间」，不是 commit 作者时间。tip diff 里会包含作者时间较早、但晚合入 main 的提交（今天不少提交的日期列是 10-27），这是正常的。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-10-28：桌面端与网页版共用一份界面偏好存储，网页版可在浏览器标签页里加载桌面端插件</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-10-28</link>
