@@ -22,9 +22,118 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 93 期 · 39289 个提交 · 每日自动更新 ·
+<p class="meta">共 94 期 · 39812 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-30" class="day">
+      <h2>Hermes 日报 2026-10-30：关掉 Hermes 不再留孤儿进程，插件目录新增 OneBot 和 Kubernetes</h2>
+      <p><strong>本期覆盖 10 月 29 日 06:30 ~ 10 月 30 日 06:30（北京时间）合入 main 的提交，commit 日期分布在 10-28 ~ 10-29（口径是按合入 main 的时间算，不是作者时间），共 523 个 commit（不含 merge），另有 2 个 merge。新增 37 个功能、200 个修复、6 个性能优化。采集口径：上次采集点到本次采集点（10-29 06:30 → 10-30 06:30），按「合入 main 的时间」统计。</strong></p>
+<p>📌 今日要点：</p>
+<p>进程收尾是这一轮最大的主题：14 条「子进程随 owner 一起死」的修复，加上一套统一的 owner-death supervisor，覆盖终端、后台任务、浏览器、语言服务器、本地模型、语音、WhatsApp 等十几类子进程。</p>
+<p>桌面端：每个 profile 都成为侧边栏里的一节，没聊过天的 profile 不再消失。</p>
+<p>插件目录：226 条提交提到目录（占这一期四成三），新增 onebot-platform（OneBot / QQ 系）、kubernetes、smolmachines 终端后端、Windows 计划任务等条目。</p>
+<p>插件安装：安装对话框只装审查过的那个 commit；网页版补上了安装桌面端插件的最后一段路；只放行 https 的来源限制按维护者裁决撤掉。</p>
+<p>定时任务：新增每任务自己的宽限时间 grace_minutes，并修好任务时区驱动排期计算与到点扫描。</p>
+<p>重点条目：</p>
+<p>桌面端</p>
+<p>每个 profile 都是侧边栏的一节（47f0fc99d2，feat）</p>
+<p>问题：侧边栏按 profile 分组时，分组的来源只有「有会话的 profile」，一个新建的、或者很久没聊天的 profile 在侧边栏里直接不存在，用户看不出它还在。</p>
+<p>修复：profile 分组额外从 profile picker 读的那份 profile 列表（$profiles）生成，在读取它的那个 owner 名下补一个空分组（请求连接、网页版标签页里的 local、原生端未打标的主池各自对应）。空分组照样显示标题、新建会话按钮和一行灰字「No sessions yet」。筛选、归档、加载失败的视图保持不变。网页版和原生桌面共用这套逻辑。</p>
+<p>效果：新建 profile 之后立刻能在侧边栏看到并点进去开会话。</p>
+<p>eaf03cb4dc（fix）补上一个边界：多个 profile 全都空、同时没有任何项目、线程、任务时，侧边栏以前会退回那个空白页，把刚刚建好的空分组藏起来。现在两个以上 profile 分组会保留会话区，只有一个空 profile 时才显示空白状态。</p>
+<p>断线重连时回复不再只显示第一块（95ea501366，fix）</p>
+<p>问题：工具调用之后回复还在流式输出时掉线，会重跑当前会话的冷恢复，恢复的 RPC 回来之前视图和运行时是解绑的。这段窗口里 message.complete 落地，只更新了运行时状态，视图还停在第一块；但 settle 追踪器已经把这次 complete 记下来了，于是恢复流程认为屏幕上的实时记录比自己的输入新，丢掉了刚重新读到的整页——视图一直截断到下一次会话轮询或者刷新。</p>
+<p>修复：只有落地那一刻视图确实绑在这个运行时上，settle 才算数；离屏的 settle 会清掉标记，恢复流程就能按预期核对重新读到的页面。</p>
+<p>效果：重连之后回复完整显示，不用手动刷新。</p>
+<p>强制重装被拒时不再删掉已装插件（3dbd91639a，fix）</p>
+<p>问题：installDesktopPluginFromGit 只要收到 Force，就先删掉已存在的插件目录，然后才做 plain-tree 检查。如果替换的那棵树被拒（里面有符号链接、或者超过 64 MB），用户手上就一个插件都没有了。</p>
+<p>修复：去掉提前删除——publishDesktopTree 本来就是在检查、暂存、写标记全部成功之后才在同一个 root 写锁下替换目录。</p>
+<p>效果：强制重装失败时旧插件照常可用。</p>
+<p>配套两条：5b4468b159 让安装对话框把被拒的桌面端半边报成失败（以前另一个 profile 发布过同名包就当成功）；83bde48a4d 在重新 pin 之后让 Install 等新的 pin，并保留用户点下去时看到的那个 commit。</p>
+<p>双指手势不再抢输入框焦点（6f43cc98df，fix）</p>
+<p>问题：两指手势在网页版输入框上方结束时会把输入框抢去聚焦，其中外面那根手指先抬起的情况尤其容易触发。</p>
+<p>修复：加了移动守卫，并补上外面手指先抬起的用例（0b95c47163 是它的测试）。</p>
+<p>效果：滑动手势不再把光标送进输入框。</p>
+<p>进程收尾：关掉 Hermes 不再留孤儿进程</p>
+<p>背景：Hermes 里长期存活、自带独立 session 的子进程很多，它们这样起是为了不被误杀，但反过来也意味着 owner 被 SIGKILL / OOM 杀掉之后没人收。以前只有 stdio MCP 服务器能用到一个父进程死亡监督器，其他每一类子进程要么自带一个 reaper，要么干脆没有。</p>
+<p>统一基建（d66b9cd9ce，refactor）把 tools/mcp_death_supervisor.py 提升为 hermes_cli/process_identity.py 的第 4 层（和 spawn ledger、Windows job object 并列），MCP 的三个调用点改用 process_identity.update_supervised_pgids。协议不变：注册/注销 pgid、EOF 等于 owner 已死、TERM → 3 秒 → KILL、不安全目标拒绝、重生时重放、空了就释放。监督器本身从第二个 CPython 换成 POSIX sh（hermes_cli/process_supervisor.sh），空闲时 USS 0.5 MB，对比 Python 版 8.1 MB。7da67cfac1 进一步规定 spawn_owned 是拥有子进程的唯一入口（own/release 取代旧的动词字符串），d1cb5d5cbd 加了 CI 门：新的 detached spawn 不走 spawn_owned 必须写明理由。</p>
+<p>终端前台命令（63519c9a74，fix，orphans_after_10s 2 → 0）</p>
+<p>问题：LocalEnvironment._run_bash 用 start_new_session 起每条命令，Hermes 被强杀之后没有任何东西回收这个进程组，命令和它起的东西都 reparent 到 init 继续跑。实测 Linux：owner 被 kill -9，10 秒后 bash 和 sleep 2/2 存活。</p>
+<p>修复：_run_bash 把命令的进程组交给 owner-death supervisor（pipe EOF → TERM，3 秒 → KILL），等待返回后无论走哪条路都释放，所以命令故意留在后台的东西（server &amp;）行为不变。</p>
+<p>效果：同一探针 3/3 次 0/2 存活；有监督器常驻时每条命令的 own+release 成本 0.02 ms。</p>
+<p>后台任务（755a280ff0，fix，orphans_after_10s 3 → 0）</p>
+<p>问题：terminal(background=true) 的任务各自独立 session，停止它们的清扫（kill_all、agent_close、回合超时）全在 owner 活着的时候才跑。owner 被强杀后每个任务都留在 init 上。忽略 SIGHUP 的 PTY 任务（nohup 的 server、trap &#x27;&#x27; HUP）连正常挂断都停不掉，实测 2/2 存活。</p>
+<p>修复：新增 ProcessRegistry 的 ownership mixin，管道任务走 spawn_owned（purpose=terminal-background，进 spawn ledger），PTY 任务把 pty.fork 出来的组交给 own_process_groups；任务离开 _running 时释放。</p>
+<p>效果：实测 0/3 存活；带 persist_on_release 的任务仍然能活过 owner。</p>
+<p>浏览器 harness 守护进程（6139223158，fix，orphans_after_30s 2 → 0）</p>
+<p>问题：browser_harness 故意 detach 守护进程，好让它在多次 browser_exec 之间存活，而守护进程没有空闲退出。Hermes 被强杀，它驱动的每个守护进程就永远活着，各自握着一条 CDP 连接。正常退出也漏：stop_harness_daemons() 只从 cleanup_all_browsers() 调用，而后者只在跟踪了 agent-browser 会话时才跑，纯 browser_exec 的进程永远不跟踪，实测 4/4 泄漏。</p>
+<p>修复：每次 browser_exec 之后，把 BU_NAME 背后的守护进程交给 owner-death supervisor；只有它确实是本用户的、正在跑的 python -m browser_harness.daemon 并且自领一个 session 时才接受，所以一个过期或伪造的 pid 文件塞不进别人的进程组。atexit 现在无条件调用停止。</p>
+<p>效果：孤儿归零，且替掉了 #120739 那套 1150 行的 per-family reaper。</p>
+<p>TUI 斜杠 worker（f3ebdfadbd，fix，orphans_after_30s 1 → 0）</p>
+<p>问题：网关被强杀时正在跑 exec 类型命令的 worker，自己的 ppid 看门狗只结束 worker 本身，组里其他成员留给 init；正常 close 也只 signal worker 一个 pid，命令的 shell 活着。</p>
+<p>修复：worker 通过 spawn_owned(purpose=slash-worker) 起，仍然自领 session（mcp_tool 的孤儿清扫不会 killpg 到网关组），组交给网关的 supervisor；close 走 TERM、等 1 秒、再 KILL 整组。</p>
+<p>效果：强杀和正常关闭都不再留命令残骸。</p>
+<p>其他同批修复：WhatsApp 的 Node 桥（73804ca2f9，1 → 0，以前会一直占着端口和已登录会话）、仪表盘扫码配对的桥（bcf275a675）、raft 桥（9c0641eb47，1 → 0）、语言服务器整棵进程树（3d24fce471，1 → 0）、execute_code 内核的单元子进程（eb834d16f2，3 → 0，同时删掉了只通知内核的死亡管道）、llama-server 进程树在 POSIX 上（97bef249ac，2 → 0，以前一直驻留到下次开机）、命令型 TTS/STT provider（118712327d，3 → 0）、verify 起的应用服务器（b4031c37c8，3 → 0）、computer-use 内嵌的 cua-driver（adf564d01b，1 → 0）、有界 git maintenance（fc67e99e99，commit-graph 刷新标成 detached）。41d0a947f4 修了 owned spawn 撞上 MCP 发现时把 MCP 自己的监督器交出去的问题；2a845db458 让空闲监督器留 30 秒再退（不再每条命令起一次）。</p>
+<p>插件目录</p>
+<p>这一天 subject 里出现 catalog 字样的提交有 226 条（占全期 43%，一条 grep 即可复核），几乎全是新增条目、pin 版本和过审披露。其中 subject 直接以 catalog: / plugin-catalog: 开头的有 86 条。用户侧最值得看的几条：</p>
+<p>onebot-platform（1f47d67116）：OneBot 协议的平台插件条目，QQ 系机器人可以按这套协议接进来，是这一批里唯一面向国内 IM 生态的。</p>
+<p>smolmachines 终端后端（1e18dedf91）：把 smolmachines 作为终端后端接进 Hermes。</p>
+<p>hermes-windows-tasks（80ef2e56ea）：Windows 计划任务相关。</p>
+<p>hermes-github-mentions（7136f34584）：GitHub 提及相关。</p>
+<p>hermes-profile-switcher（a6b47fd60a）：profile 切换。</p>
+<p>hermes-themes-pack 1.2.0（1df2e5179d）：主题包。</p>
+<p>uuid-ref（68a4e34b6b，配 2c2582609e 的目录卡片）。</p>
+<p>transcription-dashscope（13fa2ff02a）：阿里云 DashScope 转写。</p>
+<p>x-dashboard（5f74e57cbe）、comfyrizz 便携插件（1a36ccaac4）、tripwire（0ec8ce26de）、inspeximus memory provider（b48bfc61a8）、found（9515a347ce，LinkedIn/邮件 SDR，随后 bump 1.0.1）、super-artifacts（7662b9bc69）、Runa 插件与 MCP（fbdd1dd571）、better-capabilities（536fba1b13）、obscurify-provider（49f4ab79c0）、eu-mode（a9d97cb9b4）、dsers（95892a7b94）、aixy（606336dd13）、Canadian Primary Care 社区预览（a584c179a8）、signal-notify（b776dee3ba，随后 30d33275ce pin 到 v1.0.0）。</p>
+<p>插件安装</p>
+<p>安装对话框只装它审查过的那个 commit（2c64c7fdb7，fix）</p>
+<p>问题：对话框会先审查来源、把要装的 commit 展示给你，但点 Install 时 agent 半边克隆的是分支 tip。分支在审查和安装之间动了，装上的就是没人看过的那棵树，桌面端半边也从这个 checkout 里拷。原生 Electron 那边连探针都不返回 commit，缺口一样。</p>
+<p>修复：plugins.manage install 收 inspected_sha（无 pin 的自定义来源），克隆仍然是普通分支 checkout，但 tip 不是那个 commit 就拒绝，报「源在你审查之后变了」。e4b0ab2365 规定只对真正的准入拒绝重试，源移动了要重新审查；e0c52c4fbf 让目录安装保留审查到的 commit，老后端会被追问，部分安装需要 Force。</p>
+<p>效果：审查看到什么就装什么。</p>
+<p>网页版能装桌面端插件了（abfe2876f3，feat）</p>
+<p>问题：在浏览器访问的网页版里，安装桌面端插件是死路——对话框能通过网关审查仓库，但没有东西可以拿来装。纯桌面端的包只会回答「这个包在这里没东西可装」，混合包的桌面端半边被跳过并弹一个 toast，因为唯一的克隆逻辑在 Electron 里。</p>
+<p>修复：新增 plugins.manage 的 install_desktop / remove_desktop，指向服务该标签页的宿主；hermes_cli/desktop_plugin_install.py 把仓库的桌面端半边克隆到应用级 desktop-plugins/ 根目录，解析规则、目录名、包标记和 Electron 一致，同样是暂存后改名、在 root 写锁下发布。</p>
+<p>效果：网页版标签页里点安装，桌面端半边真的装上了。</p>
+<p>来源限制被撤回（43ee1b0872，revert）</p>
+<p>问题：之前那条只放行 https 来源的规则（桌面端安装 IPC 的 guiInstallSourceRefusal、plugins.manage 里的 gui_install_source_refusal、仪表盘的安装接口）会拒掉 git@ / ssh:// 私有仓库、http:// 和 file:// 本地目录。</p>
+<p>修复：按维护者裁决，桌面端和网页版必须能装私有插件，这条规则连同测试一起撤掉，用户指南写明「Install from Git」接受 hermes plugins install 支持的任意 git 来源。01dfee9a41 同步让网页版的桌面端插件安装也接受 CLI 支持的各类来源。</p>
+<p>保留：publishDesktopTree 里的符号链接 / plain-tree / 64 MB 上限检查、安装对话框对被拒半边的失败报告、强制重装的修复。</p>
+<p>效果：私有插件安装没有被安全收紧误伤，只留下「装什么树」的检查。</p>
+<p>定时任务</p>
+<p>每任务宽限时间（b81e71addd，feat）</p>
+<p>问题：补跑窗口（错过的那次最晚能迟多久还补跑）以前对每个任务都一样，等于周期的一半，夹在 120 秒到 2 小时之间，改不了。</p>
+<p>修复：grace_minutes 可以按任务覆盖，0 ~ 1440 分钟，0 表示永不补跑。0 在 Python 里是假值，写入（v in {None, &quot;&quot;, False}）和读取（if value:）两条路都会把它吃掉，所以两边统一走 jobs_time.normalize_grace_minutes，读取用 is None 判断。补跑窗口还驱动分发戳，_classify_dispatch_lateness 和分发健康指标读同一个窗口。once / interval 排期拒绝这个参数。</p>
+<p>效果：单个任务可以真正做到「错过就不跑」或者「迟一小时也补」。</p>
+<p>3035c0c0ec（fix）修了 0 的坑：ticker 本身晚几秒触发，0 秒窗口会把每次准点运行都判成错过，cron.catch_up_missed=false 时任务干脆不跑。现在下限按 120 秒的 tick 容差算，并且显式的 per-job grace 可以越过全局 catch-up 默认去跳过窗口外的错过。</p>
+<p>时区（bfa67878cd，fix）</p>
+<p>问题：任务可以固定自己的 IANA 时区，但只有 cron 表达式按它算，排期和到点扫描还有几处按 profile 时区写 next_run_at——存储的时刻和表达式在两个时区里读，就会重复触发或者跳过一个班次。</p>
+<p>修复：compute_next_run() 按 job pin → profile 时区 → 基础偏移解析，所有写 next_run_at 的路径（advance、claim、resume、re-arm、recovery、配额与不可达规划器）都传它；_evaluate_due_job() 把存储时刻归一化到任务的时区，pinned 任务直接跳过为「跟随 profile 时区」准备的时间修复。3dbe3ec4d8 补上漏掉的两处：手动运行后的 extra_fire.settle，和只改时区的 profile 分发（merge_job_definition）。4e1a4df663 让 cronjob 工具 schema 为 per-job timezone 保持精简，c70876b9fe 让仪表盘创建任务也能设 timezone / grace_minutes。</p>
+<p>效果：固定时区的任务不再因为一处写入点时区不对而静默跳班。</p>
+<p>搜索（ripgrep）健壮性 ⭐⭐</p>
+<p>32e21a1352（fix）：rg --files 因为搜索根下任意一个目录 EACCES 返回 exit 2 时，文件发现那条路把它当成调用失败——stderr 被丢弃到 /dev/null，exit 2 不在接受集合里，于是一个不可读目录就让整次搜索报「File search failed while running ripgrep.」，没有细节也没有结果。现在合并 stderr、按 rg: / grep: 前缀分离诊断和路径，只含权限问题的 exit 2 降级成部分结果加一条「Skipped N unreadable path(s)」警告，目录补充那条逻辑在降级路径上照跑。</p>
+<p>37555b53a9：多根搜索的部分结果警告不再被合并逻辑吃掉。</p>
+<p>2a8640174f：不可读目录的诊断不再吃掉结果预算，find 那条路会点名被跳过的路径。</p>
+<p>ff20443d69 / 3b9dc57695：退化到 grep 时也报告不可读子树，count 模式保留警告。</p>
+<p>00695283dd：rg 二进制不可执行报成错误，不是被跳过的路径。</p>
+<p>95e1b6b7c2 / aeaaa468dd：原生 rg 的 stderr 有上限，超过上限的真实错误不再被读成只有权限问题，非权限类诊断会点名。</p>
+<p>4f92c11398：spawn 时就登记 rg 的进程组，刚退出的 rg 不再被判成 kill 崩溃。</p>
+<p>bf04f868d4：无法解释的 exit 2 仍然 fail-closed。</p>
+<p>725c952074：多根跳过路径从结构化数据合并，不再解析警告文本。</p>
+<p>技能：三个 Office 技能合成一个 ⭐⭐</p>
+<p>6fdc365d4b（refactor）：docx、powerpoint、xlsx 合成一个内置 microsoft-office 技能。SKILL.md 只放共享的 documents 环境块、PDF 导出和跨格式的坑，各格式各自的参数、流程、陷阱分到 references/word.md、references/powerpoint.md、references/excel.md。脚本和测试原样搬进同一套 scripts/ 和 tests/（62 个测试通过），所有技能、文档、工具消息里提到旧三个名字的地方都改成 microsoft-office。</p>
+<p>配套：183b5ddd5f 把小众内置技能移到 optional（按需安装），9347107cdb 删掉官方来源已经覆盖的 optional 技能；395e89060f 保留嵌套表的顺序和列名，cfabecfa79 让 pdf --flatten 保留 JSON 里没列出的表单字段，64c4f634f4 保留 Office 文档语义；30a8c50a6f / 4a8c01790a / dc82bec3bd / d202ddfda2 修的是文档技能在 Docker 沙箱和无 tmux 场景下的安装与等待。</p>
+<p>会话与登录填充</p>
+<p>refresh-prompts（e240d617e8，feat）：继续中的会话每一轮都原样重放存下来的 system prompt，好让 provider 的前缀缓存保持热。代价是 SOUL.md 的修改、新增或改过的技能、项目上下文的变化，都进不到一个长期运行的会话里，只有 /new 才生效（代价是丢掉历史）。运维推了 profile 更新、重启了网关，却没办法让已有会话采纳。现在 hermes sessions refresh-prompts [--session ID] [--json] 在 profile 的 state.db 里记一个刷新 epoch，继续会话的下一轮开头检查它。47ec37e427 让 Bot Chat 能力重建也算满足待处理的刷新，0216b1a320 让刷新 epoch 在压缩轮换后仍然存活、--session 指向 tip。</p>
+<p>63b82d209e（fix）：登录表单渲染在 shadow root 里（Home Assistant、自定义元素 SPA）时 document.querySelectorAll 看不到，密码框找不到。检查和填充脚本现在会走进开放的 shadow root。b79946d2ee 让 shadow root 表单的填充能到达宿主页面的监听器和 shadow 里的登录标签页，5a4c234a9c 保留 form 分组和 shadow 树里的 label，81985c6bd4 保留填充时带 nonce 标记（一次性随机戳）的选择器，shadow root 只收集一次，0a93a2341f 让 Camofox 页面上也能通过 browser page backend 填充。</p>
+<p>网关、消息与其他 ⭐</p>
+<p>WhatsApp 投递状态（31d5f1d44d，feat）：已发消息的投递和已读状态写进 gateway.log。a3349cf1d5 让投递回执走自己那条桥队列，不再和消息抢；29b44be139 重起桥之前等旧桥释放端口，fb45657d55 不再把旧桥的 TIME_WAIT 当成端口被占，f3acd8ff33 把桥的回收挪出网关事件循环。</p>
+<p>bot 屏幕（e298669b44）：接管以前不算「有人使用」，只有观众的第一次 RFB 帧才会盖章。一个接管落在长期闲置的屏幕上、而闲置检查正等着 start.lock 时，会被读成已经放弃的租约，屏幕在刚接手的人脚下被停掉、租约还给 agent。现在 display.lease.acquire 在写租约之前先盖活动戳。b5e47a0225 让被弃用的屏幕在闲置窗口之后自己停，d404615296 让闲置停止一并释放被弃用的 human lease，dacca6272f 让被杀掉的 sleep 或检查不再终结屏幕的自停，33803072c7 让四个窗口都没人用的 human lease 失效。</p>
+<p>网关：fbb0d63a92 / ba7bfeadb1 让结束真实回复的静音标记不再单独发出去，0bb556f3a9 让远端附件的原始文件名随附件一起删掉，cf6623e433 / fa2befeed7 修委派模式在 interim 关闭时从配置解析并在刷新后保留已 pin 的模式，c49ecd5892 / 02438db863 让被取消或被准入的中继回合拿回 typing 和反应。</p>
+<p>终端 PATH：35c2783b6a / 29fef14fbf / 214c3e68b0 修登录 profile 重置后 spawn PATH 里受管和相对目录丢失的问题，bd2fb30d2e 让 per-turn 终端 scope 最后应用受管 scope。</p>
+<p>Bedrock：e286e63e0e 让挂住的调用一次读超时就失败（不再试五次），a8b987aaa1 让客户端应用配置的请求超时，f891fbe737 让辅助调用重试 503 并把限流识别成 rate limit，e34d84897a 防止 Claude 拿到 GPT 回合的封存推理，93286ffd87 把未解析的 application-profile ARN 签发者判成 unknown。</p>
+<p>输入与其他：f511fbaba3 / f4383ac930 修同一 read 里文本和 CSI-u Enter 混在一起的提交与后续编辑，3460122ede / 25f8dbfccb 修老版斜杠 worker 看门狗的指标刷出与父进程死亡守卫。</p>
+    </section>
+    
     <section id="2026-10-29" class="day">
       <h2>Hermes 日报 2026-10-29：桌面端启动失败不再白屏，远程配置后端合入</h2>
       <p><strong>本期覆盖 10 月 28 日 06:30 ~ 10 月 29 日 06:30 合入 main 的提交，共 300 个 commit（不含 merge），另有 1 个 merge。新增 10 个功能、219 个修复、1 个性能优化。（另有 41 个测试、18 个重构、5 个杂务、2 个文档、1 个格式、3 条其他。）</strong></p>
