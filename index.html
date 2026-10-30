@@ -22,9 +22,88 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 94 期 · 39812 个提交 · 每日自动更新 ·
+<p class="meta">共 95 期 · 39903 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-10-31" class="day">
+      <h2>Hermes 日报 2026-10-31：定时任务能当场停下，网页版通知会闪标签页</h2>
+      <p><strong>本期覆盖 10 月 30 日 06:30 ~ 10 月 31 日 06:30（北京时间）合入 main 的提交，commit 日期分布在 10-29 ~ 10-30（口径是按合入 main 的时间算，不是作者时间），共 91 个 commit（不含 merge），另有 0 个 merge。新增 7 个功能、66 个修复、0 个性能优化。采集口径：上次采集点到本次采集点（10-30 06:30 → 10-31 06:30），按「合入 main 的时间」统计。</strong></p>
+<p>📌 今日要点：</p>
+<p>通知能追到你了：桌面端弹原生通知时同时闪任务栏/Dock，网页版标签页标题交替闪动、favicon 挂未读点，点通知直接回到会话。</p>
+<p>多个问题合成一张表单：一个回合里的多道 clarify 提问在桌面端和网页版现在一次全显示、一次提交。</p>
+<p>定时任务能当场停下：新增 hermes cron cancel 和桌面端 Stop，取消记成 cancelled 而不是 failed；每个任务还能自己选修跑策略。</p>
+<p>报错卡片重做：分阻断性和降级两级，一个主操作，文案点名 provider 或模型；本地模型服务器关掉不再被误判成「没配 provider」。</p>
+<p>一批配置读取的锁顺序修复：导入配置、日志脱敏、provider 列表不再在导入时读配置，也不再持锁等锁——启动和多 profile 切换少一批互相等待。</p>
+<p>重点条目：</p>
+<p>桌面端与网页端：通知能追到你了</p>
+<p>未聚焦时闪任务栏 / Dock（0ab62b8949，feat）</p>
+<p>问题：原生通知的 toast 是瞬时的，Hermes 最小化或者被其它窗口盖住的时候，错过的那条通知在你回来之后没有任何痕迹。</p>
+<p>修复：弹出通知时顺带请求窗口注意——Windows 是任务栏图标闪动，macOS 是 Dock 图标跳，Linux 用 urgency hint，窗口重新获得焦点时清除。</p>
+<p>效果：窗口不在前台也不会漏掉通知；引 #55179、#50718。</p>
+<p>网页版标签页闪动 + 浏览器通知（18d8b4a65d，feat）</p>
+<p>问题：网页版以前只在标签页标题上加一个标记表示「有阻塞」或「跑完了」；通知桥还存在两个硬伤——权限是在事件回调里请求的（没有用户手势，浏览器会静默拒绝），而且通知点击完全没处理。</p>
+<p>修复：标签页隐藏或未聚焦时，凡是过了原生通知门禁的事件（设置 → 通知里按类型开关），标题就在原名和通知标题之间交替，favicon 上挂一个未读点，直到你回到标签页；只有权限已授予时才弹浏览器通知，权限只能从点击请求（新加的设置行，或者「发送测试通知」），不在加载时问；纯 HTTP 没有安全上下文时设置行会直接说明，只靠标题闪动传递信号；点击浏览器通知会聚焦标签页，并按桌面端系统通知用的同一条 onFocusSession 路径打开那个会话。</p>
+<p>效果：后台跑完的会话能在浏览器里被注意到，点击直接跳回去。</p>
+<p>664202cc22（fix）让权限行和「发送测试通知」共用同一个 store：以前那行自己存一份权限快照，在测试按钮上授权之后，设置里的文字和「允许」按钮还是旧的，得重开设置才更新。9d177e05f3（i18n）把这个设置行补进阿拉伯语和繁体中文。</p>
+<p>多问题提问合成一张表单</p>
+<p>981e1325e8（feat）</p>
+<p>问题：clarify 工具一次可以问一组问题，但只有 prompt.submit 里声明了 clarify_batch 的回合，后端才会把这组问题当成一个 clarify 请求；否则一题一张卡，前一张答完才出下一张。Ink TUI 声明了这个能力，桌面端和网页版从来没有声明过，所以它们的批量表单永远只收到一个问题。</p>
+<p>修复：后端在 client.capabilities 的回答里广播 canonical_clarify_batch（每个渲染端在 gateway.ready 都会发的那一帧），桌面端的规范客户端只在被广播时给 prompt.submit 加 clarify_batch: true——老的后端 submit 参数是封闭的，会拒绝未知键，legacy sidecar 也从不发它。</p>
+<p>效果：桌面端和网页版的多问题提问变成一张表单，所有问题同时显示，通过已有的 clarify.lock 一次提交。</p>
+<p>0b5290df05（fix）键盘：在已经答过的早期问题上按普通回车，改为跳到下一个还没答的题，不再把半张表提交出去；从最后一题提交，或者没有任何未答项时才由回车提交，Ctrl+Enter 仍然随时可以提交。690da2b7be（fix）让空的多选题不再挡住这个跳转。</p>
+<p>定时任务：能停下、能选漏跑策略</p>
+<p>hermes cron cancel 停掉正在跑的那次运行（8c228c5b89，feat）</p>
+<p>问题：pause 只压制未来的触发，一个卡住的运行没有任何运维手段——要么等 HERMES_CRON_TIMEOUT 走完，要么自己去进程组里手工找。</p>
+<p>修复：杀进程那条路其实已经存在——_run_job_script 会轮询 cancel_event，并通过 kill_process_tree 拆掉整棵树，agent 运行在同一个接缝上中断。缺的是一个运维能触达的信号，而且不能是内存里的 Event：run_one_job 在真正执行前就把这次尝试交给了外部的脱离式 worker。所以取消做成按执行 id 命名的标记文件，接进已有的 _FireOwnership 取消接缝，成为第三个来源。按执行 id 键控，只有它写给的那次运行能读到，残留标记不会渗到任务的下一次触发；用 live_inflight_execution() 解析活着的尝试，死掉的 owner 留下旧行是干净的 no-op。</p>
+<p>效果：卡住的运行能被真正中断，而不是等着超时烧 token。</p>
+<p>桌面端 Stop 与每任务漏跑策略（0e0b2328e0，feat）</p>
+<p>任务头部在最新一次尝试处于 claimed/running 时显示 Stop，点击调 POST /api/cron/jobs/{id}/cancel，期间显示「正在停止」并轮询任务列表，直到那次尝试进入终态，然后提示「已取消」（或者运行先结束了、没人在跑）。别处发起的运行会因为 cron.changed 刷新也显示自己的 Stop；本窗口自己的 Run-now 在等待期间，这次运行一直算活着，直到点击之后才 claim 的尝试结束，所以按钮不会闪回。编辑器新增「错过的运行」三选一：用默认、回来补跑一次、跳过，只在用户改过时才提交；仪表盘的创建接口此前只支持 update，现在也接受 catch_up。</p>
+<p>ee394bd921（feat）把账记对</p>
+<ul>
+<li>运行中删除任务现在会取消那次运行（在它的执行上写取消标记），不再让它烧 token 到丢失 fire claim 才算完（#123045）。</li>
+<li>运维取消的运行（hermes cron cancel、新的 POST /api/cron/jobs/{id}/cancel、cronjob action=cancel、remove）记一条终态 cancelled 的账本行并带上原因；任务的 last_status 是 cancelled，不弹失败告警、不涨失败连击。取消检查排在 claim 丢失处理之前，所以被删掉的任务记的是取消，不是「fire claim 归属丢失」。</li>
+<li>新增可选的每任务 catch_up（true = 补跑一次，false = 跳过）。不设时周期任务继续跟随 cron.catch_up_missed，一次性任务保留 120 秒宽限（#93526）；选择加入的一次性任务会迟一次触发。</li>
+<li>每个被跳过或合并的班次记成一行 missed xN，由 hermes cron runs 和仪表盘/桌面端的运行历史展示。</li>
+<li>执行账本的 status CHECK 就地放宽（在 BEGIN IMMEDIATE 下一次性重建表）以容纳 cancelled 和 missed。</li>
+</ul>
+<p>配套修复：3f43514791 让 hermes cron run 等到被 cancel 结束时不打印「Ran now: failed.」并退 1；e3353d52b8 修桌面端三处——运行还在跑时暂停的任务显示「暂停」但点了会恢复（现在标签跟排期状态、圆点跟运行）、1.5 秒的运行中轮询会并发刷新导致 Stop 永远卡在「正在停止」（改成一次一个请求）、切换连接时清空的任务列表被当成任务已删而错报「已取消」（待处理的 Stop 绑定到它的连接和 profile）；4e3a6a2265 让被拒的 Run-now 背后的活运行也显示 Stop；7de83afa76 让取消能到达被拒 Run-now 背后的运行并说明 agent 运行为什么被停；249a90c037 让被停下的运行在所有账本读取路径里保持 stopped；cd377d884d 让 HERMES_HOME 不支持硬链接时 Stop 也能落地；422fce2f52 按 BOM 容忍方式读取消标记；9e5ff5098b 让第二次取消保留第一次的原因；8e20191c46 让 hermes.cron.run 遥测 schema 接受 cancelled；d4865574e4 是第三轮审查：Stop 按自己那次运行结算、missed 计数用任务固定时区、分布统计保留 catch_up。</p>
+<p>报错卡片</p>
+<p>错误卡片 v2（ef35e8b9e1，feat）</p>
+<p>问题：失败轮次下面那张内联卡片是单一形态，所有错误长一个样，操作入口和文案都不区分「必须处理才能继续」和「先这样也能用」，原始错误藏在控制台里。</p>
+<p>修复：按错误系统改版重做——严重度分阻断性（用户不处理没法继续聊天；暖色底加图标）和降级（聊天还能用；白卡、灰图标、带关闭 X），由卡片的主操作推导；每个失败一个主操作、最多一个次选，改用设计系统的次级按钮和幽灵按钮。新增动作：继续（回复被截断）、打开 provider 设置（隐私拦截）、TLS 和本地服务器的安装指南、打开模型设置（agent 初始化）；额度类错误保留「换模型 / 买额度」。「查看错误详情」展开后在设计系统的复制块里显示原始错误并带复制图标，下面是复制详情、打开日志、发送诊断。文案重写：标题最多五个词并点名 provider 或模型，正文一到两句说清怎么修，翻译进全部 8 个桌面语言。还有一条「一个事件一个出口」：屏幕上那个会话的错误不再额外弹 toast（卡片已经说了），额度用尽是输入框上方的横幅，只有那个横幅不在这个聊天上时卡片才说话，后台会话保留 toast。</p>
+<p>效果：报错页面能直接看出严重程度和该点哪个按钮。</p>
+<p>92213f9767（fix）是评审跟进：「继续」改为通过这个聊天的输入框真正提交「continue」（aui.thread().append 在 ChatRuntimeBoundary 下是空操作）；额度用尽一律给卡片；恢复策略合并成 errorCardActions 一套；窄窗口下动作行换行，详情开关不再被裁掉。685bb3c8c4 / b1d7c5b296 修桌面端的 Continue 保留草稿、信用卡入口打开正确账单页、重新排队的外部发送保留身份并落到新建的会话。</p>
+<p>本地模型服务器：不再误判成没配 provider</p>
+<p>8a8d453ad1（fix）</p>
+<p>问题：主模型跑在受管 llama.cpp 运行时而服务器没起来（桌面端被关掉顺带带走了它、还在加载、或者干脆关了），setup.runtime_check 回 ok:false，而 setup.status 说 provider 已配置。引导门禁把这个组合记成「没配置」，打开了 provider 登录浮层；一次发送拿到的是「更新 API 密钥」卡片——解析失败被盖成了 auth_permanent。</p>
+<p>修复：解析器改抛类型化的 LocalRuntimeUnavailableError，两个 setup.runtime_check 后端都用 error_code local_runtime_unavailable 回答，引导门禁保持应用打开并显示「本地模型不可用」提示、带「打开本地模型」，轮次失败在端点层带 reason local_runtime_unavailable。</p>
+<p>效果：卡片说的是模型服务器连不上，并给「切换 provider」，而不是让你去改密钥。</p>
+<p>配套：6c625765d6 在轮次失败表里补上 local_runtime_unavailable，TUI 和仪表盘不再回落成「你的自定义模型端点没有响应」；解析器的句子原来指向 设置 → Providers → Local models（只有桌面端有这个面板），改为指向 /model。dc15316219 让聊天卡片直接点名本地模型服务器。d17e4a34a4 让网页版在没有 Local models 面板时提示「从桌面端启动服务器」并提供「选择其它模型」。7b62fb095d 让服务器已关掉时不再建议 /retry，并把两种启动方式都写清楚（桌面端应用，以及 hermes model 里的 Local models）。efb8ded70d 让服务器恢复后提示自动消失（就绪判定一到就清，仍下线时 60 秒一次继续复查）。8d8a4a0365 让一直连不上的服务器改为退避复查。b19ca8c974 重新生成 TUI 语言键表。</p>
+<p>快捷键：Chrome 应用窗口与冲突告警</p>
+<p>fc1719a98b（fix）</p>
+<p>问题：网页版在非 macOS 上的默认快捷键是 Alt+N/T/W 这一套，原因是浏览器标签页会在页面看到 keydown 之前就把原生 Ctrl 组合吃掉。但 Chrome 应用窗口（安装 / 「打开为窗口」/ --app=）不保留这些键——BrowserCommandController::IsReservedCommandOrKey 对 TYPE_APP 窗口返回 false，于是应用窗口里 Alt 默认白白让快捷键失效。</p>
+<p>修复：应用窗口里改用和原生桌面一样的 Ctrl+N/T/W、Ctrl+Shift+N/T/W、Ctrl+Tab / Ctrl+PageDown 以及 Shift/PageUp 一对。在 Xvfb 上用 OS 级（XTEST）输入实测：标签页里 Ctrl 形式仍然到不了页面（Chrome 开/关标签），所以标签页默认保持 Alt；应用窗口（display-mode: standalone）里十个组合全部走 Hermes 动作。macOS 两种窗口都保留 ⌃⌘ 默认，原生命令行桌面端默认不变。</p>
+<p>效果：把 Hermes 装成应用窗口的用户拿回 Ctrl 快捷键。</p>
+<p>配套：2ffe82904b 让应用窗口里打字时用户自己的 Alt 绑定也能触发，冲突比较改用归一化组合；bd8436dfcc 让窗口类型切换不再动用户自己改过的绑定（以前按值判断默认，和应用窗口另一套默认同值的自定义绑定会被吞掉，甚至变成 Ctrl+W，重载也回不来）；aa881935db 让「在 Chrome 中打开」这种不重载的窗口类型变化也实时跟上，并且只对 Chromium 的应用窗口放行这些键（Firefox 的 web app 报告 standalone 但仍保留 Ctrl+W）；fe53d0152d 修桌面端出厂默认的 Ctrl+数字切 profile 与切会话两组互相报冲突（归一化比较只在涉及用户绑定或正在录的组合时才判冲突）。</p>
+<p>配置读取的锁顺序：启动与多 profile 少一批互相等待</p>
+<p>7e037e8b62（fix）</p>
+<p>问题：hermes_cli.config 在导入时就用 provider profile 填 OPTIONAL_ENV_VARS，hermes_cli.auth 在导入时把插件 provider 镜像进 PROVIDER_REGISTRY，两条路都要列 provider，而 provider 发现有读配置（plugins.enabled、plugins.isolation）。在一个进程服务多个 profile 的场景里，导入期的配置读拿到的是启动 profile 的配置；更糟的是配置后端自己的载入会导入 hermes_cli.auth（远程后端的 Nous 凭据），形成死锁。</p>
+<p>修复：两者都改成首次读取时执行——OPTIONAL_ENV_VARS 是一张首次读取前跑一次填充的 dict（CORE_DECLARED_ENV_NAMES 通过模块 __getattr__ 跟随它），PROVIDER_REGISTRY 在首次读取前同步。内容和优先级不变：核心条目胜出、provider 条目替换平台清单、先声明名字的 provider 胜出；填充遇到 ConfigBackendUnavailable 会传播并重新待填充。</p>
+<p>同批：e924f75176 让日志脱敏格式化器不再读配置（只读内存里的密钥作用域和该 profile 载入时记下的策略，未知按脱敏处理），8ae88edc8a 让它不再等配置（持 _CONFIG_LOCK 的线程一打日志就等 handler 锁，形成锁序环；现在锁被别人持有时直接返回空、按脱敏处理且不缓存）。4905b9f9ff 让 provider 环境变量表的第一次填充不持锁。b4d8e4c332 让 provider 环境变量目录改从 bundled_profiles() 构建（执行每个 bundled provider 插件到私有模块并收集注册，不读配置、不做发现、不改注册表，结果是幂等缓存；禁用的插件永不执行）。5aaf0fdb5d 让插件 provider 镜像等发现结束再同步且不持锁。3c88843c81 让远程配置的凭据解析发生在取数据的锁之前，锁下产生的消息收集起来在释放后写日志，同线程重入自己的载入立即报后端不可用。5057eaa3a4 让 provider 环境变量的完成钩子读进程级来源记录而不是按 profile 扫描。9d1cf25f00 让 bundled_profiles 在安全 worker 里不执行任何插件代码。测试：96c029315b（冷进程 Nous 引导、无配置 auth 导入、锁序回归）、ea95e67ec6（配置/WAL 锁序探针跟随填充移出导入）、e77bb162b4（先加固 profile home 再做只读 chmod）。</p>
+<p>会话与媒体</p>
+<p>超过 100 MB 的视频能在聊天里播了（c933945285，fix）：媒体流路由套用了保护 base64 读和附件下载的 100 MB 整文件上限，于是一段 103 MB、2 分 15 秒的 1080p 录像直接 413，播放器一片黑只显示「打开视频文件」。播放器的源是按 Range 从磁盘一段段读的（SSH profile 的 clip 早就没有这个上限），现在流路由和旧下载路由的播放器请求都去掉这个上限，/api/files/read 仍然保留。</p>
+<p>图片与音视频不再重复下载：f1a0e52c9e 给聊天图片的响应加 ETag（路径、inode、大小、mtime）和 private/no-cache，浏览器自己缓存正文、每次只做校验，没改过的文件只花一个 304，同尺寸重写的场景由 9cbaca18cc 处理（If-None-Match: *）。c45eca7627 让重建的聊天记录行复用音视频流地址：以前每次挂载都签新票，重新挂载（回合重新渲染 markdown、重连）就重下一遍，按 URL 记的播放位置也失效；现在解析过的地址保留 20 分钟（票有效期一小时），失败的地址忘掉重解析，只存 URL 不存字节；74a0e1f462 让复用的地址失败重试一次并给缓存设上限。</p>
+<p>断线重连不再解绑会话（381876c642，fix）：重连会清掉全部存储到运行时的绑定，包括规范网关那个（它的运行时 id 就是持久会话 id）。下一次发送看到未确认的绑定就去做整次 session.resume，而 resume 会先解绑视图——子 agent、后台任务那排状态会凭空消失几秒（慢链路上更久）。运行时 id 等于持久 id 的绑定不可能被重新铸造或回收给别的聊天，客户端会在下一个请求里重新挂上它，现在这份映射和瓦片重置都保留它。</p>
+<p>存活探测不再误杀健康连接（a558069104，fix）：每次聚焦、可见性、上线和唤醒事件都会用 5 秒的 ping 探一条打开的网关连接，探不通就关（没有回合在跑时立刻关）。后端只在排在同一连接前面的所有控制请求都答完之后才回 ping，因此任何超过 5 秒的控制请求（手动压缩、大恢复、斜杠命令、慢的远程/云主机）都会让下一次 Alt+Tab 变成掉连接、重连、重新 resume。现在桌面端改用 gateway.ping——后端的 socket reader 自己应答（#108325 之后的每个后端都有），比心跳更老的后端会回 -32601，而每个探测点本来就把这个当活着。实测：规范网关上跑一个 sleep 8 时，gateway.ping 0.00 秒应答，ping 7.52 秒。修 #145737。59c4570c8a / 1abb78e871 补心跳 tick 自己跑晚时的再探（只对一次性卡顿授予）。</p>
+<p>插件、消息平台与其他</p>
+<p>6bb377a51d（fix）：网关的孤儿空闲探测在打开读取之前先解析目标。</p>
+<p>fa78e686fa / e1e956f1df / 903230b1e2 / 831637fe8d（fix，插件 doctor）：doctor 现在拒绝插件内部指向自己临时目录的链接（copytree 会跟随目录链接，把暂存输出又读一遍）、拒绝把插件复制进它自己的临时目录（TMPDIR 落在插件里时会一直读自己的输出直到路径过长或磁盘满）、只暂存它要校验的那个插件、也不会再把一个只包含插件 checkout 的 home 目录整份复制。</p>
+<p>606b83456b（fix，Discord）：/model 选择器切换或取消后没有调 stop，视图和 120 秒超时还挂在 discord.py 里，超时一到把「已切换/已取消」卡片换成「选择已过期」（#143851）。现在两个分支在设置 resolved 之后、任何 await 之前就 stop。6abdd20449 让提示视图超时时保留已解析的页脚。</p>
+<p>配置（MoA 预设）：00b6397418 / 2f5a5a7615 / 0217c5f6bb 让受支持的 MoA 预设设置被识别，包括任意预设名下的聚合槽字段、名字带填充空格时的提示，以及把路径规则移进 moa_config；d7f296079a 把预设键用例并入运行时键测试集。</p>
+<p>会话与项目：e864515d26 只为会话自己的目录写 host_workspace；4f45619643 让未挂载的 Docker 会话保留它的项目；b623ded86d / 7750d1a1d2 让未挂载的 Docker 会话留在 profile 沙箱里解析文件；3408c1a23c / 3a481782eb 让 TUI 在终端策略读不出来时仍然保留桌面端 cwd 记录、登记时只读后端和挂载标志；fdb71a95a2 让 :ws: 键保持幂等；b4a2d66c28 的文档说明修复前按目录分的沙箱去了哪里。</p>
+<p>其他：6337f1f22f 让群组里直接点名且通过的成员显示出来；2d2808ee84 让 Nous Portal 停在引导的 API 密钥页；目录侧 7020ea3e96 把 llmslim 重新 pin 到 v0.12.0、8a9eca371d 把 loreconvo 升到 0.10.20、5608b5faf1 补它的过审披露。</p>
+    </section>
+    
     <section id="2026-10-30" class="day">
       <h2>Hermes 日报 2026-10-30：关掉 Hermes 不再留孤儿进程，插件目录新增 OneBot 和 Kubernetes</h2>
       <p><strong>本期覆盖 10 月 29 日 06:30 ~ 10 月 30 日 06:30（北京时间）合入 main 的提交，commit 日期分布在 10-28 ~ 10-29（口径是按合入 main 的时间算，不是作者时间），共 523 个 commit（不含 merge），另有 2 个 merge。新增 37 个功能、200 个修复、6 个性能优化。采集口径：上次采集点到本次采集点（10-29 06:30 → 10-30 06:30），按「合入 main 的时间」统计。</strong></p>
@@ -77,6 +156,7 @@
 <p>插件目录</p>
 <p>这一天 subject 里出现 catalog 字样的提交有 226 条（占全期 43%，一条 grep 即可复核），几乎全是新增条目、pin 版本和过审披露。其中 subject 直接以 catalog: / plugin-catalog: 开头的有 86 条。用户侧最值得看的几条：</p>
 <p>onebot-platform（1f47d67116）：OneBot 协议的平台插件条目，QQ 系机器人可以按这套协议接进来，是这一批里唯一面向国内 IM 生态的。</p>
+<p>kubernetes（7517949ce3，随后 f549bfa0a6 re-pin 到新的 commit）：集群操作类插件。</p>
 <p>smolmachines 终端后端（1e18dedf91）：把 smolmachines 作为终端后端接进 Hermes。</p>
 <p>hermes-windows-tasks（80ef2e56ea）：Windows 计划任务相关。</p>
 <p>hermes-github-mentions（7136f34584）：GitHub 提及相关。</p>
