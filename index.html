@@ -22,9 +22,68 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 95 期 · 39903 个提交 · 每日自动更新 ·
+<p class="meta">共 96 期 · 39948 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-01" class="day">
+      <h2>Hermes 日报 2026-11-01：按房间允许静音，插件安装与网关卡顿一并修掉</h2>
+      <p><strong>本期覆盖 10 月 31 日 ~ 11 月 1 日合入 main 的提交，共 45 个 commit（不含 merge），另有 1 个 merge（PR #146715，它第二父支带入的提交正是本期第 44、45 条密钥改动）。新增 1 个功能、31 个修复、0 个性能优化。（口径：按「合入 main 的时间」统计，不是 commit 作者时间。）</strong></p>
+<p>📌 今日要点：</p>
+<p>群聊静音：房间可以按 allow_silence 开启，被点名也能真的不回复：</p>
+<p>Telegram 静音判定：五处修复，回复未知作者、频道贴文、无字幕语音都保留提示：</p>
+<p>桌面端插件安装：.git 不再算进 64 MB 上限，Desktop 拼写不再被误判成链接：</p>
+<p>插件安装安全：Windows 上插件文件夹名不能再用冒号或设备名跑出插件目录：</p>
+<p>网关卡顿：本机对端关掉逐帧压缩，轮询的属主域建到后台线程：</p>
+<p>重点条目：</p>
+<p>群聊静音（本期唯一新功能）</p>
+<p>33cf20374d feat(gateway): allow intentional silence per room — 多机器人房间里，模型有时会用 NO_REPLY 或 [SILENT] 这样的标记结束回合。以前只要这条消息提到了机器人或者直接问了它，网关就会往群里发一条「只返回了静音标记」的提示，等于替模型开口。现在在服务该房间的 profile 的 config.yaml 里写 allow_silence: true（走 channel_overrides，或用顶层平台块的 channel_overrides，查找顺序是会话 ID、线程 ID、父 ID），被点名或 @ 也能真的不出声。默认、null、false 保持原有回复策略；空回复、失败、部分完成、被打断的结果没有这个许可；这个开关只影响最终投递，不撤销工具动作、不撤回已经发出的进度，也不指示模型去选静音。改完要重启网关。</p>
+<p>71981bd1fd fix(gateway): room allow_silence reads top-level platform blocks and fails safe — 查房间配置时只读嵌套的 platforms: 形式，而网关自己的加载器还会合并顶层 &lt;platform&gt;: 块并让 channel_overrides 生效，在那边配了 allow_silence 的房间（同处配的 model / provider 却生效）会静默丢掉这个键。现在走加载器同样的两步（先 merge_platform_sections，再取平台段覆盖），并且只读路由到的那个平台。同一次改动里还补了失败安全：查询原来在投递路径上无保护，ProfileRouteRejected 之类的错误会把整个回合变成 agent 错误回复，现在只记日志按默认回复规则处理。</p>
+<p>78aa58f672 fix(gateway): room allow_silence honours the gateway&#x27;s own config for its primary profile — 每个来源都带 RoutingIdentity，独立网关也有，于是 _room_allow_silence 每条消息都去重读 profile 家目录的 config.yaml，忽略了 runner 真正服务的配置（比如 gateway --config 指定的文件）。在那边开启的房间照旧收到警告，反过来还可能把本该发出去的话吞掉。现在主 profile 的回合直接用服务配置，只有路由到别的 profile、或者 runner 没有配置时才读那个 profile 的 config.yaml，单 profile 的常见路径也少一次读文件。</p>
+<p>30071865c9 fix(gateway): a failed room silence receipt no longer turns silence into an error — 写静音回执的函数跑在回合的 try 块里，调用 lookup_by_session_key / load_transcript / set_session_metadata 都没有保护。load_transcript 按设计会抛 TranscriptReadError，存储拒绝或磁盘满也会抛，于是一个房间已经允许静音的回合反而投递了 agent 错误回复。回执的唯一用途是让崩溃恢复认得这次静音，没有它恢复走文档写明的兜底（保留人类回合的提示），所以现在只记日志，实时投递保持静音。</p>
+<p>e2d8f3606c docs(gateway): two allow_silence limits the room docs did not state — 文档补上两个边界：一个只设了别的键（比如只有 model:）的线程条目会第一个命中并盖住父级的 allow_silence，要在那里重复写一遍；另外从那之后的一个提交起，模型在只做杂事的工具调用（记忆、待办、技能管理、会话搜索）旁写了正文、再用一个裸标记结束完整回复时，那段正文会作为最终答复投递，开启静音的房间也一样。后者是文档化而不是改行为，因为丢掉已经写好的回答才是那个提交修掉的 bug。</p>
+<p>73da180084 refactor(gateway): pass the platform name to platform_section as str — 为上面按路由平台取配置的读法铺路，平台名由枚举改传字符串。</p>
+<p>Telegram 群聊的静音判定</p>
+<p>dc6519da4a fix(telegram): let a silence marker stand on group messages not addressed to the bot — Telegram 适配器从来不设 MessageEvent.reply_expected，silence_allowed() 永远拿到 None，于是群消息里每一个裸 [SILENT] / NO_REPLY 都被当成「只返回了静音标记」的提示发到整个群（#120051）。现在由 telegram_context.py 的 group_reply_expected 逐条给出信号，规则与 WhatsApp 那套一致：私聊、以及被 @、被回复、喊唤醒词、斜杠命令（正文或图片说明里都算）的群消息要回复；回复了别人、或者一开口就 @ 别人的消息，以及纯闲聊，允许静默；论坛主题的根锚点不算回复某个人。</p>
+<p>c419cf7c86 fix(telegram): replies to a channel or anonymous-admin post keep the notice — Telegram 对频道自动转发填的是服务账号 777000，匿名管理员填 GroupAnonymousBot，由聊天签名的贴文则设 sender_chat。这些以前被算成「回复了另一位成员」，于是在关了 require_mention 的讨论组里，有人评论频道贴文（包括机器人自己频道的贴文）来提问，会被判成不需要回复，可能被一个裸静音标记吞掉。现在回复聊天签名的贴文按未知作者处理，提示保留；只有回复另一位已知成员才算闲聊。</p>
+<p>61794f3f17 fix(telegram): a reply to an unknown author keeps the notice without a &quot;?&quot; — 被引用的消息没有 from_user 时，以前不算回复别人，但会掉进闲聊规则，一句「同意」就变成 reply_expected=False，一个裸静音标记什么都不发。Telegram 文档和 WhatsApp 规则都承诺引用作者未知时要发提示，现在这类回复在闲聊规则之前就返回 None。论坛主题根的检查也在这次改动里收进一个共用的 _quoted_reply 辅助函数（返回类型由 c419cf7c86 补上）。</p>
+<p>5bb0e7d87d fix(telegram): uncaptioned voice notes and audio files keep the silence notice in groups — 判定只看正文或说明文字，没配说明的语音条和音频文件没有文字，于是群里用语音提问也可能被静音标记吞掉。现在无说明的语音和音频返回 None（提示保留），带说明的按说明判断，图片、贴纸、文件、位置行为不变。</p>
+<p>e97cdd16fe fix(telegram): match the WhatsApp rule on unknown reply authors and indented commands — 对齐 WhatsApp 规则的两处：被引用作者未知的回复不再算回复别人；带前导空白的命令也算对机器人说的，与网关解析命令的方式一致。</p>
+<p>桌面端插件安装</p>
+<p>2c9946a6c5 fix(desktop): root-layout git installs no longer count .git toward the 64 MB cap — 插件文件就在仓库根目录时，发布的是克隆根目录本身，原生 git 安装没有传过滤条件，尺寸检查把整个 .git 也走了一遍并复制进发布目录，一个约 32~64 MB 的插件明明只发布几个文件，却被拒「larger than 64 MB」。现在安装套用 reconcile 已有的根目录过滤（排除 .git 和 __pycache__），与宿主侧安装先丢掉 .git 再检查的做法一致。是 10 月 28 日那批插件安装改动引入的回归。</p>
+<p>df98f3d8b0 fix(desktop): a Desktop/-spelled plugin folder publishes on macOS and Windows — 纯目录检查把 realpath(源目录) 和期望路径当字符串比较。在大小写不敏感的文件系统上，包里目录拼成 Desktop/ 时能通过 desktop/plugin.js 找到，但 realpath 返回磁盘上的真实拼写，于是整棵树被当成「文件夹是符号链接」拒掉，实际里面没有任何链接。现在逐级 lstat 包根到桌面目录之间的每个文件夹，只在真的是链接时才拒，链接的 desktop/ 和更上层被链接的情况仍然覆盖。</p>
+<p>3b3706a270 fix(plugins): host reconcile refuses links in a package&#x27;s desktop/ folder — 宿主侧同步只对根目录式的半边做纯目录检查，包里的 desktop/ 目录连着链接被原样复制，链接被发布进对外提供的插件目录，而 Electron 那边的同步是拒绝的，桌面端指南也这么写。现在除 dev checkout 链接进 plugins/ 的豁免（与 Electron 一致），每个桌面半边都过检查；64 MB 上限也覆盖这些目录，.git 和 __pycache__ 同样检查，因为 desktop/ 拷贝会把它们带上。被拒的半边保留已发布的旧副本，除非另一个 profile 里同名半边发布成功，否则在安装页报告出来。</p>
+<p>aa2f4af3c6 fix(webapp): plugins tab reports a refused desktop half, not installed — 网页版的同步端点只返回它碰过的目录，浏览器桥也没有 reconcileDesktopPluginsReport。宿主拒绝一个包的桌面半边（树里有链接、超过尺寸上限）时，安装页看不到拒绝；升级时又找到旧副本里的 plugin.js，把插件报成已安装，实际还在跑旧的桌面代码。现在宿主同步遇到被拒的树会抛错，reconcile_desktop_halves_report 收集每个被拒包及原因，并剔除被后续 profile 同名半边覆盖的拒绝；端点返回这份报告，浏览器桥暴露成 reconcileDesktopPluginsReport。被拒的半边也不再占住名字。是 10 月 28 日那次改动留下的缺口。</p>
+<p>插件安装安全</p>
+<p>792ebd2df4 fix(plugins): desktop plugin names cannot reach outside the plugins folder on Windows — 名字检查以前只拒绝斜杠、点和控制字符。Windows 上 root / &quot;C:&quot; 会拼到根目录本身，root / &quot;C:..&quot; 会拼到 Hermes 家目录，一次强制 remove_desktop 就把整棵树删掉。现在 install_desktop 和 remove_desktop 拒绝任何含冒号的名字、CON / nul.txt / COM1 / CONIN$ 这类设备名（加任何扩展名）、以及结尾的点。是新代码里的 bug，不是回归（这些 RPC 之前不存在）。</p>
+<p>网关事件循环：卡顿与误判断线</p>
+<p>1ae92cf59f fix(gateway): stop per-frame deflate and per-tool control reads from saturating the loop — 多个会话同时跑时，网关会有几秒钟完全不回话，socket 超时，客户端打印「Gateway disconnected; turn outcome is unknown」。用 py-spy 剖析真实的 hermes gateway run 驱动 24 个并发 hermes -z 会话，循环线程 94.7% 时间在忙：48% 在发 WS 帧，其中一半是 uvicorn 的 permessage-deflate 逐帧压缩（网关每流式输出一个 token 发一帧），18% 是每个工具调用后的控制卡重发（在循环上读三行 state.db 元数据，还压着 agent 写库的连接锁）。现在只要对端全在本地（回环绑定、没有公开网关、不经 SSH 隔离），session 监听器和仪表盘/桌面端监听器都关掉 permessage-deflate；非回环绑定、回环但挂了公网地址/隧道、SSH 隔离的后端保留压缩。控制卡改用 publish_async 在 worker 读快照，ticket 仍在循环上按调度顺序取，慢读不会覆盖更新的发布。</p>
+<p>8e13a8090a fix(gateway): read the RPC owner scope and ancillary polls off the event loop — 客户端按打开的会话轮询：经典 CLI 在回合进行中每秒查一次 subagent.list，Ink 每 1.5 秒查 subagent.list 和 process.list，桌面端每个可见面板每 5 秒一次。多路复用（默认）网关上，每一次 RPC 都在循环里同步做两件事：session_controls.dispatch 进 owner_scope 建属主密钥域（读 .env、托管环境、家目录 realpath）和终端策略（读 .env、config.yaml）；投影本身拿着会话的 event_stream.lock，而每个流式 token 都要从 agent 线程拿那把锁，锁内还要走压缩谱系、读本地回执和控制元数据、读进程注册表。剖析显示 23% 的循环时间花在建域上，32 个会话单路时附属投影约占忙碌时间四分之一。现在多路复用的属主域改成一次 worker 跳转里建好密钥和终端策略、只在循环上设上下文变量，投影在 worker 线程里跑；单 profile 网关、符号属主、缺失家目录回退到原来的 owner_scope。</p>
+<p>86cc60932f fix(gateway): retired-session polls answer not_found; one scope build path — 投影挪到 worker 之后，能看到循环上刚 retire 掉、而读取还在等 worker 或事件锁时被弹出的会话，于是抛 KeyError，变成 -32603 和「ws dispatch crash」堆栈，而不是 not_found。现在这种「已经不是读取开始时那个会话」的 KeyError 映射成 not_found，活会话的 KeyError 照旧抛。属主域的进入顺序（家目录覆盖、密钥、终端策略）也收成一处定义，不再靠手抄一份镜像。</p>
+<p>c2f14e48b8 fix(gateway): a secondary-profile Webapp tab keeps a scale-to-zero instance awake — 网页版 socket 现在在标签页 profile 的 owner_scope 里跑 handle_ws，心跳标记写在次级 profile 家目录，而多路复用网关的闲置监视器没有覆盖、读的是启动家目录，于是开着标签页的实例照样被挂起。现在写入侧（tui_gateway/ws.py）和监视器（run_shutdown.py）都走同一个 dashboard_client_heartbeat_path，统一解析到进程家目录。</p>
+<p>浏览器 raw CDP 的三处守卫边界</p>
+<p>1c11a23f0f fix(browser): raw CDP blocklist, interception and cookie calls work on guarded backends — Network.setBlockedURLs、Network.setRequestInterception、Fetch.enable、Page.handleJavaScriptDialog 和 cookie 设置器的 URL 参数被当成要抓取的目标去做安全检查，于是云浏览器、/browser connect 端点、容器终端里请求封锁和拦截直接失效，连屏蔽元数据地址本身都被拒。根因是未列方法的守卫扫描把每个字符串参数里的 http(s) 字面量都解析一遍，通配符解析不了 DNS，回环和元数据模式读成内网目标。这些调用只做匹配、标注或限定范围，不会真的抓取，现在放行，每个可抓取的 URL 也只检查一次而不是两次。是 10 月 28 日浏览器守卫改动引入的回归。</p>
+<p>e20007e4e7 fix(browser): raw CDP URL scan reads bracketed IPv6 and scheme-relative hosts — 字面量正则在第一个 ] 就停下，把 https://[2606:4700:4700::1111]/ 切成两半：头解析失败、尾巴根本没人检查，于是公网 IPv6 地址在受保护后端上被误拒，而 IPv4 映射的元数据地址 http://[::ffff:a9fe:a9fe]/ 反而在守卫关闭时被拦下。现在方括号主机按一个整体读，同时认识 //host、///host、\\host 这类协议相对写法，按字面主机判断（含十进制、十六进制、八进制 IPv4 写法），不查 DNS；// 注释、路径里的 a//b、别的网址路径中的 // 不会被当成第二个目标；带控制字符的协议相对写法按同样的规则拒绝。</p>
+<p>09d2e686f9 fix(browser): raw CDP metadata check reads the host after userinfo — 反引号、]、&lt;、&gt; 在网址的 userinfo 里合法，但字面量扫描在这些字符处截断，于是 http://x]@169.254.169.254/ 被读成 http://1.1.1.1，而浏览器真的会去连那个元数据主机；协议相对的 //x]@169.254.169.254/ 和 urlsplit 解析不了的 url 参数同理。现在当字面量在 authority 里被截断、且之后再出现 @ 时，额外返回最后一个 @ 之后的主机，元数据下限和私网守卫都能看到。</p>
+<p>Bot Chat 历史不再永久 not_found</p>
+<p>075618f4a2 fix(gateway): judge Bot Chat history by the delivering principal — 门禁校验一条带戳的记录时，拿戳本身当收养人，等于永远通过（same_owner(x, x)）。于是属主投递（cron 到点、bot_relay.deliver）会保住别的系统用户（如 auth:v1:[&quot;local&quot;,&quot;&quot;,&quot;uid:1001&quot;]）或没有注册 provider 的登录盖的 TUI / CLI 行，属主自己收养失败，此后每次投递都被拒 not_found，再也恢复不了。现在门禁向本地打开时的同一条规则（validate_legacy_row）询问投递主体的 actor.subject；同一用户的同伴通过控制 socket 转发过来的登录，仍然可以收养它用自己主体或 &lt;provider&gt;:&lt;user&gt; 标签盖过的聊天。宿主属主永远是第二个收养人，所以收养不了属主自己历史的投递会被拒，而不是把那批历史挪走。</p>
+<p>c841bfcd0a fix(gateway): decide a compressed Bot Chat&#x27;s displacement by its tip — displaceable_bot_chat 只要谱系的根或者压缩尖端任一可收养就保留标题，而投递只收养尖端（_target → resolve_local_target）。根能打开、尖端打不开时（崩溃留下的路由列、别的用户的戳、别的 profile），标题被占住、尖端收养失败，投递永远 not_found。现在两行的绑定检查都保留，但只有尖端决定谱系是否留下。</p>
+<p>1a08f050cc fix(gateway): preserve owner Bot Chat history on first delivery — 首次投递时保住属主自己的 Bot Chat 历史，是上面这条判定链的起点。</p>
+<p>密钥缓存搬到 profile 家目录根</p>
+<p>2bed5b2258 fix(secrets): move secret caches and the Photon token to the profile home root — Bitwarden、1Password 的磁盘缓存（bws_cache.json、bws_cache.enc.json、op_cache.json）和 Photon sidecar 的运行记录从 cache/ 和 runtime/ 挪到家目录本身。原因很具体：按路径隐藏凭据文件的沙箱只在家的顶层安全——agent 能把自己写的 cache/ 或 runtime/ 改名，然后在新路径下把藏起来的文件读出来。首次读取时把旧路径的副本改名搬过来以保留权限；两份都在时删掉旧的；搬不动就继续读写旧副本，任何时候只有一份在用。SECRET_CACHE_STORES 现在同时列出这两个位置，导出分发用的 PROFILE_CREDENTIAL_PATHS、文件工具的读写拒绝、网关的媒体投递拒绝都走它——1Password 缓存以前三份清单里都没有。</p>
+<p>f413c2ee9a fix(secrets): delete old secret-store copies instead of moving them — agent 能写 cache/ 和 runtime/，那里的文件可能是链接，也可能是伪造的记录。现在首次使用时直接删掉旧位置的 Bitwarden / 1Password 缓存和 Photon sidecar 记录，不读它们，只在家的顶层读写；四个存储都是用时重新生成。备份也不再包含这四个顶层名字。</p>
+<p>其他</p>
+<p>d21408ec66 fix(update): Windows checkout-lock probe no longer leaks a ctypes type per call — 共享的持有检查每次运行都新建一个 OVERLAPPED 结构并调 ctypes.POINTER，Python 3.14 之前指针类型进全局缓存永不释放，于是 Windows 上 3.11~3.13 的网关每 30 秒一次更新栅栏轮询就长 6 KB，一天约 17 MB。现在结构和 LockFileEx / UnlockFileEx 签名在缓存的辅助函数里建一次。是 10 月 28 日更新锁改动引入的回归。</p>
+<p>149e3f5539 fix(terminal): reuse the profile container for sessionless workers — 没有会话键的命名 profile 进程以前塌到 default，落不到该 profile 的沙箱。派发 worker 会设 HERMES_HOME 并清掉会话变量，所以不算路由覆盖；现在持久 Docker 对这个进程复用 profile:&lt;name&gt;，默认 profile、非持久后端、不是命名 profile 的家目录仍然走 default。</p>
+<p>e10765f7c3 fix(terminal): key a named profile&#x27;s unnamed chats by its name too — 以命名 profile 启动的网关（hermes -p work gateway）不给自己的聊天盖 profile，持久 Docker 的键以前回退成 default，而同一 profile 的桌面端会话（会带名字）用 profile:work，上一处修复会把它们拆到两个容器。现在不写 profile 的会话取家目录的 profile 名，聊天、桌面会话、cron 和看板 worker 落在一个容器；名字来自统一的 home_profile_name，容器键、容器标签、文件面板的沙箱名共用它。</p>
+<p>a53acf8d3a fix(skills): document env setup never deletes a working env another agent published — 文档技能的沙箱回退先做自己的 import 检查，另一个 agent 在这期间发布了能用的 venv 时，本调用方把它当成坏构建换掉并删除，那个 agent 正在跑的进程可能丢懒加载的文件。现在只有仍然 import 失败才替换和删除，晚来的调用方丢弃自己暂存的那份。</p>
+<p>b544b82db1 fix(skills): OCR side env stays selected in the next terminal call — pdf 技能 OCR 参考里的 pymupdf 和 marker 安装块只赋值 PY 没有 export，终端工具只把 export 过的变量带到下一次调用，于是之后每行 $PY 助手命令都跑空命令（rc 127）。现在两个块都以 export PY 结尾，并加了检查每个文档安装块都 export 了 PY 的测试。</p>
+<p>f282c57b78 fix(skills): hermes-agent skill describes one-call text+Enter truthfully — 技能里写着 tmux send-keys 或一次 PTY 写入里带回车会被当成换行、还叫 agent 别用 process_manage submit；burst-end 回车处理落地后这两句都不成立。现在写成一次调用 send-keys 和 submit 都能用，把分开的写法留作不依赖 burst 时序的形式。</p>
+<p>78077b2b8f chore(plugin-catalog): bump kiwi to v1.2.3 (kiwi@0.12.7) — 插件目录把 kiwi 升到 v1.2.3。</p>
+<p>f30105a0b4 chore(plugins): pin birkin-mnemosyne to core 0.8.0 — birkin-mnemosyne 固定到 core 0.8.0。</p>
+<p>666589b325 chore: map nicodoggie&#x27;s commit email (salvage #141293) — 补上 nicodoggie 的提交邮箱映射。</p>
+<p>配套的测试与文档：0c181d3782、34411c1a68（docker 仪表盘 fail-closed 守卫的测试）、c88ccd08c8（投影与事件锁）、adecc40244（终端 profile-home 夹具）是上述修复的回归测试；f0888d77bf、4003c210cc、c13f64ad26、a7c6f729be 是注释与文档同步，没有独立的用户可见变化。</p>
+    </section>
+    
     <section id="2026-10-31" class="day">
       <h2>Hermes 日报 2026-10-31：定时任务能当场停下，网页版通知会闪标签页</h2>
       <p><strong>本期覆盖 10 月 30 日 06:30 ~ 10 月 31 日 06:30（北京时间）合入 main 的提交，commit 日期分布在 10-29 ~ 10-30（口径是按合入 main 的时间算，不是作者时间），共 91 个 commit（不含 merge），另有 0 个 merge。新增 7 个功能、66 个修复、0 个性能优化。采集口径：上次采集点到本次采集点（10-30 06:30 → 10-31 06:30），按「合入 main 的时间」统计。</strong></p>
