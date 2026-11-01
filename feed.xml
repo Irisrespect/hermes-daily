@@ -5,8 +5,109 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 01 Nov 2026 06:59:11 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 02 Nov 2026 07:25:32 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-02：桌面端多个网关同时在线，审批不再藏着看不见的字符</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-02</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-02</guid>
+      <pubDate>Mon, 02 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 1 日 06:30 ~ 11 月 2 日 06:30（北京时间）合入 main 的提交，共 118 个 commit（不含 merge），另有 0 个 merge。新增 12 个功能、72 个修复、4 个性能优化。（口径：按「合入 main 的时间」统计，不是 commit 作者时间。）</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端多网关：注册过的网关全部常连、掉线自动重拨，选网关变成即时激活，不再弹切换确认也不清空会话列表：</p>
+<p>侧边栏运行状态：没打开的会话行也能显示正在跑的子代理和后台进程，后台任务结束的会话不再显示成已完成：</p>
+<p>网关折叠：堆在一个忙回合后面的多条后台完成折叠成一整轮，不再十个任务十条回合：</p>
+<p>审批显示：零宽字符、双向覆盖、标签区字符、ANSI 转义和空格填充都换成可见转义，审批卡片保留原请求：</p>
+<p>新命令与开关：模型重置命令、调用前钩子可以拦截整轮、流式响应生命周期上限、定时任务拿到真实运行时间：</p>
+<p>重点条目：</p>
+<p>一、桌面端：所有网关常连（本期最大变化）</p>
+<p>13bd44e4a4 fix(desktop): every gateway stays connected; picking one is instant, with no switch prompt — 桌面端不再一次只连一个网关：启动时拨通每个已注册网关的 socket 并顶住空闲回收（本机也算），断开就每 30 秒重拨，某个网关连上就重拉会话列表。选网关从「切换」变成即时激活——先把目标打开（目标死了就在那一步失败，什么也不动），再解绑旧运行时、立刻起一份新草稿；没有屏障、不清空会话列表、不重置机器上下文。Switch to 文案改成 Open，只有选本机会装安装器时才询问。以前启动时连不上的网关，恢复后也不会出现在 All profiles 里，这条一并修了。</p>
+<p>32a39600c4 fix(desktop): a gateway pick rescans the star map and leaves the old profile&#x27;s project — 配套修正：网关变了但 profile 名没变时星图缓存不重置，界面显示并操作的是上一个后端的图；现在连接 id 变化也重置缓存并重载打开的视图。同一网关上带 profile 选连接时，新草稿继承了旧 profile 的项目目录，现在网关或 profile 任一变就离开项目。</p>
+<p>4841ace953 fix(desktop): keep-connected pin never blocks a gateway edit; review fixes — keep-connected 改成自己的 pin（不再借用 bot relay 的计数租约）：空闲回收仍然尊重它，但编辑过的网关重拨不等它，socket 立刻换到新 URL 和 token。本机没装 Hermes 时 keeper 跳过 This device（探测失败即放弃），安装器只在确认点击后跑；OAuth 远程和云端选择会先做一次受保护的 REST 读取再动前端。</p>
+<p>二、桌面端侧边栏：哪些会话还在干活</p>
+<p>e032b8a264 fix(desktop): sidebar rows not on screen show running subagents and background work — 没打开的会话行也能显示正在跑的子代理和后台进程：以前只有可见面板在轮询 subagent.list 和 process.list，其他会话、以及渲染器重载或重连之后的每一行都显示空闲。新增无会话的 subagent.roster RPC，按属主会话返回活着的顶层子代理数和运行中的后台进程数（只报所请求 profile 的 state.db，不把别的 profile 的会话 id 交出去）；前端在连接或重连时读一次、窗口可见时每 10 秒读一次，只给没有实时事件来源的会话补数据，打开的会话仍以事件为准，连续失败三次的来源先停下等下次重连。</p>
+<p>cc9dbb0583 fix(desktop): sessions waiting on subagents or background processes keep the running highlight — 回合以 delegate_task(background=true) 或 terminal(background=true) 结束的会话，以前侧边栏显示成已完成——运行弧和加亮的标题只覆盖 working 和 stalled，而点状态已经解析成 background。现在 background 也带运行弧，空心圆点仍用来区分真正的进行中回合。</p>
+<p>3452786673 fix(desktop): roster lights background-only rows, every owner, and stops churn — roster 只点亮后台行、覆盖每个属主，并停止无谓抖动。</p>
+<p>c7c7e0fa92 fix(desktop): dismissing a background row never hides roster-reported work — 关掉一条后台行不再把 roster 报来的工作一起藏起来。</p>
+<p>f8bcc73c79 fix(desktop): roster never crosses profiles and one hung backend never freezes the rest — roster 不跨 profile，一个卡住的后端不会冻结其余后端。</p>
+<p>9f050ccc82 fix(desktop): status bar names the profile when another profile&#x27;s messaging is down — 别的 profile 消息服务挂了时，状态栏标出是哪个 profile。</p>
+<p>c7da41dd52 fix(desktop): a session&#x27;s running highlight ends when its background work ends off screen — 会话的运行高亮在其后台工作在离屏结束时正确收尾。</p>
+<p>62128cd8ff fix(desktop): a profile whose scan failed no longer shows &quot;No sessions yet&quot; — 某个 profile 的会话扫描失败时不再显示成 No sessions yet；失败的 profile 不出空分组，已经带过来的行照常显示。</p>
+<p>944799abc0 fix(desktop): apply a saved pack language at boot — 启动时应用已保存的界面语言包。</p>
+<p>0df6c56546 fix(desktop): the language picker only offers languages it can show — 语言选择器只列真的能显示的语言。</p>
+<p>7af86aa2dd fix(i18n): a freshly started gateway serves installed language packs — 刚启动的网关也会提供已安装的语言包。</p>
+<p>三、网关：堆在后面的后台完成折叠成一整轮</p>
+<p>343a5f7f58 fix(gateway): background completions that pile up behind a busy turn run as one turn — 一个回合在跑的时候，每个结束的后台进程都各自进 FIFO 排一轮：十个任务跑完，就是十条「后台进程已完成」的回合挨着跑，每条都重读整个上下文只为回一个结果。现在新的完成会折叠进还等在 FIFO 末尾的那条完成里，带上两段文本、全部生产者身份和「N background process results」表头，并在同一事务里取消等待中的那一行；只折叠末尾，夹在两条完成之间的 prompt 保留自己的位置。</p>
+<p>3030077ef0 fix(gateway): a completion fold never reorders past a prompt or stores results twice — 折叠不会越过一条 prompt 重新排序，也不会把结果存两次。</p>
+<p>33920f4b2f fix(gateway): a folded completion keeps only its own identity; a finishing job&#x27;s tick never blocks the fold — 折叠后的完成只保留自己的身份；正在收尾的任务 tick 不再阻塞折叠。</p>
+<p>四、遥测：忙时到达的消息也算进来</p>
+<p>6f55623cc9 feat(telemetry): count messages that arrive while a chat&#x27;s agent is busy, and the day&#x27;s peak of busy chats — 新增 hermes.gateway.busy_arrival.count：一条人类消息到达时该会话的回合还在跑，就记一行——结果分别是排队、steer、硬中断后接着跑、合并进同一波忙时消息，还是被 /stop、/new、拒绝、队列上限丢掉，连同从到达到交给 agent 的等待时长。engagement.day 增加 gateway_peak_busy_chats_bucket，记录当天同时在跑回合的会话峰值（按 profile、按 UTC 日）。都在既有的共享指标开关后面，聊天 id 和 session key 不出进程。</p>
+<p>bd47fe3b63 fix(telemetry): count busy messages that wait behind a running FIFO turn; cancelled rows read as dropped; per-profile home and closing-day peak — 补上层队列场景：适配器以为是空闲、实际有一条 FIFO 回合在跑时，也在准入时打戳并结算；被取消的行计为丢弃；归属取路由身份的运行 profile，不是最后在该会话跑过回合的 profile；跨零点的日期先折叠自己的峰值再写行。</p>
+<p>a41d1dfca0 fix(telemetry): a busy message saved behind a pause or restart is not dropped; auto-resumed chats count toward their own profile&#x27;s peak — 暂停或重启后排队的忙时消息不再被判成丢弃；自动恢复的会话算进它自己 profile 的峰值。</p>
+<p>9fb07208be fix(telemetry): settle a cancelled busy row after its waiter and successor drain — 被取消的忙时行在它的等待者和后继者排空之后再结算。</p>
+<p>b7ab3f7d85 fix(telemetry): tool names a stable release shipped stay valid after leaving core — 稳定版曾经提供的工具名在离开核心之后仍然算有效。</p>
+<p>五、审批提示：把藏起来的字符显示出来</p>
+<p>3f5612cde6 feat(approval): show hidden characters and padding in approval prompts — 危险命令可以夹带渲染成空白的内容：零宽字符和 bidi 覆盖、U+E0000 标签块、原始 ANSI 或 OSC 转义、一个裸回车，或者几百个空格把真正的尾巴挤出屏幕和聊天预览的 200 字符上限——人批准的和实际执行的不是同一件事。新增 sanitize_command_for_display()，把隐藏字符换成可见的转义写法、把填充换成明确标记（正常缩进和制表换行不动），再套上原有的密钥脱敏；CLI 提示、回调、网关通知、execute_code 待批体、插件审批通道、消息卡片、TUI 和桌面端、API 服务全部走这个函数。只改显示，执行的命令、智能评估和允许列表键都不变。</p>
+<p>6513a4f591 fix(tui): page long approval commands so every line is reviewable before a choice — TUI 里长审批命令分页显示，每一行都能在做出选择前看到。</p>
+<p>33bce7b26d fix(approval): show hidden characters on the remaining first-render prompt surfaces — 其余首屏渲染的审批界面也显示隐藏字符。</p>
+<p>f62f42e4cf fix(approval): escape blank-rendering code points by category, collapse separator and blank-line padding, sanitize consent descriptions — 按类别转义渲染为空的码点，折叠分隔符和空行填充，清洗同意描述。</p>
+<p>92c86afb1f fix(gateway): resolved approval cards keep the request on Telegram, Feishu and Teams — 审批卡片点了按钮之后不再把整条消息换成只剩决定：Telegram、飞书、Teams 现在都保留原请求（Telegram 用消息自带实体重建 HTML，代码块也在），决定追加在后面，共用聊天里留下「批准了什么」的记录。Discord 和 Slack 本来就这样。</p>
+<p>02a790293d fix(gateway): timed-out and resolved approval cards keep the full request — 超时和已决定的卡片保留完整请求：超时卡片补回为什么被标记的原因，Teams 按钮数据带完整命令预览而不是 200 字符截断，Telegram、Slack、飞书的已决定卡片去掉那句 N 分钟内不回答就不会执行。</p>
+<p>288c0c1cae fix(teams): approval card stays under the size cap for long non-ASCII commands — Teams 的审批卡片在长非 ASCII 命令下也留在尺寸上限内。</p>
+<p>六、新命令与新开关</p>
+<p>5bb7bdc7c4 feat: /model reset — clear a session&#x27;s model pin without losing history (NS-563) — 新增 /model reset：会话的 /model 覆盖会持久化并盖住之后对默认模型的每次修改，以前唯一回到默认的办法是 /new，顺带把对话丢了。现在 /model reset 不带参数就清掉覆盖、回到 config.yaml 里配置的默认模型，历史保留；和任何参数组合会被拒。</p>
+<p>66c48cb158 feat(cli): /model reset in the classic CLI, help hint and queued-pick display (salvage #74899) — 经典 CLI（桌面端那个斜杠 worker 用的就是同一处理器）里 /model reset 走正常的键入路径（守卫、确认、写会话行），只作用于会话、永不带 --global，并按命令那一刻的 config.yaml 重新读；已经在默认值上会说已经在默认值，没有 model.default 会说没得重置。/model 的参数提示里列出 reset。</p>
+<p>65effb1e9f fix: /model reset on the session owner (canonical TUI, Desktop, attached CLI) — /model reset 作用于会话属主（标准 TUI、桌面端、附加的 CLI）；17 种语言的提示文案同步补上。</p>
+<p>ad9229c843 feat(hooks): pre_llm_call can block a turn before any inference request — pre_llm_call 回调（Python 插件或 shell hook）现在可以返回 block，在发出任何推理请求之前否决这一轮：不调模型，返回的 message 就是用户看到的回复，transcript 留正常的 user 到 assistant 一对，结果里带 turn_exit_reason=blocked_by_plugin_pre_llm_call。这是 DLP、隐私、策略插件以前只能改核心代码才能做到的正规接缝；被否决的 prompt 这一轮不再触发会话标题、外部记忆预取和同步、后台记忆回顾。</p>
+<p>4061818385 fix(hooks): /retry and /undo after a block use the typed text, not the placeholder — 被 block 之后 /retry 和 /undo 用的是你打的那段文字，不是占位符。</p>
+<p>792330dc91 fix(hooks): a blocked prompt is stored only as the withheld placeholder — 被 block 的 prompt 只以撤回占位符的形式存进会话。</p>
+<p>c0bcfe2bb2 fix(hooks): a blocked turn runs no post-turn compaction — 被 block 的回合不跑回合后的压缩。</p>
+<p>ac8037c05b feat(streaming): opt-in cap on a streaming response&#x27;s total lifetime — 新增 agent.stream_max_lifetime（环境变量 HERMES_STREAM_MAX_LIFETIME），默认 0 即关闭：以前的失效流检测只看两块数据之间的间隔，每来一块就重置，于是一条一直吐数据却永不结束的流永远切不掉，回合就卡在那里。打开后从本次流尝试开始计、不因数据到达重置、每次重试重新计算，并且不低于实际的失效超时；触发时按失效 kill 处理，取消尝试、中止请求客户端、关掉 socket，交给重试循环或部分投递续写。</p>
+<p>eee418e089 fix(streaming): cap kills name agent.stream_max_lifetime and skip the stale breaker — kill 的提示里点明 agent.stream_max_lifetime，并跳过已经过期的断路器。</p>
+<p>c552db90bc fix(streaming): give up on a worker that stream_max_lifetime kills cannot unwind — 对 worker 解不开的 stream_max_lifetime kill 放弃等待。</p>
+<p>18d6041890 fix(streaming): count only kills of an attempt the worker is still inside — 只统计 worker 还在这条尝试里时发生的 kill。</p>
+<p>53cbb38389 fix(agent): name stream_max_lifetime in the exhausted-retries headline — 在重试耗尽的标题里点出 stream_max_lifetime 这个名字。</p>
+<p>b484be5610 fix(agent): configure stream_max_lifetime through config.yaml only — stream_max_lifetime 只能通过 config.yaml 配置。</p>
+<p>97f895faf3 fix(streaming): log the stream watchdog&#x27;s arming and an abnormal monitor exit — 流看门狗的布防和异常退出写进日志。</p>
+<p>3166c4a4b1 feat(cron): give scheduled jobs their actual run time in the prompt — 定时任务的 prompt 里现在带实际运行时间：系统提示里的时间戳只到日（为了提示缓存字节稳定），所以 cron 触发时无从知道自己是几点跑的——早上 7 点的早报和晚上 7 点的重试长得一样，对时间敏感的报表只能编时间或者花一次工具调用去查。现在在 cron 提示之后加一行 CURRENT RUN TIME，写星期、日期、时分和时区，按配置的时区；跨运行的技能脚手架缓存不受影响。</p>
+<p>七、平台、插件与集成</p>
+<p>016bc1df65 feat(telegram): support video note messages — Telegram 支持视频留言（圆视频）：以前这类消息没有对应的处理器，直接不进来；现在 video note 按视频处理，会被下载、缓存成 mp4 交给 agent。</p>
+<p>840d104031 fix(telegram): an uncaptioned video note keeps the group silence notice — 没有说明文字的视频留言在群里保留静音提示：判定把无字幕的语音条和音频当成话在音频里，返回 None 让提示留下，圆视频同样是这个情形；否则在关了 require_mention 的群里，用圆视频提问可能被一个裸静音标记吞掉。</p>
+<p>ed960fe960 fix(telegram): localize the download-failure reply for video notes — 视频留言下载失败的回执本地化了：标签以前没有对应条目，德语或日语用户会收到一句混着英文 video note 的翻译，现在映射到已有的视频类别。</p>
+<p>3a73078f3a feat(slack): show emoji reactions in thread context — Slack 的线程上下文里显示表情回应：有人用表情代替回复的频道，以前冷启动时这些回应被丢掉，十二条对勾、一条回复都没有的消息读起来像没人回应。conversations.replies 本来就带每条消息的反应数组，不需要额外 API 调用和新 scope；每行上下文末尾加一个 reactions 标记（最多 8 个不同表情，多的写 +N），表情名按 Slack 的字符集收敛，防止伪造上下文结构。</p>
+<p>5d9b27cd23 feat(photon): gate setup success on iMessage opt-in via first message — Photon 的 setup 现在以 iMessage 主动发信为成功条件：投递面只路由 opt_in 为真的号码，这个标记只有人从手机上给分配到的号码发一条消息才会在服务端置上；没有它的记录在哪看都是已配好，实际收发全不通。现在 setup 把分配到的号码打出来、等这个 opt-in 落地（Ctrl-C 或非 TTY 跳过），status 里多一行 routing，报已 opt-in 还是没 opt-in。</p>
+<p>a97f13ff3f fix(photon): setup without a phone number ends on saved-not-live, not &quot;complete&quot; — 没填手机号的 setup 结束在已保存但未生效，不再报完成。</p>
+<p>d47a49d46c fix(photon): setup only says &quot;complete&quot; once the number can route; bound the opt-in wait — 只有号码真的能路由时 setup 才说完成，并给 opt-in 等待加上上限。</p>
+<p>9bc94eb21d fix(photon): look up the iMessage line before the opt-in wait; skip the wait when there is none — 先查 iMessage 线路再等 opt-in；没有线路就跳过等待。</p>
+<p>ce02e4686d fix(photon): `photon status` routing row gives up after 5 s on an unreachable API — photon status 在 API 不可达时 5 秒放弃那行路由状态。</p>
+<p>95d0629df4 fix(photon): a misshapen lines payload keeps the iMessage line lookup best-effort — 形状不对的 lines 返回不再让 iMessage 线路查询整条失败。</p>
+<p>4e89a6d585 fix(mattermost): stop sending setup to a profile dialog that has no user id — Mattermost 不再往没有 user id 的 profile 对话框发 setup。</p>
+<p>94bd083712 fix(mattermost): tidy the user-ID setup hint and move the plugin test — Mattermost 的 user-ID 设置提示整理过，插件测试挪了位置。</p>
+<p>fd03da9ee5 feat(plugin-catalog): add simular-sai (Sai by Simular) — 插件目录新增 simular-sai（Sai by Simular）。</p>
+<p>a6c229af16 feat(plugin-catalog): pin simular-sai to 365b247, declare SAI_API_KEY — simular-sai 固定到指定修订，并声明需要的 SAI_API_KEY（后者不带修订号）。</p>
+<p>9a76ac8e4f plugin-catalog: re-pin claude-subscription-directsdk to 01fa168 (official #245: runs as hermes-agent, ~1.7x less of the 5-hour window) — claude-subscription-directsdk 重新固定修订（编号见 subject）：以 hermes-agent 身份运行，5 小时窗口的占用约少 1.7 倍。</p>
+<p>c6d6538c51 fix: a process reaped mid-probe reads as gone, not as an error or alive — 进程在探测中途被回收时读作已不在，不再报错或当成还活着。</p>
+<p>d4283a9c9c fix(kanban): dispatch dependency block hook post-commit — 看板的依赖阻塞钩子改成提交后分发。</p>
+<p>78f7db6349 fix(middleware): preserve pre-Relay tool request snapshot — 保留 Relay 之前的工具请求快照。</p>
+<p>426f9ad1fb fix(desktop): drop the &quot;automatic continuation&quot; layers badge from session rows — 会话行上那条自动继续层徽章去掉。</p>
+<p>61ba1f684e fix(gateway): a profile rescan drops status verdicts about removed credentials — profile 重扫会清掉关于已移除凭据的状态结论。</p>
+<p>八、更新流程、插件安装与性能</p>
+<p>005fbe8058 fix(update): stash only what the update collides with, and ask before stashing — hermes update 以前对任何有改动的树都跑 git stash push --include-untracked：checkout 里任何未跟踪目录都会被算进 git 对象、从磁盘删掉、恢复时再写回来。一个 55 GB 的残留工作树副本（280 万个文件）让更新前暂存这一步要跑几分钟，拒绝恢复就把整个目录留在 stash 里。现在只有更新可能落到的 ref 上确实有同名文件（或它的父、子路径）的未跟踪条目才进 stash，其余留在磁盘上（大小写不敏感文件系统按 casefold 比较）；fork 和读不到的目标树保留旧的整树 stash。交互终端在暂存之前就问更新后要不要保留这些改动。</p>
+<p>001b0eba27 fix(update): never offer the delete answer when there is nothing to pull; scan ignores showUntrackedFiles — 没有东西可以 pull 时不再提供删除选项：主 checkout 的 in_place_update 是 False，于是 HEAD 已经在 origin/main 上也会弹出保留还是删除，点否就把改动删了。现在只在真正切分支、或目标不是 HEAD 也不是它的祖先时才问。另外 showUntrackedFiles=no 会让扫描漏掉全部未跟踪条目，现在扫描显式传 --untracked-files=normal。</p>
+<p>c483933325 fix(update): tree-ref probe reads only the exit code, so it needs no text decoding — 树探针只看退出码，不再需要解码文本。</p>
+<p>8fc50f0551 fix(update): Windows process probes build their ctypes bindings once — Windows 上的进程探测只建一次 ctypes 绑定：两个探测辅助函数以前每调一次就新建一个 WinDLL 包装和带类型的原型，还会重新定义结构体并再调一次指针类型；Python 3.14 之前这些指针类型永久留在 ctypes 缓存里。实测 50 次预热调用会造出 200 个 DLL 包装和 300 次指针调用，现在缓存后一次都不建。</p>
+<p>016b76da3a fix(desktop-plugins): install and remove treat a Windows junction as a link — 桌面端插件安装和卸载把 Windows junction 当链接处理：junction 对 is_symlink() 答 False，悬空的连 exists() 也答 False，于是安装会无 force 地替换悬空 junction，卸载会跳过从别处链接过来的拒绝。现在两处都用 reconcile 模块的链接判断。</p>
+<p>c1bf0fdba0 fix(desktop-plugins): host reconcile treats Windows junctions as links — 宿主侧插件同步同样把 Windows junction 当链接。</p>
+<p>00953653cf fix(desktop): a native plugin install never replaces a folder outside desktop-plugins — 原生插件安装不再替换 desktop-plugins 之外的目录：文件夹名来自仓库（manifest 的 name 或子目录最后一段），以前不加检查就拼到 desktop-plugins 根下，一个叫 .. 的包在强制安装时会删掉并替换整个 Hermes 家目录；现在拒分隔符、冒号、首尾点、控制字符、超 128 字符和 Windows 设备名。</p>
+<p>c627ec8466 perf(desktop): ignore root geometry in theme observation — 性能：主题观察忽略根节点的几何变化。</p>
+<p>915fb1b875 perf(desktop): suppress hidden terminal DOM rows only — 性能：只隐藏真正不可见的终端 DOM 行。</p>
+<p>4a15cf36b6 perf(desktop): bound terminal retention without redundant publication — 性能：终端保留量有界，且不做多余的发布。</p>
+<p>57864bb220 perf(desktop): keep live deltas out of navigation context — 性能：实时增量不进导航上下文。</p>
+<p>4a8cc6f705 fix(background-review): ground memory writes in the conversation, not inference — 后台记忆回顾只保存对话里能支持的事实，不从间接信号推断偏好；一次性的把这句改短点不再沉淀成长期偏好。</p>
+<p>b47fe6ecc6 fix(background-review): a stated like or dislike counts as a standing preference — 明确说出喜欢或不喜欢也算一般偏好，不再只认 always、from now on、remember 这几个词。</p>
+<p>f92db3b007 fix(profiles): hermes update never copies the default .env into a profile — hermes update 不再把默认的 .env 复制进 profile。</p>
+<p>890ddad617 fix(profiles): hermes update&#x27;s .env backfill leaves messaging channels behind — 更新时的 .env 回填不再漏掉消息平台通道。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-01：按房间允许静音，插件安装与网关卡顿一并修掉</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-01</link>
@@ -1642,6 +1743,9 @@
 <p>7a035176c2 feat(plugin-catalog): relist browserpaw at v4.0.0</p>
 <p>问题：目录本期一次收进大量新条目，需要逐条给出定位、提供的能力与最低核心版本。修复/内容：新增 TTS Buddy（原生语音服务商）、hermes-vcc（确定性、不用 LLM 的压缩引擎）、auto-pin、long-conversations、wicked-memory（工具插件）、channel3（购物）、heartbeat2、hermes-mobile（把 Hermes 接到手机的平台适配器）、telegram-stickers、NetMind（模型服务商）、Kumiho Memory（托管 MCP）、event-read、index-search、myswarm、hermes-lang-el（希腊语桌面语言包，约五千个键量级的桌面文案），browserpaw 以 v4.0.0 重新上架。效果：可直接在目录里安装的新能力数量明显增加。</p>
 <p>插件目录 · 版本更新与审核披露</p>
+<p>7165f8b7af feat(plugin-catalog): re-pin Index 0.48.5 to 1214c61</p>
+<p>45dd0427c0 feat(plugin-catalog): pin Index to 0.48.5 (7f4c3ed)</p>
+<p>ec71e8920a feat(plugin-catalog): pin Index to 0.48.4 (87e714d)</p>
 <p>939647bdf2 feat(plugin-catalog): add account-pool</p>
 <p>f18d7d55e6 feat(plugin-catalog): bump approval-ledger to 1.2.0</p>
 <p>059150a855 feat(plugin-catalog): bump error-ledger to 1.3.0</p>
@@ -2081,6 +2185,7 @@
 <p>beb62ceb91 feat(plugin-catalog): add beam plugin</p>
 <p>1231058a6e feat(plugin-catalog): rename meshtastic-gateway to radio-dm-gateway</p>
 <p>fb6f09374d feat(plugin-catalog): remove old meshtastic-gateway file name</p>
+<p>e1e243882d feat(plugin-catalog): repin radio-dm-gateway to f3f8049 after the repository rename</p>
 <p>876190273c Add hermes-vision-inline to the plugin catalog</p>
 <p>99b067e315 feat(plugin-catalog): bump command-ledger to 1.1.0</p>
 <p>1a66e0c7b0 feat(plugin-catalog): bump approval-ledger to 1.1.0</p>
@@ -2385,6 +2490,7 @@
 <p>问题：一批用户能直接撞上的细节。修复：给项目里新开的会话保留项目工作目录；堆叠图片的预览框加宽，一组图片能完整看到；缺失的远程 profile 给出说明而不是空白；未知的云 agent 状态不再显示；手动触发 cron 之后排队中的那一行立刻出现；新建的分组会话带上房间上下文，且原文照搬不做改写。</p>
 <p>模型目录 · claude-haiku-5.5 进入目录</p>
 <p>3cabfad57e feat(models): add anthropic/claude-haiku-5.5 to OpenRouter and Nous Portal catalogs (#134759)</p>
+<p>04dc7f846c chore(plugin-catalog): pin claude-subscription-directsdk to 4bc79c7 (Haiku 5.5) (#134749)</p>
 <p>dd6ab89cb8 fix(pricing): price Bedrock Claude Opus 5 and 5.5 from the snapshot</p>
 <p>dd7ee86004 fix(models): TokenHub&#x27;s saved endpoint is not a relay, so /model keeps the curated Hy list</p>
 <p>问题：新模型要两个目录都登记才能在选择器里出现，价格也要单独跟上。修复：anthropic/claude-haiku-5.5 加进 OpenRouter 和 Nous Portal 两个目录；订阅直连插件同步 pin 到带 Haiku 5.5 的提交；Bedrock 上的 Claude Opus 5 和 5.5 按快照补齐定价；TokenHub 保存的端点不是中转，所以 /model 保留整理过的 Hy 列表而不是被覆盖。效果：Haiku 5.5 和 Bedrock 上的 Opus 5 / 5.5 能正常选中并正确计价。</p>
@@ -2699,6 +2805,7 @@
 <p>57ced3ebac feat(plugin-catalog): add brethof-brain</p>
 <p>f2555a8dfc feat(plugin-catalog): pin listing banners for the PIR8 plugins</p>
 <p>6855de2e92 feat(catalog): add standalone Antigravity OAuth Plus</p>
+<p>3732ba0116 feat(plugin-catalog): pin Index to 0.48.3 (a9204dc)</p>
 <p>32222059c2 feat(plugin-catalog): bump redaction-pack to 1.1.0</p>
 <p>5a88649f7c feat(plugin-catalog): show a card image for progress-squash</p>
 <p>61bf68aced feat(plugin-catalog): add the aux-ledger catalog card</p>
@@ -2739,6 +2846,7 @@
 <p>插件系统 · Home Assistant 搬出内核，成为官方插件</p>
 <p>fb9fc8a3dd refactor: move Home Assistant out of core into the homeassistant catalog plugin</p>
 <p>403fc8beee Plugin catalog: homeassistant (official, NousResearch)</p>
+<p>93782e9cc3 Plugin catalog: re-pin homeassistant to 2.0.1 (ba30cb0)</p>
 <p>问题：Home Assistant 的网关平台（plugins/platforms/homeassistant）和 ha_* 工具集（tools/homeassistant_tool.py）一直打包在内核里，任何一个 HA 的特殊情况都要在内核里写一段专用代码。修复：两者改由官方目录插件 homeassistant（NousResearch/hermes-homeassistant）提供，平台名、工具集/工具名、配置键和环境变量都保持一致；迁移表放在 hermes_cli/left_core_migration.py，复用了 memory-provider 迁移的辅助函数——凡是用过 HA 的 profile home（.env 里有 HASS_TOKEN、platforms.homeassistant 启用或存着 token、或选了 homeassistant 工具集）都会被 hermes update 按审核过的 pin 装上插件，另外在 agent start / gateway start 时每进程惰性装一次（遵守 security.allow_lazy_installs），结果会送到终端、桌面端和聊天里，网关启动时的结果交给该 home 的第一个 agent。内核里 HA 的三个特例改成通用的 PlatformEntry 接缝：trusted_inbound（事件总线平台的允许名单旁路）、display_tier（内置显示默认值）、shared_env_prefixes（插件工具共享环境变量的 profile 克隆归属规则），cron 投递走已有的 cron_deliver_env_var 接缝，HASS_TOKEN 仍然按已安装插件的 manifest secrets 从子进程里剥离。效果：HA 变成和其它插件一样的可独立更新的条目，平台与工具对用户的使用方式不变。</p>
 <p>插件系统 · Home Assistant 迁移过程的一批边界修复</p>
 <p>e641b71913 fix: a removed Home Assistant plugin stays removed after update and restart</p>
