@@ -5,8 +5,57 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 04 Nov 2026 07:01:42 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 05 Nov 2026 07:06:18 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-05：终端里直接画图 —— TUI 和主流终端支持内联图片</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-05</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-05</guid>
+      <pubDate>Thu, 05 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 4 日 06:30 ~ 11 月 5 日 06:30（北京时间）合入 main 的提交，共 116 个 commit（不含 merge），另有 4 个 merge。新增 8 个功能、71 个修复、2 个性能优化。口径按合入 main 的时间统计，不是 commit 作者时间，因此窗口里包含合入日期早至 11 月 3 日的条目。</strong></p>
+<p>📌 今日要点：</p>
+<p>内联图片：TUI、经典 CLI 以及 iTerm2 / WezTerm / Konsole / VS Code 都能在对话里直接画出附件和工具截图，不再只显示路径。</p>
+<p>桌面端：语音输入链路的回声与串音误判修了一组，工具调用行的归属和键盘可达性也一起补上，另外还有两条性能改动。</p>
+<p>bot 模式：message_agent 一次可以扇出给 8 个同伴，支持只要通知、可以撤回自己发的请求，回执按同伴报状态。</p>
+<p>上下文窗口：默认兜底值在所有显示位置标成 fallback，Bedrock 按 AWS 模型卡补齐了一批模型的真实窗口。</p>
+<p>安全与平台：cookie 写入按浏览器的 Fetch Metadata 判定拒绝，Windows Store 发版改为草稿提交后自动上线。</p>
+<p>重点条目：</p>
+<p>终端内联图片（本期最大的新能力）</p>
+<p>TUI 记录区直接画图（d4ac2edd5d）：以前对话里的附件和工具产出的图在 TUI 里只有一个路径。现在用户那一轮的附件挂在它那一行下面，工具产出的图片挂在发起它的工具行下面，锚定方式和内联 diff 一样。为此 tool.complete 现在携带 image_path，sidecar 网关的 tool_progress 和共享网关的 local_viewer_events.complete_fields 都带，标准会话也能拿到；image.render 负责把图片排成客户端能画的样子：TUI 自己握着能画 placeholders 的终端时用 kitty 占位符，否则用半块字符，display.inline_images 关掉或文件不是可读图片时什么都不画。渲染结果跨虚拟滚动重挂缓存，每张 kitty 图片在每个进程里只通过 tty 发一次。</p>
+<p>经典 CLI 的 scrollback 直接画图（ab9dda55d6）：/paste、/image、拖拽进来的附件，以及工具产生或看过的本地图片，现在都显示在它们那一行下面。哪些字段算图片是定好的：image_url、url、path、image_path、screenshot_path，先看结果再看参数，和桌面端工具预览用的是同一条规则，所以列一次文件目录不会刷出一屏图片。图片按普通文本行打印，scrollback 重放和行数计算都保持原样；kitty 与 Ghostty 用 kitty 的 Unicode 占位符，其它终端（含 tmux、WezTerm、iTerm2、VS Code）用真彩半块字符。kitty 的传输和携带图片 id 的颜色走在 prompt_toolkit 的零宽转义括号里，否则它的 ANSI 打印会把 APC 丢掉、把颜色压成 256 色。一次调用只写一行：整张真彩图一次写入会撑爆 Windows 控制台的写操作、丢掉尾部几行。配置项 display.inline_images 取 auto / kitty / unicode / off，默认 auto。</p>
+<p>iTerm2、WezTerm、Konsole 改用全分辨率（e0d6efd4de）：这三个终端以前在经典 CLI 里只能画成彩色半块字符（一个字符格两个像素），截图出来是糊的。它们都支持 iTerm2 的内联图片协议，画的是真实像素。这个协议画在光标处、不占文本单元，所以 CLI 先把图片要占的行留成空行，再从最后一行保存光标、往上移、按列数行数精确画上去、恢复光标。这些行真实存在于 scrollback，重放、改变窗口大小、后续轮次都能保住布局。auto 在 iTerm2、WezTerm、Konsole（看 KONSOLE_VERSION）下选它，tmux 和 VS Code 仍走半块；display.inline_images: iterm 可强制。TUI 不变：Ink 会重排自己的框，留不出行来盖上去，resolve_inline_mode 只对声明了 overlays 的绘制方提供 iterm。</p>
+<p>VS Code 打开图片支持时用全分辨率（be01eb2a95）：VS Code 的终端只有在 terminal.integrated.enableImages 打开时才画图，而环境里没有任何变量说明它是开是关，所以 auto 以前在 VS Code 只能给半块，即使已经打开了图片。现在启动时（和浅色模式的 OSC 11 探测同一个 pre-prompt_toolkit 窗口）经典 CLI 发一次 XTSMGRAPHICS sixel 图形查询，用 DA1 围栏收尾；只有 VS Code 的图片插件会回应 XTSMGRAPHICS，有回应就说明图片是开的，auto 走全分辨率的 iTerm2 路径。超时是实测出来的：VS Code 1.145 上回复约 7 毫秒，8 毫秒时有些次会漏、迟到回复会漏进下一次读取，10 毫秒以上每次都准，定 50 毫秒留余量，正常启动多付 7~10 毫秒。SSH 上跳过（远程往返可能超过这个时间并漏进提示符），Windows 上也跳过。探测说图片关着时，大约五次启动有一次会给一句提示，告诉用户可以打开 terminal.integrated.enableImages；固定了 display.inline_images 则探测和提示都跳过。配套的是两条 fix：解析器不再丢掉迟到的探测回复（ed1afb082e），超过探测截止时间的 VS Code 回复在 cbreak 下仍会被读取（5ce0175784）。</p>
+<p>内联图片的工程细节</p>
+<p>缓存按调用做键（64a30e926c）：进程级渲染缓存以前只按（路径、宽度）做键、从不淘汰，第二次往同一个路径截图、或者原地重新生成的图片，画出来还是第一张；缓存里的 off 也会一直卡住，即使文件后来出现了或者配置改了。现在键是（路径、版本、宽度）：工具图片的版本是它的 tool call id，所以每次调用只问网关一次，引擎按 mtime 算的 kitty id 能生效；附件不带版本，因为每次都会暂存到新的 uuid 路径。off 不缓存，下一次挂载会重新问。缓存是 48 条 LRU，kitty 传输（常是 50~500KB base64）写完就从条目里丢掉。</p>
+<p>一个文件多个尺寸各用各的 kitty id（32a2c3bad6），另一个尺寸替换了位置时会重发（ec8262822f）；什么都没画的图片行不占滚动空间（1569804f7b）；工具图片结束它挂着的工具架（cdc29d49cd）；工具图片行按自己的高度估算（3fa3656edc）；每次发送的附件都重新渲染（301e758a28）；image.render 给调用方设预览预算上限（75eef50b86）；客户端为 image.render 和 pet.cells 声明自己的终端类型（eed57b0beb）；只给确实显示了图片的调用画工具图片（268266994b）；内联图片的传输不写进重放的 scrollback（fcfd416dcd）。</p>
+<p>CLI 和 TUI 画同一批文件（17ba59a92a）：CLI 的附件按 cli._IMAGE_EXTENSIONS 接受（含 .tiff/.tif/.ico），而 image.render 走 terminal_image.IMAGE_EXTENSIONS（不含 tiff/ico），于是同一个 .tiff 附件在 CLI 里能画、在 TUI 里不画。现在两边共用 agent/terminal_image 里一份 Pillow 可渲染扩展名清单。</p>
+<p>GNU screen 与 tmux（4c910ce2b9）：auto 以前只查 TMUX 不查 STY；在 kitty 里 GNU screen 会继承 KITTY_WINDOW_ID 却把 APC 吞掉，占位符留着空白，现在两种多路复用器一样对待。文档里说固定 kitty 可以穿过开了 allow-passthrough 的 tmux，但传输从没包 DCS，tmux 直接丢掉；现在 CLI 用 OSC 52 剪贴板那套 tmux 包装（抽成 _tmux_passthrough）包住 kitty 和 iTerm2 的传输。</p>
+<p>安全：解码前就设上限（c39016f661、55bc503305、6dd58eda34）：解码上限以前排在 getexif() 之后，而一张没有 EXIF 段的 PNG 读 EXIF 会整张解码——6500×6500 的 PNG 先把 4200 万像素解出来才被拒绝。现在对不能抽样解码的格式先查头部尺寸，JPEG 仍然先抽样再撞同一个上限。iTerm2 的图片尺寸以前按编码字节算，现在按解码后的字节数。</p>
+<p>嵌套过深的工具结果（9aea04c329）：utils.safe_json_loads 捕获了 JSONDecodeError、TypeError、ValueError，但没捕获 RecursionError——json.loads 在 body 嵌套太深时抛的是它。而 tool_image_path 和 _detect_tool_failure 都用它解析结果，于是这类结果会从 TUI sidecar 的 _on_tool_complete 和标准网关的 complete_fields 里抛出去，整帧 tool.complete 丢掉。现在共享助手把 RecursionError 当解析失败处理。</p>
+<p>桌面端：语音输入与朗读（7 条 fix）</p>
+<p>语音链路上改了一组：说话检测改为由实际采集到的音频驱动（25e48eaf1a），采集前先等检测器就绪（9935fc27a8），回声拒绝保留采集播放的来源信息（0242f2ac9c），排队中的扬声器串音仍按播放阈值过滤（9ac280e757），排空排队音频期间保留播放冷却（c35cf3a69b）。这些修的是同一类误判：自己刚放出来的声音被当成用户在说话，或者尾音被重新采回去。朗读的待处理轮次归属改为在界面之间共享，不会两处各算一次（4010a2f834）；流式绘制只作用于本地语音会话（ca7cf2f8d3）。</p>
+<p>桌面端：键盘可达性、焦点与工具行</p>
+<p>会话标签页和侧边栏现在可以用键盘操作（c211af0724）。浮层关闭后焦点回到原处，编辑器指示器不再叠加（4164de0aa8）；在分栏里打字会进到它那一栏，命令面板的描边内缩到边界内（3d59cf8a0c）；焦点指示器保持可见但不叠加（97c7b6cb9f）。</p>
+<p>工具调用行和排队轮次的边界修了九条，多数围绕同一个问题：一条工具事件在什么情况下算新的一次调用。重复的工具事件只按同一次调用匹配（b0ba7a06de）；已经结束的调用被重新投递时只画一次（5337980970）；复用的 tool_call_id 与上一行丢失的完成事件隔离（cca20dc349）；复用 tool_call_id 重新布防要看这一行自己的在飞证据（e69b7a2161）；轮次已结算后才到的工具开始事件按迟到的完成事件处理（474588cd6a）；迟到的工具副本靠参数和轮次与新调用区分（aaf3a4376e）；上一轮已封存的工具行不再进到新一轮（99b5ee4cdd）；已经开始的排队提示作为它自己那一轮的边界（7b0ceaddae）；排队提示的开始标记会发布到视图（9302ba9e21）。</p>
+<p>桌面端：预览与性能</p>
+<p>隐藏窗口的渲染被节流，但功能性的工作照常推进（1c75623ca1）；预览的活动租约改走自有的 guest IPC，不再常驻轮询（d901734ada），租出去的预览在页面切换期间保持唤醒（f914914935），被取消的预览注释安装会加上围栏（a66e74dc67）。新的控制连接先 attach 再 steering，不会对还没挂上的连接发指令（919a93732a）。</p>
+<p>bot 模式：message_agent 的请求语义（2 个 feat + 9 条 fix）</p>
+<p>扇出、只要通知、自己撤回（ef52d34bdb）：target 现在接受最多 8 个逗号分隔的同伴，每个按原来的规则接纳；一个合并的 runner 把这些同伴的回复 runner 合在一起，只唤醒发送方一次，每个同伴带自己的结果（settled / failed / cancelled / pending，附 reply / error / reason / target_state）。expects_reply=false 时消息在归属冒号后标上「[no reply needed]」，不启动回复 runner，发送方不会被唤醒。cancel 传投递编号时，发送方可以撤回自己排队的那条，或者停掉自己开始的那一轮，走的是所有者的 prompt.cancel，回执作者必须是调用方。所有者的 deliver 回应里带 target_state（idle / working / waiting_approval / waiting_clarify / paused，不落库），同伴被自己的用户卡住时会直接说明，等待过期 pending 的 runner 用同一个 id 重放去重读，而不是静默超时。还有一条去重规则：message_agent 拒绝发给这一轮正在回复的那个 bot，因为最终回复本身就会回去。</p>
+<p>带标注的请求与更清楚的回执（160339e0dd）：message_agent 可以带 constraints 和 expecting，同伴读成带标签的「Constraints:」「Reply needed:」两行。同伴如果这一轮结束得静默或空着，但回答写在别处（旁边一次工具调用，或者发给发送方的一条 message_agent），那最后一句话会被转发一次，标成「[no final reply; their last message this turn:]」；只要通知的投递和非 bot 投递保持静默。被自己网关的停止/重启打断的一轮算失败回执而不是 cancelled，因为没有取消它。每个完成和扇出合并都以 outcome 开头：「@beta answered.」或者「@gamma never answered: 原因」并说明重发是否安全；等待在不可达的所有者上过期会直说（target_state 为 unreachable）；忙的同伴会在 ack 里说明它下一轮接这个请求。</p>
+<p>跟着的修复：正在跑的这个请求不再被说成「在忙上一轮」，message_agent 的 schema 也瘦身（3a1e9ef50a）；扇出保留每个同伴的回答、错误和等待状态（303f2a8035）；扇出到同名的远端同伴和本地 bot 时两边都能收到（53f5378a8e）；按投递编号取消总能覆盖到这次投递的重试（50c7d1c4b9）；被发送方取消的同伴轮次报 cancelled 而不是 failed（a78d43003e）；同伴的回复只返回一次（9c8dd84abf）；扇出规格读取容忍 BOM，取消失败会记 traceback（9fb0d6b0ce）；网关群聊出现在名册里，不再有刷新按钮和原始报错（e98b60f8b8）；网关房间在 bot 列表读取失败时仍然存活，不会自己复活（6d765b5705）。</p>
+<p>上下文窗口的 fallback 标注与 Bedrock 模型窗口（1 个 feat + 4 条 fix）</p>
+<p>默认值标成 fallback（2111815fab）：没人知道某个模型的窗口时，网关会话行以前会打印「◆ Context: 128K tokens (detected)」——_resolve_gateway_model_context 只把通用的 256K DEFAULT_FALLBACK_CONTEXT 认成默认，Bedrock 静态的 128K 被报成「检测到的」，而 CLI 的各个界面干脆不带任何来源说明。现在这个值在所有显示位置标成 fallback：网关会话行（context_source 为 default，措辞改成 fallback、不是检测出来的上限）、CLI 与网关的 /usage、宽状态栏（新增 cli.status_bar.ctx_fallback，17 种语言都翻）、欢迎横幅、/model 切换摘要。判断只在本地读，不探测，缓存 60 秒（状态栏重绘很频繁），失败时按「是 fallback」处理。没有新增配置键，覆盖方式仍是 model.context_length 或 model_overrides.&lt;provider&gt;.&lt;model&gt;.context_window。配套两条：压缩器保留 fallback 来源，MoA 预设下也保留（a212421dbd）；fallback 标签从解析器读，/status 和 /context 也标出来（0b388277f9）。</p>
+<p>Bedrock 先查表再回落（9625c34f52）：get_bedrock_context_length 以前只认 BEDROCK_CONTEXT_LENGTHS，表没跟上的模型一律 128K 默认，即使 model_metadata.DEFAULT_CONTEXT_LENGTHS 已经列了它——GPT-6.1 Terra 在同日把那批元数据加进去之后、到这次修复之前的 9 天里正是这个情况。解析顺序改成 probe → Bedrock 表 → 目录家族窗口 → 128K 默认；家族那一层只给 Anthropic、OpenAI 和 xAI（裸 ID、带地理前缀、或者包在 foundation-model / inference-profile ARN 里）。其他厂商的目录行是按厂商直连写的，可能超过 Bedrock 真正能服务的值（Llama 3 8B 的卡是 8K 而目录行 131072，Qwen3 32B 的卡是 32K 而目录行 131072），借用这些会把「压缩太早」换成「请求太大被 Bedrock 拒绝」，所以它们仍然走默认。</p>
+<p>按 AWS 模型卡补上下文长度（4b3fba6942）：有位运维在 Bedrock 上跑 GPT-6.1 Terra，看到 128K、压缩在 96K 就开始（75% 小窗口下限），而 AWS 的模型卡写的是 1,050,000。这次把 100 张文本模型卡和 get_bedrock_context_length(id, probe=False) 逐张比了一遍，主分支上有 45 张对不上，只补模型卡明确写了数字的那些：GPT-6.1 Terra 与 GPT-5.4（两张卡都是 1,050,000）进表、进 Mantle / Converse 白名单 BEDROCK_OPENAI_RESPONSES_MODEL_IDS 和静态选择器；第三方按各自卡上的 Context window 字段补 Nova 2 Lite 1M、Jamba 1.5 256K、Gemma 4 26B/31B 256K、MiniMax M2.1/M2.5 196K、Devstral 2 与 Mistral Large 3 256K、Kimi K2.5/K2 Thinking 256K、Kimi K3 1M、Qwen3 Coder 256K、GLM 4.7 203K、GLM 5 200K、GLM 5.3 1M。每条都不超过同裸 ID 在 model_metadata 里的值，这条不变式现在有测试守着；卡上比 model_metadata 大的（MiniMax M2、DeepSeek V3.2、Nemotron 3、Qwen3 235B/Next/VL）留给目录先修。</p>
+<p>插件、技能、编辑器协议</p>
+<p>插件目录新增 rex，做 Rex 终端集成（d8d6ee42af）。</p>
+<p>技能缓存的信任等级（29a61cb7ab）：scan_skill_cached 以前在内容、来源和 SCANNER_VERSION 都一致时直接返回扫描时记录的信任等级，于是仓库加进或移出 TRUSTED_REPOS 之后，用户之前扫过的技能一直沿用旧策略：新受信的厂商仓库还是按社区策略装，被移出受信的仓库还保持宽松策略。现在当前信任等级是缓存匹配的一部分，等级变了就重新扫。</p>
+<p>ACP 的服务档位（42500a10d9）：ACP 客户端只广告编辑、模型和推理三项控制，不广告速度，所以编辑器里选不了后端已有的服务档位。现在按所有者的网关、在其配置和凭据范围内读可选档位，通过校验过的会话级 setter 应用，不改配置默认值；档位变化发布给已连接的查看者，下一轮请求的值独立于当前 agent 元数据读取，重连的客户端走快照投影以免重入连接锁。配套：编辑器重载后会刷新请求的档位（ea9cabf491），attach 提示推迟到选项就绪后（d761fb9d79），服务档位选择走跟随路由（9156c854e3）。</p>
+<p>发布、Web Access、安全</p>
+<p>Windows Store 发版（b7ed4972da）：之前绿色构建提交的是 Manual 的 Store 提交，发布阶段想把它改成 Immediate，而 Partner Center 拒绝更新已提交的提交（v0.22.7 的 409 InvalidState「Cannot update the submission because it is in certification」），于是每次发版都要手动点一次 Publish now。现在 stable-store 留一份未提交的草稿并设成 Immediate，发布阶段提交它：认证和客户都不会提前拿到，构建通过认证就自动上线。配套：MS_STORE_HOLD 可以把 Store 构建切回手动发布（d6c98faab0），已提交的自动发布构建不再显示 Publish now（07274ac654）。</p>
+<p>Web Access 的 Start 记录（0883642645）：Start 记录以前要等后端的改动锁和 plan() 之后才写，排在其他网关的 Start 后面就什么都不报，于是第二个窗格又给一个 Start 按钮、网关重启两次，重开的窗格也丢掉等待时间。现在每个 Start 从到达就有自己的记录，排在别人后面时是 preparing，结束时只删自己那条，一个 Start 完成不会遮住后面排队的那个。配套：Start 一直持续到重启后的网关真正服务它（cf53dd8b99），重启只在替换掉旧网关的那个网关上结束（fb98be0dbe），后面的 Start 重启会替换前面那条跟随记录，不再出现第二个也失败后第一个又被报成重启中、按钮被按住 90 秒（27cbcb122f），没有人重复的 Start 不再一直占着控制按钮（3ca657cd58）。</p>
+<p>安全与其他：dashboard 拒绝浏览器标记为来自其他页面的 cookie 写入（0073fa98cf）：SameSite=Lax 仍会从同站兄弟（别的 localhost 端口、兄弟子域）发送会话 cookie，而 Webapp 之外那道门放行任何带 cookie 的写请求。现在浏览器自己的 Sec-Fetch-Site 判为 same-site 或 cross-site 时，cookie 写入（含登出）一律拒绝；没有 Fetch Metadata 的请求保持原规则，Webapp 保留更严格的同源检查。另外：远端没有 Origin 的 ticket 拨号可以进到 Webapp 网关（97d75f3eed）；Slack 线程上下文的发送者按当前消息的 allowlist 打标（cad0aaaf0d）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-04：群聊房间重做，成员状态、Lead 路由和定时投递一起到</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-04</link>
