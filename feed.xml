@@ -5,8 +5,60 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 06 Nov 2026 07:41:36 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 07 Nov 2026 06:58:54 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-07：内容安全拒绝改为模型侧移除、显示侧保留；终端两下 Esc 回退；群聊接入远程 bot</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-07</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-07</guid>
+      <pubDate>Sat, 07 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 6 日 ~ 11 月 7 日合入 main 的提交，共 319 个 commit（不含 merge），另有 3 个 merge。新增 18 个功能、190 个修复、0 个性能优化。按「合入 main 的时间」统计，不是 commit 作者时间；tip 从 9f9b9f54a 推进到 6b21d0564。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>内容安全拒绝：被拒的整轮从模型上下文移除，你的原话以灰色卡片留在聊天里，旧版本卡死的会话升级后自动修复</li>
+<li>终端：经典 CLI 与 TUI 换成 Codex 式的两下 Esc 回退，附带面板按终端单元格折行（CJK 不再破边）</li>
+<li>群聊：网关托管群聊可以给别的网关上的 bot 发邀请和授权入座，44 条 groups 修复</li>
+<li>接口：新增 hermes gateway attach，插件可注册 session env、JSON-RPC 方法与压缩稳定的 conversation_id</li>
+<li>撤销：/undo 现在告诉你要用哪个 /rollback 短 hash 把被撤销轮次改过的文件恢复回来</li>
+</ul>
+<p>重点条目：</p>
+<p>内容安全拒绝 · 模型侧移除，显示侧保留</p>
+<p>整轮移出模型上下文（52eef32905）：内容安全过滤是按整段对话判断的，不是只看最新一条消息，所以只要被拒的那一轮还持久化在记录里，后面每条消息都会再被拒一次，会话就停在那儿了——记录里把它叫作 Bot 卡死会话的报告。handle_content_policy_refusal 现在把拒绝前的历史交还给调用方，进程内的消息列表不往下带任何东西；这一轮已经写进库的行在 run_conversation 的 finalizer 里软删除，用的是 /undo 同一套 active=0 回退，必须等轮次租约释放之后才能做，因为持租约期间禁止改记录。CLI、TUI、网关的 Bot Chat、ACP 和子 agent 都经过这一个门面。瞬时故障（429、超时、5xx）保持原来的持久化重放路径不动。</p>
+<p>显示侧保留（6ec9d85795）：把「擦掉」换成「留着给人看」。整轮拒绝——user 行、中间的工具轮、拒绝本身——照旧从模型读到的上下文里消失，所以确定性的过滤器不会被重新触发；但 user 行以 active=0、compacted=1 留在显示投影里（和压缩归档的行一样可见），打上 display_kind 为 content_refused，并带一条存下来的提示。工具轮和拒绝细节仍然软删除，所以最后只渲染一张灰卡。模型读的是 active=1，看不到这些。</p>
+<p>两个漏口（ab3afc0b89）：一是以异常形态到达的拒绝（HTTP 400 或 APIError，而不是 HTTP 200 加 finish_reason）以前会持久化并把下一次提示重新污染；二是 CLI 和 ACP 自己持有 SessionDB，agent 在知道被拒之前就已经写盘了，现在各自在轮次结束后于 owner 侧擦除。ACP 还要按「是不是 owning agent」判断，因为非 owner 的 replace_messages 已经写入了干净历史。</p>
+<p>桌面端渲染（7270572354、6629906a3a、013871804d）：content_refused 行投影到桌面端时走 system 通道，不会画成蓝色用户气泡，你自己的文字保留在 ChatMessage.contentRefused 字段里，resume 重放也会重绘。渲染成虚线弱化卡片加盾牌图标加一句拒绝提示，右对齐但不可编辑、没有操作按钮，也不会走成模型回复；提示优先用后端下发的文案，没有就用 i18n 字符串（英文加 8 种语言）。正在对话中发生的拒绝以前只画成普通错误卡片，要刷新才能看到灰卡，现在实时识别 content_policy_blocked 帧当场替换。</p>
+<p>暖启动重复提示（02bcb123a3）：保留的拒绝行是 system 角色而不是 user 行，所以一次正常提交留下的乐观 user 提示找不到已确认的对应行，暖启动 resume 时会和灰卡并排再插一条重复提示。现在把 content_refused 行认作这条提示的存储对应物，比较提示文本后去掉重复的那一条。</p>
+<p>旧会话自动修复（f126d33384、18e8a1dead、8f95f69acd、7ca2bf7f40、1d64137aa6）：老版本用 assistant failed_turn 边界关闭被拒轮次，错误卡片写 content_policy_blocked；这类记录升级后依然卡死，Bot Chat 里更麻烦，因为 /new 会变成 /compact。现在打开一个可写的 SessionDB 会跑一次性修复，把这类轮次按新规则移出模型上下文、提问保留成灰卡。只动确实卡住的会话（最近几个已结算轮次全是拒绝），按事务一条一条修，在打开时的预算内完成；从索引里找、在写锁外面找、只看真实聊天；COMMIT 失败的那次修复会整体回滚。被 /compress 折进摘要的会话不动——摘要里重述了被拒的提问，删行解不开，提示改为让你开个新会话。</p>
+<p>文案与网关侧（30c0b0210a、6b2e513075）：提示不再教你 /undo N 自己清，而是说这条消息没有进入对话、你没卡住、换个问题问就行。网关不只是进程内的 runner 擦除，每个持久化 owner 都会擦，Bot Chat 才不会锁死。</p>
+<p>终端 · 两下 Esc 回退</p>
+<p>TUI（1dabfe94a0）：空闲、输入框为空时按 Esc 预备回退，屏幕提示 esc again to edit previous message，没有时间窗口，按别的键、点击、粘贴或者开始新一轮都会取消。第二下 Esc 或 /rewind 打开历史浏览，最新的提示默认选中并反白；默认模式滚动真实 transcript，--tui-native 打开提示与回复的浏览器。左右换提示、上下和 PgUp/PgDn 滚动、回车把这条填回输入框并预备好编辑、f 分叉、Esc 回上一层、q 或 Ctrl+C 关闭。发送这条编辑才真正回退，空提交、Esc Esc、Ctrl+C、斜杠命令或切会话都会取消，什么都不切。</p>
+<p>经典 CLI（8a6fb5113f）：同样两下 Esc 打开一个 transcript 浏览面板（prompt_toolkit 滚不了终端回滚区，所以自己做面板），每条 › 提示与 • 回复都按终端单元格折行、按屏幕尺寸算高度，最新提示反白。单个 Esc 的绑定不是 eager 的，所以 Esc 加回车、Esc 加 V、连按 Esc Esc 仍然优先匹配；vi 插入模式和输入框被占用时不生效。带草稿时连按 Esc Esc 仍然丢弃草稿，和以前一致。</p>
+<p>细节修复（6732f5d4e6、816dcd7cc2、ae3cd98af0、ba64245b13、ce9ce12bee、1da0bc0da3）：带多张图片的提示重新编辑时每张图都会恢复；清空的编辑不会把图片复活，浏览状态下的粘贴不会丢；浏览里的粘贴、被拒的回退和已发送的编辑 chip 不会吃掉正在打的草稿；浏览器的 PgUp/PgDn 真正翻一屏（以前只挪一行）；快速连按 Esc Esc 再按左右或回车会正确打开浏览，不会误判成 Alt 组合键；第二下 Esc 立刻打开浏览，不再等 escape 超时。</p>
+<p>CJK 与性能（06466a6512、5de49e24ac、d569ce08b2、1fc56d5a79）：面板的折行、裁剪、补齐以前按字符数算，一段中文提示或界面会画得比终端宽、右边框断开，现在按终端单元格算，纯 ASCII 行为不变；全角空格按两个格子处理，组合字符跟着字母走。性能上，长中文提示每折一行都要把剩余全文重新分簇，3 万个中文字符每滚一下约 1.73 秒，现在一次遍历并用 marker、text、width 缓存折好的行，降到 0.005 秒。</p>
+<p>群聊 · 远程 bot 入座</p>
+<p>席位与邀请（5f3cb0c441）：网关托管的群聊现在可以给别的网关上的 bot 发邀请、按固定成员目录授权注册，对端用成员网关上的 profile 入座。文本轮次、停止、重启恢复、丢失回复都用两个网关实测过；对端运行支持精确代次重试、保留准备阶段的重试。</p>
+<p>状态与审批（5d950e7790、b0ab988067）：对端 bot 的工具进度走已有的运行状态回报，成员确认还在跑时会显示已经恢复的尝试，只在一次尝试被替换时收起进度，并对迟到的轮询做围栏。别的网关上的 bot 发起的审批能在群里显示并回答。</p>
+<p>生命周期修复（80ac661e24、8eb5ea845a、00cda93a40、ade44d2df9、2a519923e2）：散场前必须先撤销对端授权，成员网关连不上时散场也能走完；保存的那次运行没了之后重试还能重新发一轮；成员网关在轮次中途掉线时这一轮先挂起，等它回来再结算；对端停止要确认，未确认的尝试有上限。</p>
+<p>性能（2313ef93cc）：没有对端 bot 的时候，每个 worker 周期以前都会跑一次欠账撤销维护，开 BEGIN IMMEDIATE 并在 shared-state.db 上删一次，十次空闲扫描就是十次写事务。现在欠账用只读查询，只有真的要丢一条过期行或者结算时才开写事务；既没有对端路由又没有欠账的网关直接跳过维护，能欠下撤销的操作会重新武装它。</p>
+<p>客户端与插件接口</p>
+<p>hermes gateway attach（f55d794b50、85973667b3）：一个自带界面的客户端以前只能通过 Ink 的私有脚本 ui-tui/scripts/gateway_bootstrap.py 才能接上 profile 的网关，因为 gateway ensure 虽然公开但拿不到凭据，session-ticket 这个动作又没有公开调用方。现在 attach 在 ensure 的 JSON 之上补 url、protocol、protocols 和一个单次使用、绑定 profile 的 ticket（只走 stdout，从不写日志）；没有可接的 owner 时给出同样的 gateway 状态与原因，并用 ensure 的退出码。两个客户端共用 hermes_cli/gateway_runtime_attach.py 里的同一个函数。文档同步说明：TUI 说的是 WebSocket 协议 hermes-gateway-v1，不是 stdio。</p>
+<p>插件 session 环境变量（450ece86c4）：工具跑在共享网关里，某个会话所在终端或面板的变量（pane id、socket）传不到 agent 为该会话跑的命令。以前只能用 tool_request 中间件改写每条 terminal 命令加一个 export，既改了命令文本，也漏掉其他 spawn。ctx.register_session_env 声明变量名和 resolver，子进程环境桥每次构建本地子进程环境时按子进程自己的 HERMES_SESSION_ID 调用，覆盖终端前台与后台、execute_code 的 terminal()，以及其他已经拿到 HERMES_SESSION_ 前缀的进程。名字必须在 HERMES_ 开头之外，值要过和密钥清洗同一套内部密钥与 provider 黑名单判定，插件没法把凭据塞回去；解析器抛异常会记录堆栈并当作没有贡献；注册跟着插件管理器的 profile 作用域，卸载时通过归属账本释放。</p>
+<p>插件 JSON-RPC 与事件（aa39347712、486f4a6a99）：插件前端是网关的 JSON-RPC 客户端，但以前调不到自己那半边 Python，Python 那半边也触不到某个会话的观看者，只能靠共享文件和 tool.complete 负载传数据。ctx.register_rpc 注册 plugin 点插件 id 点名字的方法，排在核心处理表之后，走和插件斜杠命令同一道门；处理函数不占事件循环、在 owning profile 作用域内跑（后来落在 runner 的轮次线程池上），失败返回 4001；卸载时从归属账本里移除。ctx.emit_to_session 只往那一个活跃会话的事件流发事件，会话按 conversation id 或驻留 agent 的当前 id 找，所以压缩之后的 id 也能到达。</p>
+<p>conversation_id（660eb55fc8）：插件工具处理、pre_tool_call、post_tool_call、transform_tool_result 钩子、工具中间件和系统提示段落，现在都能拿到 conversation_id。它是会话的压缩谱系根，反复压缩不变，只有 /new 和 /branch 才换新的；委派出去的子 agent 和后台审查分叉报的是父会话的。按物理 session id 记忆化，每段只走一次谱系。</p>
+<p>llm.oneshot（f39868fd6a）：插件前端以前没法通过网关跑插件的辅助任务并拿结构化输出，只能起一个 Python 助手直接 import call_llm 和脱敏器。现在 llm.oneshot 支持 task（内置辅助槽位或插件注册的 aux 任务，未知键直接拒绝，以前会悄悄跑在主模型上）、schema（JSON Schema，回复带解析结果，不匹配就报错）和 redact（用 agent.redact 在模型看到之前遮掉密钥）。</p>
+<p>导入白名单（0502fe0597）：插件能导入的 89 条名单以前是 hermes_cli/plugin_validate_private_imports.py 里的硬编码集合，没有任何页面给插件作者看。现在搬到 hermes_cli/data/plugin_api.json，由脚本生成公开文档，文档过期会让测试失败。</p>
+<p>/undo 与 /rollback</p>
+<p>提示文件与该用哪个参数（8ea5add59c）：/undo 只回退对话，从不碰文件。开着检查点时，被撤销轮次第一次写入之前的快照还在，但没有任何地方告诉你它在、也没告诉你用什么把它找回来。现在 /undo 在正常输出之后加一行只读信息：那次检查点之后改过的文件（先列 8 个，多的写还有几条）以及恢复用的 /rollback 参数。区间起点取被撤销 user 消息的时间戳，如果保留的最新消息更晚就取它（网关记的是平台发送时间）。这一版先给的是 list_checkpoints(cwd) 里的 1 基位置 N，也就是所有界面 /rollback 用的那个列表；同窗口更晚合入的 2f0b328e01 把它换成了短 hash——编号会在下一个检查点拍下时漂移。检查点关着时完全不额外做事，输出和以前一模一样。</p>
+<p>配套修复（2f0b328e01、b957d635d6、945e17738f、ada6384cea）：这一行现在指向被撤销区间第一次拍下的那个快照，按 tree 在保留的快照里匹配，从 take 记录取——因为每次拍检查点都会让「第 N 个」这个编号漂移。每次拍摄尝试都会先记录再完成（sub-second 时间、tree、作者秒），所以一个「其实没改动、复用了旧快照」的轮次也能定位对。所有界面的 /rollback（经典 CLI、消息网关、owner 的 rollback.restore/diff 与 sidecar）都通过同一个 resolver 解析这个参数。修剪不再靠 pruned_through 戳：被删掉的快照按 tree 找不到，记录里任何缺口（老版本、失败的 take、写不进去的元数据、没登记的 snapshot）都输出 no-hash 行。ACP 和网关聊天客户端不打印 /rollback 那一行，因为它们跑不了 /rollback；整棵树的 /rollback 在 /undo 之后不会把 /undo 留下的那几轮又切掉。</p>
+<p>记忆插件</p>
+<p>续接标识（6b21d0564d）：memory provider 以前分不出「新会话」和「agent 正在续接已有会话」，没法跳过重复播种、也没法和自己已经持有的内容对账。initialize() 现在收到 resumed 和 message_count：resumed 表示这个 session id 之前已经有一轮回答被存下来（CLI 的 resume、网关重启后接上的聊天、桌面端和 TUI 重开的会话都算），message_count 是这个会话已存的消息数。注意它按「有回答的轮次」判断而不是按条数，所以一个刚提交提示的 TUI 或桌面端新会话不会被误判成续接；新 session id（子 agent、cron）或者没有会话存储时读 False；/branch 复制历史出来的子会话报的是那次复制。</p>
+<p>fork 继承 provider（f02ba87b8c）：四个 fork 子 agent 的调用点都传 skip_memory=True，子 agent 的 _memory_manager 是 None；而 compression.checkpoint_required 是按 agent 实例从配置武装的，不看有没有 provider，于是子 agent 第一次压缩就抛 CompressionCheckpointUnavailable，委派任务直接 status=error、summary 为空，父 agent 还在跑。现在四个点改成 skip_memory=not checkpoint_required_from_config()，开关关着的时候行为逐字节不变；同时新增 memory_agent_context 参数，四个点都传 subagent，避免 fork 的记录被当成用户自己的记忆写进按平台分域的 provider。</p>
+<p>其他修复（0b45b75ece、e79ac5ab27）：on_turn_start 把 model 参数透传给 memory provider；只加载了钩子的 provider，在宿主停止前注册过的所有东西都会被释放。</p>
+<p>桌面端与终端环境</p>
+<p>源码构建重建（df9ffa977d）：Windows ZIP 更新会丢掉 workspace 的 node_modules，如果重装又失败了，渲染层和它的回执还是新的，hermes desktop --source 就以为不需要构建，结果根本启动不了。现在 apps/desktop/node_modules/electron 不存在就当需要构建。</p>
+<p>终端环境变量（ced0ea775d、b115764185）：通过 pnpm run 启动的桌面端或控制面板会带上 pnpm_config_*（store、cache、state 目录）以及 npm_config_*、npm_package_*，用户在集成终端里跑自己的 pnpm 会捡到这些值。两个 shell 构建器、Electron 的终端 IPC 和控制面板宿主终端现在按大小写不敏感地丢掉这三类前缀——但这条差点误伤：大小写不敏感会把用户自己设的 NPM_CONFIG_REGISTRY、NPM_CONFIG_USERCONFIG 一起删掉，配好的镜像就失效了，所以最终只剥掉小写的注入写法。</p>
+<p>Bot Chat 名册（7fbbe58f6b、a26c1124bf）：名册里那个已经过期的 canonical_session.id 现在当成不存在处理，归档之后打开不再卡在退役的 id 上；还活着的隐藏 Bot Chat、或者探测抛错，仍然 fail-closed。从来没有被回答过的任务运行，它的记录会保留，修复预算每 250 个会话检查一次。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-06：桌面端群聊状态可见、自动路由与讨论上限继续；密钥脱敏 37 条提交</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-06</link>
