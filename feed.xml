@@ -5,8 +5,130 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sat, 07 Nov 2026 06:58:54 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 08 Nov 2026 06:49:31 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-08：桌面端与 Webapp 共用保存的网关，群聊统一由网关托管</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-08</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-08</guid>
+      <pubDate>Sun, 08 Nov 2026 06:32:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 7 日 ~ 11 月 8 日合入 main 的提交，共 384 个 commit（不含 merge），另有 9 个 merge。新增 24 个功能、239 个修复、2 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>保存的网关：桌面端的连接登记与 OAuth 登录搬出 Electron 的 userData，桌面端和 Webapp 读写同一份列表，Webapp 里可以直接添加、测试、设为主用、删除，OAuth 登录与 SSH 隧道都由服务端完成。</p>
+<p>群聊只剩一种：新群聊一律由网关托管，桌面端关掉也继续跑；任意 profile 都能借给别的网关当成员，别的电脑上的 bot 能按邀请入座。</p>
+<p>应用内浏览器接上真实 Chrome 配置：可以用真实配置登录站点，也可以用真实配置里保存的密码盲填，Hermes 侧不解密。</p>
+<p>网关会话读取补齐：session.list 带 workspace 过滤、session.transcript 支持分页与轮询、客户端可自报名字，控制 socket 直接回答哪个网关服务某个 home。</p>
+<p>更新与状态库各修一类会让程序起不来的问题；转录的交接查询在 3 万行的段上从 0.457 秒降到 0.007 秒。</p>
+<p>重点条目：</p>
+<p>桌面端 · 保存的网关（本期最大一块）</p>
+<p>一份列表：44fff7e17b</p>
+<p>问题：桌面端的连接登记和原生 OAuth 登录存在 Electron 的 userData 里，Webapp 看不到，两边各记一份，profile 路由、Bot Mode、群聊记录指向的网关要靠 id 猜。</p>
+<p>修复：搬到 Hermes 根目录下的 gateway-connections.json 和 gateway-connection-tokens.json，和 ui-preferences.json 同目录、同一套锁（mkdir 锁加 owner token、临时文件 rename、损坏时留 .corrupt-时间戳 副本，只有 ENOENT 才当作没有这份库），并把 Electron 侧的一次性无损导入做成迁移。</p>
+<p>效果：桌面端与 Webapp 读写同一份列表，两边的 id 一致。</p>
+<p>Webapp 里直接管连接：44901b1db9</p>
+<p>问题：Webapp 之前只能看到自己那套配对出来的网关。</p>
+<p>修复：Webapp 的设置 → 网关 页显示桌面端自己的「保存的连接」：添加、测试、设为主用、删除、切换启动方式，数据来自 /api/gateway-connections（不返回密钥）；转发代理 /api/relay/&lt;连接 id&gt;/ 用该条目保存的凭据访问每个网关，token 模式带 session token，OAuth 模式带刷新后的 bearer 加一次性 ws ticket，外加条目自己的额外请求头。</p>
+<p>效果：对端网关不需要改代码或加配置；同一条提交把原来的配对机制（同意页、grant、hub key、scopes、webapp/relay-gateways.json）整体删掉，最终形态是保存的连接加转发代理。</p>
+<p>OAuth 登录搬到服务端：88f5bc6299</p>
+<p>问题：OAuth 模式的网关登录原本是 Electron 里的 native OAuth，Webapp 没有这一路。</p>
+<p>修复：服务端自己跑 RFC 8252 原生流程，持有 PKCE verifier，把远端的 /auth/native/authorize 交给浏览器，自己的 /webapp/gateway-connections/oauth/callback 做回环重定向；token 落到 token 文件，过期走远端 /auth/native/refresh，单飞刷新，401 掉登录，远端不可用则保留。</p>
+<p>效果：两个真网关之间实测通过（远端是基础密码 provider），登录、回调、受限访问都跑通。</p>
+<p>SSH 网关联通搬到服务端：7479098100</p>
+<p>问题：SSH 网关的隧道由 Electron 建立，Webapp 与纯服务端场景没有这条路。</p>
+<p>修复：服务端向条目主机开 ControlMaster，按同样参数起 serve --isolated（隔离的 127.0.0.1、端口 0、ssh session token 文件、owner nonce），在远端更新标记互斥下运行，只在 127.0.0.1 做转发给代理用；所有权按本机连接库限定，桌面端和网关不会回收对方的 serve。</p>
+<p>效果：进程内复用、新进程回收重生、断开时杀掉 serve 并清理锁文件都已实测；限制是两端都要 Linux/macOS，Windows 作为远端或本机直接按 unsupported-platform 拒绝。</p>
+<p>转发代理改走 reach 模块：0a6a2a34b3</p>
+<p>问题：代理需要按每条连接的凭据类型分别处理，401 与 socket 票据各有一套。</p>
+<p>修复：统一走 gateway_connections_reach 解析（token、oauth、SSH 三种），远端回 401 时强制刷新一次并重发一次，socket 用 mint_ws_ticket（oauth）或 session token；删除连接会连带断隧道、清掉挂起的登录。Webapp 里给 oauth 连接登录会起服务端的 PKCE 流程，浏览器不在同一台机器时把回环地址粘回来完成。</p>
+<p>效果：一条路径覆盖三种连接，删连接不会留下隧道。</p>
+<p>中继与配对方案的收尾：965172c498 / 1182e64823 / 44901b1db9</p>
+<p>过程：当天先做过一版「已登录的 Webapp 中继到其他网关」，用授权码加 PKCE 配对，每个中继请求按方法、目标、受众、时间、nonce、grant 签名，桌面端在 Webapp 的设置里出现「其他网关」和「能访问本机的网关」两份列表。</p>
+<p>结果：同一批里 44901b1db9 把配对那套（同意页、grant、hub key、scopes、relay-gateways.json）删掉，换成保存的连接；中继代理本身保留了原有的加固规则（头部白名单、沙箱 CSP、no-store、重定向留在所属网关内、不留 cookie jar、移除连接即断开）。</p>
+<p>相关加固修复：96b6cb6c90 中继的 Location 先按浏览器规则解析 . 与 .. 再加前缀，带空白、控制字符或反斜杠的 Location 直接拒绝；4e223983d8 中继的 shell、CLI、唤醒词 RPC 按 scope 放行；326678cf61 中继的屏幕与语音 RPC 按授权范围放行；0cc53201d0 只有授权被撤销后才移除中继网关；696a2cc436 中继的 HTTP 客户端不存 cookie；af02c72274 中继的 Git review、图片上传和附件按文件访问放行；7068a28433 中继响应不进浏览器缓存；eaefab2e66 读不到的 relay store 绝不写回。</p>
+<p>桌面端 · 中继网关的细节修复</p>
+<p>734be805cb：在中继网关上新建的 profile，在其 roster 读取之后也能打开。</p>
+<p>085ed4b71e：中继网关不提供的 profile 现在标记为不可达，而不是消失。</p>
+<p>ed007a6d5e：Webapp 终端固定留在它启动时所在的那个网关。</p>
+<p>b1cd8ddc8a：HTML 预览的脚本从提供页面的那个网关加载。</p>
+<p>8161523ecf：一个卡住的中继网关不再拖住整个 roster。</p>
+<p>30e17e3104：只在这个 profile 变更过的网关上清除它的 Webapp 偏好。</p>
+<p>2dcdf2d6c5：Webapp 窗口与默认动作只给该网关自己。</p>
+<p>群聊 · 一律由网关托管</p>
+<p>只有一种群聊：21cd0af57d</p>
+<p>问题：以前存在两种群聊，一种网关托管、一种桌面端驱动，桌面端关掉后者就停。</p>
+<p>修复：新建群聊一律规划成网关自己拥有的房间，bot 在本机或别的电脑上都一样；无法这样安排时（属主 Hermes 太旧、属主放不了席位、被借的 lender 缺 API server/地址/审批、机器连不上），对话框说明哪台机器缺什么，保留草稿并提供重试，绝不退化成桌面端驱动。桌面驱动的创建路径与「升级成不依赖桌面端」那条流程被删除，已有桌面驱动的房间保留历史与输入框，成员编辑不会把房间改成桌面驱动。</p>
+<p>效果：群聊只按「网关托管」这一种语义运转。</p>
+<p>任意 profile 可外借：9a7931dc31</p>
+<p>问题：授权网关只能把 default 这个 profile 借给跨网关群聊。</p>
+<p>修复：room_link()/groups.peer.invite 按连接的 target_profile 公布与签发；继承网关 room_link_url 的具名 profile 在目录里公布 &lt;room_link_url&gt;/p/&lt;profile&gt;，每次 lender 调用都跑在那个 profile 的 /p/ 前缀作用域下（它自己的 home、config、.env、state.db）；run 路由（发起、查询、停止、审批、事件）都校验 claims.target_profile 与请求 profile 一致。</p>
+<p>效果：一个网关能把任意它服务的 profile 借出去，权限仍只在自己的路由上应答。</p>
+<p>别的电脑上的 bot 入座：d477427cae / 75d15b6040</p>
+<p>d477427cae：桌面端群聊可以让别的电脑上的 bot 入座，lender 检查按连接和 profile 分别做，邀请发到目录里指定的那个 profile。</p>
+<p>75d15b6040：桌面端先提供「不依赖桌面端运行的群聊」入口，随后的 21cd0af57d 把它统一成唯一形态。</p>
+<p>生命周期修复：5b3fa448b2 / 945685041f / c2e15b5b3d / 5a9381988a</p>
+<p>5b3fa448b2：属主网关版本太旧时，报错直接说去更新那台机器。</p>
+<p>945685041f：新建群聊失败时点名是哪些 bot 没进来。</p>
+<p>c2e15b5b3d：重试一个还没命名的群聊会复用同一个房间。</p>
+<p>5a9381988a：对端掉线后能恢复，被拒的群控会用人话解释原因（lender 能力不足时说明缺什么）。</p>
+<p>另有 fix(groups) 17 条集中在生命周期：Stop 与 Discard 在成员重启、回复丢失、状态读失败之后都要收敛到正确结果（ac6918dbef 房间到家未知时说明怎么解除 Disband、a61bc1054f 被移动的轮次要留在接管它的 home 上执行 Stop 与 Retry、ada04cbd6a 到接纳这一轮的 home 去问 Stop、caab69a83a 重放的被超越 Continue 不会让新消息搁浅）。</p>
+<p>应用内浏览器 · 真实 Chrome 配置</p>
+<p>用真实配置登录站点：3931998165</p>
+<p>问题：桌面端应用内浏览器标签页（persist:hermes-preview）不带用户真实浏览器的登录状态，agent 那边的真实浏览器却有。</p>
+<p>修复：browser.use_real_profile 且后端在本机时，应用内标签页用真实配置登录站点。没有加任何解密：已有的真实配置浏览器用自己的系统钥匙串解密自己的库，新增隐藏命令 hermes browser export-signins --json 通过 CDP 的 Storage.getCookies 读出来，只写标准输出（拒绝写到终端），并对所属 profile 重新确认同意；Electron 主进程按路由解析出的连接决定是不是本机，只把 cookie 身份（url、name、domain、path）记在 userData 里。</p>
+<p>效果：关掉同意时精确移除这些导入的 cookie，不动用户手动登录的，也不动别的配置导入的。</p>
+<p>只读登录源 browser:：75b5168822</p>
+<p>问题：应用内浏览器的钥匙按钮只能选 Hermes 凭据库、Bitwarden、1Password，用不上真实配置里已经保存的密码。</p>
+<p>修复：把真实 Chrome/Brave 配置的已保存登录暴露为只读登录源（句柄前缀 browser:），只在 browser.use_real_profile 打开时启用，走已有的 vault.list 与 vault.preview.fill 路径，不新增 picker 或 RPC。读列表只取快照 Login Data 的明文列（来源与用户名，从不解密密码）；填充时让浏览器在凭据自己的 origin 上自动填充、再通过 CDP 读回，由浏览器解密自己的库，然后交给已有的填充工具注册脱敏。</p>
+<p>效果：点一下就能盲填，Hermes 侧没有留下解密后的密码。</p>
+<p>钥匙按钮：e82f0967ef</p>
+<p>应用内浏览器地址栏加了一个钥匙按钮，按页面精确 origin 列出各登录源保存的登录（Hermes 凭据库、解锁中的 Bitwarden/1Password，以及 browser: 源）；锁着的管理器给一行 Unlock，走已有的 vault.unlock；空状态链到设置里的凭据库并预填 origin。选中后调新的 vault.preview.fill，渲染进程只为一个标签页的实时文档生成不透明绑定，后端跑同一套 browser_vault 填充（先校验 origin、页面里再断言一次、字段绑定 nonce、注册脱敏），返回只有填充数量和 origin，不提交表单。</p>
+<p>安全细节：dfddce750d 浏览器自动填充落到另一个账号时拒绝这次 resolve；21f1733fc1 / ef382179df / eb440a8b75 是三轮针对真实配置密码解析的加固。</p>
+<p>9 条 vault 修复里还包括 3085b643cf（vault.list 跑在 RPC 池上，快照准备不再卡住 Stop）、c9fc2793db（应用内浏览器填充走主分支同一个 browser_vault 工具）、70060adb0c（钥匙按钮的页面脚本落到发起请求的那个 socket 上）。</p>
+<p>网关 · 不挂载也能读会话</p>
+<p>session.list 与 session.transcript：95973b61d2</p>
+<p>问题：网关客户端的会话选择器只能自己去读 state.db，因为 session.list 不带文件夹、活跃时间和最后回复，session.history 与 session.events.since 只服务已挂载的会话，而 session.resume 会把调用方订阅进去。</p>
+<p>修复：session.list 两类 scope 都支持 workspace 过滤（沿用 hermes -c 的 workspace_key 规则），返回当前段预览、last_reply、cwd、git_branch、workspace、last_active_at、pinned，每页一次批量读；session.transcript 可以跨压缩谱系分页一个存储会话的显示行，游标按每条逻辑消息的第一行做键，之后压缩或轮转仍稳定；session.compactions 返回被显示行略过的那批交接摘要。</p>
+<p>效果：外部客户端不必复制 Hermes 的列举、谱系和压缩规则。</p>
+<p>session.transcript 成为唯一存储转录读法：4d89901ef4</p>
+<p>正序游标永不为空，并携带读过的段和游标状态，只追加时继续读；原地压缩、轮转、回退、改写或删除覆盖行时，第一页就返回 reset；每行带 row_kind（message / compaction / handoff），被委派的子 agent 也能直接读。session.compactions 与 subagent.transcript 不再单独发布。</p>
+<p>客户端自报名字：d0b49116ec / 9b939d4761</p>
+<p>session.create 接受可选 client {name, version}，只做归属标注，source 仍决定策略，工具集、审批、权限、提示文本和遥测都不读这个标签；它被放进冻结的创建请求里，所以老版本属主仍能恢复会话，标签也计入精确重试的身份。session.info.client 回显，插件用 plugin_session.session_client() 读。@hermes/shared/gateway-client 同步支持指定 source 和 client，属主不认的 source 给中性拒绝。</p>
+<p>控制 socket 回答哪个网关服务某个 home：7d608e9647</p>
+<p>问题：本地客户端每次连接都要起一个 hermes gateway attach --json（一个 Python 进程）才能算出端点，multiplexer 场景下还容易算错。</p>
+<p>修复：控制 socket 新增 resolve-profile 动词，返回 discover_gateway_endpoint 对该 home 的判定（state、reason_code、detail、endpoint 与 ws_url/ws_protocol/ticket 前缀）、attachable、update_fenced 集合、control 归属、失败文案和 install_code_sha，严格信封、不含凭据；本地控制 socket 被文档化为公开客户端契约。</p>
+<p>效果：一条控制请求代替一次 Python 启动。</p>
+<p>命令行：hermes clipboard image --json：63cdc15eb3</p>
+<p>第三方客户端以前要跑 TUI 的私有脚本、把 PYTHONPATH 指到源码树才能读剪贴板图片。现在有文档化的设备本地命令，返回 JSON 加稳定原因码：ok、no_image（退出 1）、no_tool（退出 3）、write_failed（退出 4），也支持 --out；3c8ea50a5c 失败时保留已有的 --out 文件，1e82b6df14 覆盖时保留原文件权限。</p>
+<p>插件与记忆</p>
+<p>79109635df：redact_sensitive_text 列入 plugin_api.json，成为公开插件 API。插件要把用户文本送给 ctx.llm 时，可以先用它脱敏，不用再私有 import（以前 hermes plugins validate 会对这个 import 报警）。</p>
+<p>7d96784e6d：记忆 provider 的 on_turn_start 现在收到 previous_message，即恢复的转录里最后一条用户消息（首轮为空字符串）。在上一轮结束时预取记忆的 provider，进程恢复会话时本来无法补上（它可能被配置成不保存消息），现在有输入了；不接受这个参数的 provider 不受影响。</p>
+<p>2216779700：被委派的子 agent 用 subagent_id 保持可寻址，子 agent 的 model_config 上记 _subagent_id，subagent.list 的行带 child_session_id（两种传输与 SubagentSnapshot 契约都有）；已经结束的子 agent 只有在 parent_session_id 链条能通过 delegate-child 或压缩续接回到当前会话时才被认作它的孩子。</p>
+<p>296308546a：compat finder 把旧的模块名映射到现在的名字并返回真正的模块对象，旧名与新名共享状态，mock.patch 走任一个都打到真实代码，reload 会重跑真文件；今天布局下映射表是空的，机制先就位。</p>
+<p>修复集群</p>
+<p>更新 · 3caa45f370</p>
+<p>问题：提交把包搬走或删掉时，git 删掉跟踪文件但留下目录（里面还有 __pycache__），清理字节码后目录变空；空目录在老路径上被当成空命名空间包，压过可编辑查找器，把新位置的包整个盖住，于是 from 包.模块 import 函数 报 No module named。</p>
+<p>修复：两次清扫（更新完成时与手动 pull 后的启动清扫）都会按 .bytecode-fingerprint 记录的提交与 HEAD 做差异，取被丢弃文件的父目录一起删除。</p>
+<p>效果：包移动类提交不再让更新后的第一次 import 失败。</p>
+<p>更新 · 85b43c1f0b</p>
+<p>问题：移动前的语法预检和移动后的检查都会跳过目标里不存在的启动文件，于是搬走启动文件的提交两道检查都过，下一次启动才在 import 上炸。</p>
+<p>修复：启动文件清单搬进被描述的那棵树（pyproject.toml 的 [tool.hermes] update-startup-files），两处检查都读目标自己的清单；目标声明了却缺这个文件，就在任何文件移动之前拒绝更新，已经拉取的回滚。</p>
+<p>另有 fix(update) 12 条，例如 0e06fd45be（pyproject 不是合法 TOML 时直接拒绝而不是回退）、3da511e124（启动文件列表不是一份时拒绝更新）、2d0b5cff8d（被丢弃的文件夹路径保留精确的文件名字节）、3caa45f370 同族的 940dc11d9b（列丢弃文件失败会重试，prune 留在 checkout 内）。</p>
+<p>状态库 · ad37ebb765</p>
+<p>问题：在 SQLite 3.45 上，带退役 CJK 索引和旧 gateway_routing 键的库会在表重建时报 no such tokenizer: cjk_unicode61，因为索引退役跑在重建之后，而表重命名会让 SQLite 重新解析所有触发器。</p>
+<p>修复：退役紧跟 schema 脚本，先于列对账和键修复；探针判断一份持有退役索引的副本时，副本放不进临时卷不再算损坏，修复改在快照上做。</p>
+<p>同族还有 bdcb60c240（退役原子化、修复探快照）、ac61edf748（退役不阻塞打开、不改 check-only 语义）、8b216354d2 / ad37ebb765（最终扫描文件失败、退役旁边的不可加载 trigram 索引不算损坏）、7b01fac977 / 4d26dc289a（做副本失败不算库损坏，提示不再二次查临时目录）。</p>
+<p>登录 · 3fe7d20c88</p>
+<p>问题：token 在解码阶段被拒（同一个 IdP 下另一个客户端的 token、audience 或 issuer 不符、签名不对、缺声明）以前一律抛 ProviderError，显示成 503「身份提供方不可达」，可 IdP 明明答过话，真实原因只在 errors.log 里。</p>
+<p>修复：这些拒绝端到端统一成 InvalidCodeError，verify 阶段的拒绝触发重新登录；另有 b0eb36ba90（另一个实例的 agent_instance_id 算 401 而不是 503）、11f59ff117（JWKS 缺 kid 算不可验证而不是 503）、b182c16aee（只在 aud/iss 确实不匹配时记 drift）。</p>
+<p>性能</p>
+<p>9a3d874094：转录的交接查询以前用一次带 OR 的 join 把每个显示行接到本段的行上（行自身，或带同一 message_uid 的更早一行），SQLite 每显示行都要搜一遍存储行，uid 匹配还用不上 idx_messages_session_uid（那个索引只管在活行），整条谱系一页的耗时随长度平方增长。现在按主键读显示行，再按状态各查一次取 uid 的更早副本（活行走 idx_messages_session_uid，归档或已删走 idx_messages_session_active，遗留列的 NULL 单独一查），在 Python 里配对。实测 30000 行段里取 164 行的窗口：29.4M → 0.27M VM 步、0.457 秒 → 0.007 秒；整条谱系 11837 行的查询同样大幅下降，结果逐行一致。</p>
+<p>9167d4b94b：交接查询只读能整行放手交的显示行的 id、message_uid 和标志位，不再把每行正文（图片、工具结果）第二次读出来；轮转谱系的更早交接检查也不必逐行读全文。</p>
+<p>其他候选</p>
+<p>/model 与桌面端命令：ed8621d9d4 让 /model --session 在任何位置都取规范变异，0923759c78 让 /model X --provider Y 走规范模型变更。</p>
+<p>委派：3f0e3104c3 / 2f3f57b96e / 2fe80ec82e / 4098b6217b 让分批委派在 runner 抛错、分片卡住、分片提前失败时保留已经完成任务的结果，并让失败的任务保留自己的目标。</p>
+<p>插件：b55e21bfd6 hosted prompt 段能读会话信息；d30879a86d 结构化输出保留已放出的答案、插件 RPC 路由跑在插件宿主里；26e16e3834 每个会话环境变量名只归一个插件。</p>
+<p>桌面端杂项：7388dd481c 用 argv token 而不是子串识别 Hermes 进程；af61005fe8 问系统代理要 $HERMES_HOME/npmrc 里的 registry。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-07：内容安全拒绝改为模型侧移除、显示侧保留；终端两下 Esc 回退；群聊接入远程 bot</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-07</link>
