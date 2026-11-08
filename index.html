@@ -22,9 +22,114 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 103 期 · 42441 个提交 · 每日自动更新 ·
+<p class="meta">共 104 期 · 43052 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-09" class="day">
+      <h2>Hermes 日报 2026-11-09：插件目录新增 72 个条目，桌面端连接管理与澄清选项成批修复</h2>
+      <p><strong>本期覆盖 11 月 8 日 ~ 11 月 9 日合入 main 的提交，共 611 个 commit（不含 merge），另有 2 个 merge。新增 91 个功能、132 个修复、2 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>插件目录大扩容：带 scope（plugin-catalog / catalog / plugins）的登记提交 208 条，其中新增条目 72 条、版本与指针更新 34 条；再加上不带 scope 的插件目录提交（裸前缀 102 条 + 无前缀及变体前缀的 Add / Update 类约 33 条），光插件目录就有约 340 条提交、全口径新增条目 132 个（本窗口新建了 plugin-catalog YAML 且 subject 含 add 的提交数）（健康数据 fitbit / oura / whoop、garmin-connect、worldmonitor、imagegen、提示注入绊线 canary-trap 等）。</p>
+<p>桌面端连接管理成批收口：删掉的网关不再被 connection.json 复活，删除时连 cookie jar 一起清；保存的 SSH 主机上应用第二个 profile 会新增条目而不是覆盖，改过的密钥和 Hermes 路径会写回。</p>
+<p>澄清选项不再被截断：选项文字超过客户端按钮标签预算时，完整编号文本放正文、按钮只标 1..N，长问题也不会把编号列表一起砍掉。</p>
+<p>密钥脱敏加严：redact_terminal_output 处理 curl -i 输出时 cookie header 不打码的漏洞已修，裸 Cookie / Set-Cookie 一律按凭据处理。</p>
+<p>WhatsApp 配对稳定：已配对的网关在登录中收到 passkey 请求不再被判为断开，Ctrl+C 能结束配对，passkey 重试循环停掉，并改用官方 Baileys。</p>
+<p>重点条目：</p>
+<p>桌面端 · 保存的远程网关与 SSH 连接</p>
+<p>删掉的网关不再复活：875e1fb443</p>
+<p>问题：共享的网关连接存储每次读都会重跑一遍 v1 漂移修复，用户删掉的网关只要还留在旧 userData 的 connection.json 里，就会被重新加回保存列表并被设为主用（#142906、#150084）。</p>
+<p>修复：connection.json 现在只在首次导入时喂给保存列表，之后不再参与读取；只有「当前」路由在启动时单独登记，残留的旧路由在启动时和 Webapp 移除时被重置，桌面端不再去拨它。</p>
+<p>效果：被删掉的网关不会再出现，桌面端也不会对着已删除的连接拨号。</p>
+<p>删除网关连带清 cookie：90327b66c3 / 058c3a4dc1 / 75b402dffd</p>
+<p>问题：删除保存的网关时只删了条目，Electron 的 cookie jar 还在，重新添加同一地址会把旧会话读成「已登录」（#98242）；OAuth 网关更麻烦，它可能先后用过自己的 persist jar 和遗留的共享 jar。</p>
+<p>修复：删除前从移除前的登记表里解析出 jar 并清空；OAuth 网关清掉自己的整个 jar、清掉遗留 jar 里属于该主机的 cookie（除非还有别的网关、Hermes Cloud、Portal 或 connection.json 的路由共用），并清掉内存镜像；清理时把移除前后的列表交给存储监听器，Webapp 发起的删除走同一套逻辑。同一主机上另一个 per-profile 路由的登录状态会被保留，不会被误清。</p>
+<p>效果：删一次就干净，重新添加回到登录态，而不是沿用别人的会话。</p>
+<p>保存与应用 SSH profile：2655beeeea / 55de30d6d0 / 0871e416ca / 1e8f063dec / 030be8dde8</p>
+<p>问题：Settings 的保存与应用走的是迁移修复（reconcileRegistryDrift），它按 user、host、port 匹配并改写匹配项的 remoteProfile，所以在已保存为 coder 的主机上应用 writer 会把 coder 直接改成 writer；匹配成功还会提前返回，改过的密钥路径和 Hermes 路径永远写不进去；Apply 只更新路径不动 primary，窗口还停在旧的 profile 上。</p>
+<p>修复：显式应用改成按 user、host、port 加 remote profile 匹配，匹配不上就新增一条并设为主用；匹配上就把应用的密钥路径和 Hermes 路径带进条目（或清空），保留 id 和标签；Apply 传 select:true 让窗口跟着路由走，Save 只做持久化；移除后重新读列表再写，Save 用 applyConnectionConfigAtomically 保证列表写失败时回滚，启动时的重置严格读存储、读不出来绝不清 connection.json。</p>
+<p>效果：保存列表和 connection.json 保持一致，Apply 与 Save 各司其职，已移除的 legacy 路由保持删除状态。</p>
+<p>目录插件安装状态：1e2c6a68ba / 2ff6a34400</p>
+<p>问题：只在桌面端存在的目录插件（例如 Accent Picker，11 月 7 日在 X 上被报告）装完以后有三处不对：卡片仍显示「+」，因为匹配只认 catalog_name（桌面端条目没有 agent 半边，安装器又故意不写 package 标记）；插件加载后是关闭的，而对话框说「立刻开启」；再点「+」直接提示「已存在，请开启强制重装」，而强制开关在目录安装路径上根本不显示，用户无路可走。另一个问题是判断「这个目录条目装没装」时把包的桌面端半身也算进来了，桌面端半身是全应用共享的，在一个 profile 装了就在所有 profile 显示已装，那些 profile 反而永远拿不到包的 agent 半边。</p>
+<p>修复：安装器（Electron 与 Webapp 宿主）会往独立插件里写 .hermes-origin.json（catalogName、repo、sha，sha 是被检出提交，带 tag 的 pin 会剥成 commit），加载器把它放进记录的 packageOrigin，卡片按它匹配；对已经装过的同内容独立文件夹，只补记来源、不覆盖；判断是否已安装只看独立桌面端插件，是否装包的判定仍看当前 profile 的 agent 清单；带注释 tag 的 pin 同时记 pin 和 sha，两者都算当前版本。</p>
+<p>效果：装完卡片立刻显示已装、可以开启，重复安装不再撞墙；一个 profile 的安装不会污染其他 profile。</p>
+<p>路径含 # 的媒体文件：5691c9fa47</p>
+<p>问题：原生路径里有 # 时，媒体文件被当成了带锚点的 URL，扩展名读不出来，附件无法识别。</p>
+<p>修复：apps/desktop/src/lib/media.ts 在解析本地路径时把 # 当普通文件名字符，只有真正的 URL 才按锚点切分，并补了一条「含 # 的原生媒体路径会丢扩展名」的测试（0773ca99ed）。</p>
+<p>效果：文件名带 # 的图片、视频可以直接拖进来用。</p>
+<p>Webapp 的保存 SSH 终端：a27d2259f4 / 72d4433130 / 27c733427d / 04846730f3</p>
+<p>问题：Webapp 里打开保存的 SSH 终端实际没走 SSH；拨号与 spawn 锁的顺序会让连接卡住；fish 登录 shell 下工作目录没加引号就会报错。</p>
+<p>修复：保存的 SSH 终端改为真的通过 SSH 打开；先拨号连上再拿 spawn 锁；fish 登录 shell 的 cwd 做引号处理；设置里可以测试已保存的 SSH 网关连接（04846730f3），测试入口复用 reach 路由的错误表（787ee808ae）。</p>
+<p>效果：Webapp 侧保存的 SSH 网关能用也能测。</p>
+<p>插件目录</p>
+<p>插件目录是 YAML 登记表，一天来了约 340 条登记提交</p>
+<p>问题：插件目录是一张张 YAML 登记表（plugin-catalog/&lt;name&gt;.yaml），每个条目声明仓库、pin 和适配方式，条目本身由社区提交。</p>
+<p>口径：带 scope（plugin-catalog / catalog / plugins）的登记提交 208 条 = subject 含 add 的 72 条 + 含 bump / pin / re-pin / point 的版本与指针更新 34 条 + 其它登记整理 102 条；不带 scope 的插件目录提交约 135 条，其中裸前缀 plugin-catalog: / catalog: 开头 102 条（里面 add 42 条）、无前缀以及变体前缀（plugin-catalog/xxx:、catalog(xxx): 这类）的 Add / Update / Pin 类约 33 条，合计约 340 条。72 条新增里 8a808ab0c9 与 29e3f16dd4 是同一个 citation-guard、前者只改 1 行，e7948e5662 是给已有条目 spanwall 补披露，所以严格全新条目约 70 个；全口径新增条目 132 个（本窗口新建了 plugin-catalog YAML 且 subject 含 add 的提交数；按 subject 里的 add 数则是 135 条，按 diff-filter=A 计新建 YAML 的提交是 139 条）。</p>
+<p>新增条目举例：fitbit-mcp（808d88c769，pin 0.7.0）、oura-mcp（45e23aaf9d，0.8.0）、whoop-mcp（738e759c33，0.7.0）三家健康数据；garmin-connect（cc555d77d4，没有 scope 的裸前缀提交）；worldmonitor（0ccdef01e0）；imagegen（1b2bafbc5b，pin 到当时 README）；hermes-notify（2848abf4ff，随后又由 028ba66e7e 固定版本）；canary-trap（53b7561115，针对提示注入的绊线）；lahja（ed9e13a9ca，阿拉伯语方言语音转写）；此外还有 helm、dike、loci、dxmt、faxforagents、eventforge、zalodesk、oddsradar、precedent-log、solana-token-facts、aletheia、boxcompute、Skysay、sequenzy、phone-autopilot、hypnos、Fast Chat、motion-index、citation-guard、hermes-ghost-call、telos、Pareto Inference、bulkpublish、screenrig、fiscalisto、LLM API、Hermes EGM、bankbridge、Obol、zeromem、trust-ladder、adextract、headroom、cursor-subscription-directsdk、tripo、agent-galaxy、emotion-chip、munin、findbroadband-deals、internet-outage-checker、BotSee、hermes-ui-cards、web-specstream、Hackathon Judge、openrouter-everything、postsider、gsc-magic、qqq-ai-visibility、hypotize、hermes-wallpaper、hermes-make-plain、completion-proof、birta、Crux decision atlas、umami-digest、vibeleak-atlas、grounder、agent-si 等，以及 wally 这个模型 provider 条目（Pareto Inference 也是模型 provider，见上）。</p>
+<p>修复与更新：另外 34 条是 pin / bump / re-pin（serpapi 那条 e4ec13af8a 虽然 subject 是 add，实际改的是已存在的 plugin-catalog/serpapi.yaml，所以算更新不算新建），例如 provider-status 1.6.9（4e2d397a55、49353f11b7）、headroom 0.1.1 与 0.1.2（26d181445a、2f3be9ac2a）、ascii-worlds 1.2.0（da5e213234）、lineage v0.1.5（2c39ec3bc1）、tool-call-salvage 0.2.0（ab26db8e4d）、precedent-log 0.2.2 ~ 0.4.2 四条（fda4ffa4ac、d194a1f2bd、881936c91f、da5f0e6f26）、screenrig（26.11.231 重 pin）等。</p>
+<p>效果：目录条目基本上都是社区当天提交、当天登记，安装方式统一为目录卡片安装；这一块占了本期 611 条提交的一半以上。</p>
+<p>澄清选项</p>
+<p>长选项不再被按钮吃掉：4b0be5b740</p>
+<p>问题：Slack、Discord、Google Chat 和 relay 都把选项文字放在按钮标签上，而各客户端会把标签裁到远低于 API 上限（Slack 约 48 列，手机上更窄，没有 tooltip），grilling / wayfinder 这类技能生成的 50 字选项完全读不出来，整条问题也就没法回答（#78115）。</p>
+<p>修复：任一选项宽于标签预算时，完整文本带编号放进消息正文，按钮只标 1..N，按下仍然通过 clarify 条目解析回原始选项文字，位置参数和 id 不变；中文宽字符按两列计算；抽出一个共享的 gateway.platforms.helpers.numbered_clarify_choices，避免四个适配器各自漂移。</p>
+<p>效果：长选项在四个平台上都能读全，按钮点下去的含义可预测。</p>
+<p>编号列表整行保留：10b6eb5f0a / 7bf5a982a6 / ca237dc5fd / 05b85c4e4d / f5500de1c4</p>
+<p>问题：题目本身超过长度上限时，最后一段裁剪会把编号列表整个砍掉，位置按钮因此指向不存在的选项；Discord 的 max_chars 会丢掉尾部行。</p>
+<p>修复：Slack 先预留编号列表再裁问题，relay 的 text[:limit-1] 造成截断改用同一套 helper 并按该聊天的长度单位（UTF-16 lane）测量；Discord 改为缩短每个选项，让每个按钮都保住自己那一行；Google Chat 卡片文本本来就不会被裁，无需改动，但缩短后的选项必须彼此可区分、逐字列出。</p>
+<p>效果：超长 prompt 下编号与按钮一一对应。</p>
+<p>密钥脱敏</p>
+<p>终端输出里的 cookie：686edbfc4d / f2a510b259</p>
+<p>问题：redact_terminal_output 处理 curl -i 这类代码输出时传的是 code_file=True，而所有 cookie-header 处理都挂在 if not code_file 后面，于是一行 Set-Cookie 会明文进到模型上下文（#151119）；#50423 那次修复也漏了同类 header 凭据。</p>
+<p>修复：裸 Cookie / Set-Cookie header 现在和旁边的 secret header 一样按凭据处理，JSON fixture 的豁免只留在赋值类通道。</p>
+<p>效果：curl -i 的输出不再把会话 cookie 递给模型。</p>
+<p>内联 header 与边界：2d54c978f7 / 424b6a138b / 3e126a2819 / 42be7dd4f5 / ecd6bba649</p>
+<p>问题：内联 header 里往往一次塞好几对 cookie，只打第一对等于没打；shell 里被拼在一起的词、JSON 与 shell 的边界都会让打码提前或延后结束，出现漏码或把后面代码一起吃掉的情况。</p>
+<p>修复：内联 header 里每一对 cookie 都打码、说明文字保持原样；shell 拼接词的 cookie 赋值整体当一个值处理；打码值在 JSON 和 shell 边界处停止；header / cookie 的值只打到自己的边界；cookie 形态的凭据（赋值式与 header 式）统一走一套规则。</p>
+<p>效果：脱敏结果是可读的代码 + 完整的掩码，不会半遮半掩。</p>
+<p>保留可读形态：57234f3c8f / 55d6f76095 / d98b43d99e / bddbdfdf32 / fce85b29a1 / b316dc2431 / 0e70715e8d</p>
+<p>问题：掩码改得太狠会破坏已经打过码的内容、JSON key 占位符和厂商标签，让用户看不出这是哪家的密钥；反过来，JSON API-key header 值曾经有路径豁免，等于漏码。</p>
+<p>修复：已打码的 header 值和它后面的说明文字保持原样；不可复用的 header 掩码形态保留；带引号的 cookie 值和 $ 开头的内联 header 键也纳入打码；内联 x-api-key 日志值里的竖线保留；已打码的 JSON API-key header 保留厂商标签；JSON API-key header 的值取消路径豁免；JSON key 占位符和 cookie 代码形态保持可读。</p>
+<p>效果：掩码既能遮住凭据，又能让日志和代码保持可读。</p>
+<p>WhatsApp 配对</p>
+<p>passkey 请求不再把网关判死：48c7a09fd8 / e89b47ac8b</p>
+<p>问题：Baileys 在 CB:success 之后还要等 prekey 上传和 passive IQ 才到 open，这期间 connectionState 还是 disconnected，如果此时来了 passkey_prologue_request，已配对的网关会被当成断开而丢掉。</p>
+<p>修复：守卫除了连接状态，也接受已登记的凭据（creds.me.id）；已经连上的网关收到迟到的 passkey 请求同样保持存活。</p>
+<p>效果：登录中的网关不会被自己的配对流程杀掉。</p>
+<p>Ctrl+C 与验证码确认：122b31f2b4 / fc60ebb7e6 / 6b4669a261</p>
+<p>问题：在验证码提示处按 Ctrl+C，readline 的 question() 抛的是自己的 AbortError，而这次尝试的 signal 并没有被置位，passkey_socket.js 把它当成「被取代」忽略，桥接进程留在一个没有提示的状态里；而被取代的 passkey_prologue_request 会用第一次请求已经轮换过的 ADV secret 重新派生 handoff HMAC 密钥，手机端根本没见过这个密钥。</p>
+<p>修复：只有这次尝试的 aborted signal 才算被取代，其他 AbortError 变成普通失败（退出码 1）；handoff 密钥整个流程只派生一次并保留它自己的五分钟窗口；passkey 验证码确认绑定到它自己那一次尝试，被取代的尝试失败按取消处理。</p>
+<p>效果：Ctrl+C 能真正退出配对，手机上的验证码确认不会串到别的尝试上。</p>
+<p>重试与依赖：618b0d6bbe / c734375c9f / 58ebcf3007 / 9929bc74e7 / d37547bf73 / d04ebe15b9</p>
+<p>问题：配对过程里有一批写死的超时和重试，passkey 失败会进入重试循环；依赖用的是打补丁的 Baileys 分支，passkey 运行时需要单独打包。</p>
+<p>修复：停掉 passkey 重试循环并收紧配对初始化；去掉写死的配对超时，改为遵守 npm 的超时设置；改用官方 Baileys，把 setup 的回归测试单独隔离；接上本地 passkey 签名器并校验配对完成；打包固定版本的 passkey 运行时、刷新过期依赖；桥接进程流式输出的配对错误会显示在面板上。</p>
+<p>效果：配对路径少了一堆特例，失败原因在界面上能看到。</p>
+<p>其它</p>
+<p>curator 钩子：8bc0880615 / fd1cc1d1c4 / 335256076b / f7efbd1c2a / 856e75808d</p>
+<p>问题：多 profile 的治理层想根据策展结果做事（profile 路由、归档覆盖、审计日志），以前只能轮询 logs/curator/。</p>
+<p>修复：新增 post_curator_run 插件钩子事件，每次策展跑完、run.json 和 REPORT.md 完整写出之后触发一次，payload 带 run_dir、run_json_path、report_md_path；走标准 lifecycle hook（hermes_cli.lifecycle.invoke_hook），Python 插件和 shell 钩子都能收到，回调之间互相隔离；它是 observer-only，返回值被忽略，回调抛错不会打断策展。随后四条修复把它收口：等这一轮状态落盘之后再触发、只在报告完整时触发、到达 shell 钩子、不再重复播报上一轮的报告、dry-run 会标出来且不在卡住的 discovery 上反复等待。</p>
+<p>效果：治理层可以被动接收策展结果，不用轮询日志。</p>
+<p>cron 的命名 Telegram 话题：db6efce643 / 9a856f8e91 / bb0f05fa31</p>
+<p>问题：发完命名话题之后，cron 仍然把话题名字当作目标的 thread id，于是 attach_to_session 的镜像投递和媒体路由都按「Debug」这个名字去找话题，而不是数字 id。</p>
+<p>修复：发完文本后通过路由的缓存解析器解析一次名字，把真实的数字 thread id 写回目标，再发媒体、再做镜像；媒体发送遇到 thread not found 会重建话题一次后重发，和路由给文本的那套有界重试一致。</p>
+<p>效果：只有媒体的定时任务在话题被删掉之后也能自己恢复。</p>
+<p>MCP 工具元数据：4ed1b54276 / 9bd4f7670d</p>
+<p>问题：_convert_mcp_schema 只清描述里的 TAG 字符，参数描述、标题、枚举值、默认值里的不可见字符都留着，bidi 覆盖与隔离控制符（U+202A-202E、U+2066-2069）也全程存活；这些字符每次 API 调用都发给模型，用户看到的却是空白或被重排的文字。</p>
+<p>修复：注册和 sampling 转发的工具现在都递归清理描述和 schema 里的这两类字符，ZWJ / ZWNJ 保留（emoji 和部分文字要用）；服务端匹配用的名字保持原样，只清理说明文字；没有任何匹配时返回同一个对象，干净 schema 的线上字节不变。</p>
+<p>效果：工具元数据干净，且不影响名字匹配。</p>
+<p>工具输出分页：2619961551</p>
+<p>问题：内置工具的结果写进 spill 文件后外面包了一层 JSON，read_file 读进去没法正常分页。</p>
+<p>修复：把内置工具 JSON 在 spill 文件里解包，read_file 可以直接按页读。</p>
+<p>效果：超长工具输出能翻了。</p>
+<p>性能</p>
+<p>setup wizard 的导入：0b82ddc96c</p>
+<p>问题：hermes_cli.gateway 导入 hermes_cli.setup，而后者在模块层就把 setup_terminal、setup_tts、setup_summary 拉起来，连带 tools.environments.docker 和 hermes_cli.nous_subscription。每个客户端和网关启动都得付这份开销，实际只有交互式向导会用到。</p>
+<p>修复：改成在用到它们的向导函数内部导入；setup_terminal.find_docker 仍然是模块级名字，因为测试会 patch 它。</p>
+<p>效果：导入 hermes_cli.gateway 的 CPU 从约 49 毫秒降到 28 毫秒。</p>
+<p>wire 契约模型延迟编译：3770106912</p>
+<p>问题：Params / Result / Payload 基类设了 pydantic 的 defer_build，但约 850 个契约模型仍在导入时编译验证器，每次网关和 TUI 启动都要付。</p>
+<p>修复：改成首次校验时才编译，导入 tui_gateway.contracts 的 CPU 从 0.66 秒降到 0.41 秒，一个模型约 0.3 毫秒，只为自己用到的模型付费。</p>
+<p>效果：10% CPU 配额下冷启动 hermes -z 的中位数从 101.7 秒降到 90.0 秒；无配额时 scope CPU 从 5.98 秒降到 5.72 秒，8 组交错对照全部更低。</p>
+    </section>
+    
     <section id="2026-11-08" class="day">
       <h2>Hermes 日报 2026-11-08：桌面端与 Webapp 共用保存的网关，群聊统一由网关托管</h2>
       <p><strong>本期覆盖 11 月 7 日 ~ 11 月 8 日合入 main 的提交，共 384 个 commit（不含 merge），另有 9 个 merge。新增 24 个功能、239 个修复、2 个性能优化。</strong></p>
