@@ -5,8 +5,78 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Mon, 09 Nov 2026 07:40:52 +0800</lastBuildDate>
+    <lastBuildDate>Tue, 10 Nov 2026 07:03:19 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-10：目录提交一天 600 条并突破 2 MiB 上限，Telegram 与网关成批收口</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-10</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-10</guid>
+      <pubDate>Tue, 10 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 9 日 ~ 11 月 10 日合入 main 的提交，共 1109 个 commit（不含 merge），另有 12 个 merge。新增 170 个功能、346 个修复、0 个性能优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>插件目录突破 2 MiB：发布出去的目录文档涨到 2,109,306 字节、1,268 个条目，客户端写死的 2 MiB 上限让每个客户端都静默丢掉线上目录、改用自己的内置 pin；上限已提到 16 MiB。</p>
+<p>目录提交一天 600 条：按 git 改动的文件判定，只动目录文件的提交有 600 条（另 7 条同时动了目录和其他文件），占本期 1109 条的 54%，超过一半。其中 subject 带 plugin-catalog / catalog scope 的 278 条：feat 162（新增条目 94、版本与指针更新 51、卡片图等 17）、chore 97（披露与上下架整理）、fix 13、其他 6；其余 322 条是裸前缀、条目名前缀（lazy-plugin、shopmate、proof-run、wazoo、taint-sentry 等）和无前缀的登记。</p>
+<p>Telegram 富文本消息与相册成批收口：只以 rich_message 块到达的群消息现在按纯文本同等对待（不再漏过 @别的 bot、不再把 /status@other_bot 当成自己的命令）；超大文件的说明不再让整条消息被准入拒绝，相册里每个超大文件各自保留一条说明。</p>
+<p>Telegram 话题与离线消息：死掉的私聊话题现在剪掉绑定回落到聊天根（以前「成功」其实落到根、绑定永不清）；冷启动默认保留 Telegram 服务端 24 小时的队列，网关离线期间发的消息会补答。</p>
+<p>网关收口：压缩被禁用的警告只在私聊显示，Slack 的 MPIM 和 Discord 的频道不再收到；编辑过的 /goal、/queue、/steer 不再撞 admission_conflict；代理地址里的凭据不再进日志与错误文本。</p>
+<p>模型：Anthropic 的 claude-fable-5-2 加入选择列表与定价表。</p>
+<p>重点条目：</p>
+<p>插件目录：目录自己长过 2 MiB（6cff782b8d）</p>
+<p>问题：线上目录文档在 11 月 9 日过了 2 MiB（2,109,306 字节、1,268 个条目、平均 1.7 KB 一个）。客户端里 _MAX_LIVE_BYTES 还是 2 MiB，取不到就静默回落到自带的 in-tree pin——用户看不到新上架的条目，也看不到目录里新的下架，而两边的差异只会越积越大。</p>
+<p>修复：上限提到 16 MiB，并补了两条回归测试：一条证明 2 MiB 以上的目录文档能被接受，一条用 monkeypatch 把上限压到 1 KiB 复现「太大就丢弃」的路径。</p>
+<p>效果：客户端能正常吃下现在的目录，也不会在下次增长时又静默回退。</p>
+<p>目录提交量（6cff782b8d 之外的部分）</p>
+<p>按 git 改动的文件判定（每个 commit 用 --name-only 看有没有动到目录文件），只动目录文件的提交有 600 条，同时动了目录和其他文件的另有 7 条——1109 个提交里超过一半（54%）在动目录。subject 带 plugin-catalog / catalog scope 的 278 条只是其中一部分：feat 162 条（subject 含 add 的 94 条，去重后约 93 个新条目；版本与指针更新 51 条；卡片图等其他 17 条）、chore 97 条（chore(catalog) 81 + chore(plugin-catalog) 16，披露与上下架整理）、fix(plugin-catalog) 13 条、其他 6 条。剩下的 322 条是裸前缀（plugin-catalog: / catalog: 冒号前缀）、条目名前缀（lazy-plugin、shopmate、proof-run、wazoo、taint-sentry 等）以及无前缀的 Add / Pin / Bump / Update 类登记。</p>
+<p>新增条目举例：hermes-canvas（1063e3c69b）、hermes-colab GPU 任务运行器（7a244f73c1）、gmi-image / gmi-speech / gmi-video、gemini-live（45adfd05d3）、hermes-blueprint（6f7c1c07af）、better-tg-cli（209cfd6ae7）、glasses-platform（0d0d3db5b7）、crash-test（05f21dd2f3）、restoreproof（3a7d6a68c1）、clef-music-tools（11360ee631）、dyslexiasteps（b95ff99973）、hermes-detox（f5ec5a8af2）、predictionmarketspicks（357eec14ff）、Cospark workflow skill（e9811dd1ef）。</p>
+<p>桌面端（2 条 fix）</p>
+<p>群聊里点 Reply 光标留在按钮上（66bfe0c23b）</p>
+<p>问题：在 Bot Mode 群聊里点消息的 Reply 按钮，会把「@成员 」标签和「Replying to」引用条插进输入框，但焦点仍停在 Reply 按钮上，接着打字没有任何反应，必须先手动点一下输入框。</p>
+<p>修复：两个房间视图（网关托管的和桌面端驱动的，主输入框和打开的线程回复框）在 React 画完新值后，把焦点移到收到标签的那个输入框，光标放到末尾；GroupMentionInput 为此接受一个 ref（React 19 的 ref-as-prop），焦点与光标这一步抽成共享的 focusComposerEnd。</p>
+<p>效果：点完 Reply 直接就能继续打字。</p>
+<p>CI 的未压缩桌面端包不再拉 GitHub release（9ffa8c63c1）</p>
+<p>问题：JS/TS 检查任务用 builder --dir 打未压缩包，准备步骤却每次都从 GitHub release 下载 7zip 和图标工具集，加上 Electron 的包；而 --dir 构建一样都用不上——没有 archive 目标会跑 7za，提交进仓库的 .icns/.ico 也是原样通过不转换。icons@1.2.1 的 bundle 返回 504 十几分钟时，main 上每个 push 都变红。</p>
+<p>修复：dir-only 的准备不再选这两个工具集，在本机架构上直接复制 electron-runtime.mjs 已经解包的、经过 lock 校验的 Electron 运行时，因此不发任何网络请求；打包格式仍走原来的获取流程，准入也仍然拒绝缺少 archive 或图标工具的非 dir manifest。</p>
+<p>效果：--dir 打包离线可跑，图标 CDN 抖动不会再让 main 变红。</p>
+<p>Telegram：富文本消息的寻址（4161a6c4a1 / 98ba0238c2 / b13e391042）</p>
+<p>问题：只以 rich_message 块到达的群消息（text 为空的那类形状，#146067）绕过了纯文本要过的所有寻址检查——leading_bot_handles 和 foreign_command_target 只读 text/caption，于是 exclusive_bot_mentions 放行了「@other_bot please deploy」，还真的把「/status@other_bot」当成自己的 /status 执行；group_reply_expected 看到的是空串，other-participant 守卫看不到任何实体，mention_patterns 还去匹配隐藏链接的 URL。另外两处更细：富超链接的文字是 text_link 语义、不是 bot_command，却被解析成了命令（同时群里后面真正写的 @hermes_bot 仍要认）；富消息开头的行内代码被替换成空格、pre 块被直接跳过，于是「 `x` @other_bot ...」被读成对 @other_bot 说话而被丢掉，同样的纯文本却会被回答。</p>
+<p>修复：telegram_entities.py 成为所有检查唯一的读取入口——addressing_sources() 依次产出正文、说明或富文本块（代码清空、隐藏 URL 排除），并带上 Telegram 会为该文本发出的 mention / bot_command 实体；addressing_text() 是唤醒词与回复规则的视图（保留代码、排除 URL）。_entity_sources、leading_bot_handles、foreign_command_target、group_reply_expected、_message_matches_mention_patterns 全部改走它们，adapter.py 相应缩小；富消息里的代码改成 U+FFFC 占位符（pre 块给一行占位），既不是空白也不是分隔符，永远不会被当成句柄。</p>
+<p>效果：同样的内容，不管以纯文本还是富文本送达，寻址与命令判定结果一致；开头带代码的消息不再被漏掉。（#151730）</p>
+<p>Telegram：相册与超大文件的说明（541b948520 / 4b5a85f99c / 37b58f4912）</p>
+<p>问题：都知道要告诉模型「这个文件太大、这个读不了图片」，但说明一路丢：先是一条——给条目写说明时用 event.metadata 里一个新的 telegram_item_notes 键，而原生准入只接受白名单里的元数据键，于是任何带超大/读不了说明的消息（相册或单文件）都被拒成「Hermes refused this message (invalid_params)」，说明文字和原本的 caption 一起没了；再是一条——多文档相册到 agent 那里只剩一条「太大」，因为说明没带文件名，合并时第二条被当成重复说明丢掉（#150978 把这批条目挪进相册回合之后才暴露，#151871）；还有一条——同名文档或没 file_name 的同尺寸视频，说明文字一模一样，合并时照样被去重。</p>
+<p>修复：说明改成挂在私有、不上线的事件属性上，只有相册合并会读，说明文字仍然追加进事件文本再派发；文档说明写文件名（和「无法缓存」「无法当图片读取」两类说明一致），语音/音频/视频在 Telegram 给出文件名时也写；每个条目的说明挂在自己的事件元数据上，相册合并逐条追加、不参与说明去重，而 caption 仍按原逻辑去重。</p>
+<p>效果：带超大附件的消息不再整条被拒，两个同名文件会各自被说明一次。</p>
+<p>Telegram：死掉的话题与离线消息（b8f7237477 / 91582993ac / b01d28f2d3）</p>
+<p>问题：私聊话题的重试阶梯里曾被加了一步「按原生话题 id（direct_messages_topic_id）重发」（#151057）。但 Bot API 只在一个 channel 的 DM 超级群里认这个字段；在机器人的私聊里，这一步会落到聊天根并返回 ok:true，于是阶梯以为「已投递到话题」：死掉的绑定从来没有被剪掉（话题模式一直开着，#95517）、cron 也丢了 thread_fallback 说明，之后每一次发送都要把整个阶梯再走一遍。另一件事：冷启动默认会丢掉 Telegram 服务端的更新队列，网关停着的时候用户发的消息就永远没人回（#143123）。</p>
+<p>修复：三条阶梯（文本、媒体、控制消息）都从「同话题重试」直接到聊天根、不带死锚点，剪掉绑定，文本还按以前那样报告 thread_fallback，direct_topic_retry_kwargs 整个删掉；channel 的 DM 超级群仍先按 direct_messages_topic_id 路由（_thread_kwargs_for_send 未动）。drop_pending_on_cold_boot 默认改成 false：冷启动保留服务端最多 24 小时的队列，积压消息按聊天顺序由每个聊天的更新处理器补答，本地已处理过的回执（#120257）跳过，显式写 true 仍然丢弃。</p>
+<p>效果：话题被删之后第一次发送就会剪掉绑定、回落到根并说明回退；网关重启后，停机期间发的消息会被补答。顺手还有一条：重连时会复用已经建好、但 thread_id 没存下来的私聊话题（b01d28f2d3）。</p>
+<p>网关：压缩阈值警告只在私聊（4a4e985928 / b6d2c22be4 / 483d1fc2c3 / 2c51835630 / 13128bd5e3）</p>
+<p>问题：「过了压缩阈值但压缩被禁用」的警告原本会出现在任何聊天里，而这些命令在群里是管理员门控的，术语直接漏给每个成员（#101003）。补丁铺开后又冒出两个漏口：Slack 把 MPIM 的 chat_type 标成 dm（会话与线程作用域也按 DM 处理），所以只发私聊的警告照样发到了每个成员；Discord 建 handoff 线程失败时合成回合默认 chat_type=dm，即使配置的 home 是公会频道，警告又漏回频道里，handoff 也被当成 DM 记。</p>
+<p>修复：目的地判断从「共享聊天类型的白名单」翻成「除了 DM 一律不发」，过滤器挪到 gateway/run_status_filter.py；Slack 的 MPIM 来源打上 shared_session（对 dm 来源无副作用，build_session_key 与 resume 守卫只在非 DM 类型读它），状态过滤按群处理；handoff 没有新线程时用适配器的 get_chat_info 给 home 分类（Discord 与 Matrix 保留 dm/group 映射，其他平台保留上报的共享类型，无法分类才算 dm）；「压缩被拒」这类空操作警告同样不上任何聊天面。</p>
+<p>效果：群成员再也看不到内部术语，私聊里 owner 仍然能收到该看的提示。</p>
+<p>网关：编辑过的命令不再 admission_conflict（eac24f9305 / fbaa6d8f87）</p>
+<p>问题：编辑消息的请求 id 是 message_id:edit:REVISION，但几处重建 MessageEvent 的路径把 edit_revision 丢了：空闲状态下编辑 /goal，kickoff 用命令的 message_id 重建却没有 revision，目标被替换后 kickoff 又被当成「同一请求 id 内容变了」拒绝；忙的时候 /queue 与 /steer 的回合边界回退同样丢 revision，编辑一个忙时的 /q 直接撞 RuntimeStoreError: admission_conflict（#149947）。</p>
+<p>修复：三处重建都带上 edit_revision，编辑被当作它自己的回合入场。</p>
+<p>效果：编辑后的 /goal 直接开始跑，忙时改 /queue 或 /steer 变成入队，而不是报冲突。</p>
+<p>网关：代理地址里的凭据不再进日志（570f2e40b3 等约 25 条）</p>
+<p>问题：网关和适配器的错误路径会把代理 URL 原样写进日志、运行时状态和回复文本，而 URL 里可能带着用户名密码；NO_PROXY 绕过判定也不严谨，大小写不同、端口不是数字、畸形 URL、无 scheme 的写法都能绕过脱敏。</p>
+<p>修复：同一批二十来条修复把规则收口——只打印异常类型和 host:port；端口不是数字的 URL 视为不可安全记录；重建代理 authority 只用 host 与 port；畸形 URL 一律不回显；query 与 fragment、最后一段路径（只有像文件名时才留）、SOCKS 凭据、大小写与端口补零的差异、非 ASCII 与 punycode 主机都有对应处理；NO_PROXY 只在 no_proxy 或 NO_PROXY 真的设置时才计为绕过，且要求确实绕过了所有库才保留真实错误文本。</p>
+<p>效果：日志里还能看到是哪个代理出的问题，但看不到凭据。</p>
+<p>模型：claude-fable-5-2（9d97823a9b）</p>
+<p>Anthropic 在 11 月 9 日发布 claude-fable-5-2，接法沿用 Fable 5.1 / Opus 5.5：OpenRouter 与 Nous 兜底列表加 anthropic/claude-fable-5.2，原生 Anthropic 首位是 claude-fable-5-2，manifest 重建；定价 $8/$40，缓存读 0.025 倍（$0.20），5 分钟写入 $10，Anthropic 与 Bedrock 同价，fast 模式（speed=fast）$16/$80；claude-fable-5-2 加入 speed=fast 的门控；上下文与输出上限、强制思考已由 claude-fable 家族的行覆盖。同一个模型的 Claude Mythos 5.2 没有加：Anthropic 只提供给 Cyber / Life Sciences 验证计划成员，Nous Portal 和 OpenRouter 都会返回 404。</p>
+<p>插件与其他（e412d4c6a4 / 8bf50cbdf9 / 6a3bd67259 / 14accd54f1 / f53d66145c）</p>
+<p>插件钩子 on_session_open：以前插件没有「会话打开」的通知——on_session_start 要等第一次 agent 回合，重开也不会触发，于是记忆类插件没法预加载上下文，状态类消费者也没法显示会话已打开（#89385）。现在 on_session_open 在网关里、在 AuthorityConnection.resume（session.create 最终也走它）这个唯一的打开点触发，只在客户端连接上它尚未连接的本地会话时触发一次，参数为 session_id、platform（cli/tui/desktop/acp 等）和 reason（create 或 resume）；已经持有连接的快照轮询、重连时的事件重放都不触发，也不靠进程级去重集合。随后 8 条网关修复把它收口：在 attach 之前入队、跳过重连、超时在循环外读、一个挂住的投递不会拖住后面的、没有消费者就不起线程。</p>
+<p>工具可用性探针 10 秒上限（8bf50cbdf9 + 6a3bd67259）：一个永不返回的 check_fn 以前在回合关键路径上内联跑且没有超时，预热永远不结束，第一条入站消息停在 provider 请求之前——没有日志、active_agents 停在 1、平台一直显示正在输入，只能重启。现在每个探针跑在守护线程上（带上调用方的 contextvars：profile 密钥作用域与 Hermes home 覆盖），预算 10 秒，超时按不可用处理并打警告，卡住的线程按 (check_fn, profile) 复用。配套的还有一条：未缓存的探针（no_cache_check_fn 与 fail-closed 路径）不再和别人的在飞探针合并——Kanban 的检查会拒绝被委派的子 agent，子 agent 以前会拿到父级的「可用」，于是看见了 Kanban 工具。</p>
+<p>node-deps 失败时保留旧依赖（14accd54f1 + 同批 16 条）：node-deps 以前在 pnpm 拉到任何东西之前就删掉每个已装目录，第一次 install 面对的是空 store，registry 不可达时就没留下 node_modules，之后每次 hermes --tui 都失败（#150031）。现在先移到 .cache/node-deps-previous，pnpm 或 Electron 步骤失败就放回，成功才删；装到一半被杀掉的下一次运行也会放回。同批还有：串行化 node-deps、按心跳判断锁是否还活着并给等待设上限、Ctrl-C 时恢复目录树并释放锁、registry 不可达时更早放弃。</p>
+<p>TUI 依赖装不上时启动旧构建（f53d66145c + 5 条）：更新挪动 TUI 的输入之后，hermes --tui 会先重装 Node 依赖再重建；离线时这一步必然失败，于是每次启动都报错，直到有一次联网更新成功。现在只要 ui-tui/dist/entry.js 还在，就警告并启动那版构建；网关会像对待跨更新还开着的 TUI 一样把它托管起来。另外那条警告以前会被 TUI 第一次写屏（清屏并清 scrollback）冲掉，现在终端里会等回车再继续、退出后再打一次，HERMES_TUI_FORCE_BUILD 与 --dev 一样跳过回退。</p>
+<p>更新与状态（a2350b2643 / 81d6941401 / 891de306ce / 6c8606d51d / 1ab6ec2a70 / 2e1b3558f0）</p>
+<p>PM 的 venv 记录（pm scope 11 条 + update 1 条）：pm.build_env --python &lt;系统 python&gt; 建的 venv，pyvenv.cfg 的 home 在 PM 工具库之外，_built_by_pm 把它当成 main 时代的 venv，于是没有记录选择的 data root 会把它的 extras（all 及其全部）带进每一次同步；现在 PM 给自己创建的每个环境写 hermes-pm-built = true，_built_by_pm 认这个键，同时保留对旧环境的库路径检查。另外 hermes pm repair（以及 main 时代 .update-incomplete 的启动恢复）在没有记录选择时以前会发布 [all] 并报告成功，把旧 venv 的 extras 永久丢掉；现在它会恢复那个 venv 的 extras（扣掉用户主动拒绝的），而可能抹掉 main 时代 extras 的「无记录修复」会被拒绝。</p>
+<p>profile 改名后的会话收据：hermes profile rename 会重写会话行、路由索引、心跳、投递义务和 origin 列，却漏了 state_meta 里的几类收据——本地会话策略收据 gateway.local_policy.v1:*（改名后打开桌面端的 Bot Chat 会撞 profile_mismatch）、API 绑定收据 gateway.api.binding.v1.*（restore_api_session 会从当前 profile 名重算两个值，导致 session_key 不匹配 admission_conflict、origin.profile 还是旧名 profile_mismatch，#150651）、以及本地收据里的路由命名空间（route mismatch，客户端看到 storage_unavailable）。三处都改成只重写 resume 真正比较的字段：顶层 route、entry.session_key、entry.origin.profile；签发时的 home 保持原样（API 收据同样只保留较旧 home 仍可恢复的语义，#150633），API 与本地收据共用一个 _rekey_session_receipts 辅助函数，按 GLOB 前缀扫描、按 agent:&lt;旧&gt;: 命名空间匹配行。</p>
+<p>其他零散（03f348e401 / 085d8b5d98 / 6ee6b7cb77 / adebd646a9 / 6897399c1b）</p>
+<p>MiniMax-M3 的思考标签：MiniMax-M3 把思考过程序列化成 &lt;mm:think&gt;...&lt;/mm:think&gt;，而统一的标签列表 THINK_TAG_NAMES 只有裸名字，于是最终回答的剥离（block / orphan / unterminated 三遍）、流式清洗、CLI 与网关的流过滤以及 TTS 都把原始标签、甚至成对的整段思考内容交给了用户（#124705）；现在带命名空间的名字统一列进那张表，所有隐藏面都从它派生。</p>
+<p>QQ 审批按钮带请求 id（085d8b5d98）：编码统一成 approve:&lt;session&gt;:&lt;decision&gt;[:&lt;request_id&gt;]，卡片里的请求 id 能完整往返解析器（#124974），最新的卡片解析最新的请求，已结算请求的卡片什么也不解析。</p>
+<p>兜底原因可读（6ee6b7cb77）：HTTP 200 的拒绝（Anthropic stop_reason=refusal、finish_reason=content_filter）以前不带原因就切兜底，提示读起来是「不可用（provider failure）」，而同一个拒绝以 HTTP 400 抛出（DeepSeek 的 Content Exists Risk）反而走分类器说自己被内容策略拦了。现在两处都传 FailoverReason.content_policy_blocked（不属于限流原因，冷却与重置延迟不变），并且每一处非异常的兜底切换（急切的无效响应切换、Nous 限流守卫、Codex 只推理不停、内容过滤流、Codex app-server 回合失败）都会打一条带原因的警告。</p>
+<p>单次会话不再自动起标题（adebd646a9）、鉴权裁决尊重 should_fallback=False（6897399c1b）：前者一次性会话不再多发一个起标题的请求；后者让明确的鉴权裁决不再被兜底流程覆盖。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-09：插件目录新增 72 个条目，桌面端连接管理与澄清选项成批修复</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-09</link>
