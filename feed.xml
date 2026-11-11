@@ -5,8 +5,235 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 10 Nov 2026 07:03:19 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 12 Nov 2026 07:04:48 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-12：托管沙箱权限改成白名单，Telegram 图文终于算一轮</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-12</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-12</guid>
+      <pubDate>Thu, 12 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 11 日 06:30 ~ 11 月 12 日 06:30 合入 main 的提交，共 1134 个 commit（不含 merge），另有 3 个 merge。新增 133 个功能、171 个修复、2 个性能优化。口径按合入 main 的时间算，不是 commit 作者时间。</strong></p>
+<p>📌 今日要点：</p>
+<p>托管沙箱的权限判定从「列拒绝清单」翻成「列允许清单」，只有 7 个工具放行，宿主机上的东西一律碰不到。</p>
+<p>Telegram 22 条修复，核心是「先发文字再发图片」不再拆成两轮，另外修掉了大文件上传的假超时和轮询冲突后永久掉线。</p>
+<p>text_to_speech 和 manage_connections 默认走延迟加载，每次请求省 557 和 1563 个 token；内置工具缺必填参数现在直接拒。</p>
+<p>插件目录一天新增 207 个目录条目，其中 hermes-phone-use、computer-view、hermes-jobs、blind-accessibility-reader 比较有代表性。</p>
+<p>另一个 Hermes agent 可以通过 dashboard 的 peer 路由调本机接口，不必持有 API key；profile 创建统一走网关。</p>
+<p>桌面端（1 条 fix）</p>
+<p>509d122b37 内嵌网页预览的宽度改为跟随对话列，上限 960 像素。原来的宽度来自页面第一次上报的尺寸并被卡在 640 像素，一个撑满自身框架的页面会上报它拿到的宽度，所以在窄窗口里打开的预览，窗口拉宽之后仍然窄；加载之后才绘制的图表也会停在绘制前的宽度。现在框架撑满 transcript 列、上限 960 像素，CSS 跟随列宽变化，注入脚本只上报高度，120 到 1200 像素这档仍实时生效。960 的上限是为了让画满宽度的方形图待在这个高度区间里，不在框内出滚动条。框架和文档都透明无边框，靠左排布的小尺寸组件仍像一张小卡片，居中的则落在列中间。桌面端平台提示、prompt 快照和插件 SDK 文档同步成新规则。</p>
+<p>沙箱与作用域（32 条：fix(sandbox) 21、fix(scope) 8、3 条新功能；另有 test 4 条、refactor 1 条、docs 1 条）</p>
+<p>4fd509e4e0 托管作用域改成默认拒绝。原策略列的是「哪些要拒绝」，两轮评审各找出约 8 条新的宿主路由，永远列不完。现在 tools/hosted_tool_policy.py 的 HOSTED_TOOL_ALLOWLIST 只放行 terminal、process_manage、execute_code、read_file、write_file、patch、search_files 这 7 个只在 agent 自己沙箱里干活的工具，denylist 整个删掉。memory、session_search、todo、vision、web、browser、MCP、connectors、catalog、delegation、skills、cron 在任何 handler 之前就被拒；dispatch 之外的原语（inline executor 表、handle_function_call、browser_exec 直调入口）也各自问一次。另一个开关 host_feature_enabled 关掉所有读写本机 profile 状态的非工具功能：上下文文件与 SOUL.md、子目录提示、@ 引用、工作区快照、后端探测、内置 memory 的初始化与写入、recall 库、后台评审、轨迹导出、失败写记录、检查点、图像和视频处理、内联技能 shell、cron 脚本、MCP 子进程、媒体投递、语音转写、/review 的 delegation。本机模式不变，并有测试钉住本地路径的字节级一致。</p>
+<p>1745efae53 每个托管操作都要带上自己的作用域。此前只有方法签名里写了 scope 参数的托管后端才拿得到授权，签名用可变关键字参数的操作会在没有任何授权的情况下静默执行。现在托管环境必须实现 execute、cleanup 和长驻进程那几个接口并接受 scope 参数，否则创建时就被拒。同一提交还修了空闲回收：它按创建任务 id 判断后台任务是否在跑，而托管沙箱的身份键永远不等于任务 id，于是有任务在跑的沙箱照样被销毁；现在按进程的沙箱键判断，空闲的托管沙箱只做挂起不销毁，生命周期调用也在创建它的作用域下执行。环境清理现在会停掉并回收每个长驻进程，关闭管道，组空之后释放归组。</p>
+<p>468e1628c5 browser_exec 会在宿主子进程里跑模型写的 Python（云浏览器只搬 Chromium，不搬解释器），这类没有沙箱路由的工具现在在托管作用域里直接失败关闭，报错写明原因：browser 系列、computer use、桌面 UI、桌面项目、图像和视频生成、文本转语音、skills、cron、delegation、kanban、catalog、连接管理、onboarding，以及所有 MCP 工具。</p>
+<p>3cae8fc633 白名单此前只在 dispatch 时执行，托管 agent 仍要为自己用不了的工具付 schema token，试一次还浪费一个回合。现在定义列表组装后就按托管标记过滤，缓存键带上该标记，本地列表不会发给托管调用方。</p>
+<p>1bd13ebac8 作用域现在带上了 agent 的归属和角色，每一轮对话携带自己的围栏。</p>
+<p>151dc5fc3e home、secrets 和终端策略合并成一个 Scope 值，不再分散在多处。</p>
+<p>178b1d0349 托管作用域里的工具只能落到它自己 agent 的沙箱。</p>
+<p>a618df2379 owner、manager、member 三种角色收敛成一个管理权，绑定只复制它保留的东西。</p>
+<p>46baba54d8 绑定在目标 profile 的 home 和 secrets 下构建终端策略。</p>
+<p>e4f38b8e1f 在 profile 自己的 home 下 hydrate，延迟的策略保留自己的覆盖层。</p>
+<p>39422ef38a 托管轮次内的同身份绑定保持这一轮和它的围栏。</p>
+<p>Telegram（22 条 fix）</p>
+<p>2181a2d2d3 一句话加一张图现在算一轮。短文字在 0.18 秒静默期后 flush 出去时，紧随其后的图片可能还在下载，随后又进自己的 0.8 秒爆发批次，agent 就先答了文字、过一会儿再单独收到图。同一个 chat 的更新按顺序处理，所以图片 handler 启动时属于它的文字还在待发：handler 现在在第一个 await 之前认领同发送者同 chat 的待发纯文字批次，被认领的 flush 在正常延迟后最多等 8 秒，图片到 batcher 时把文字吸收进去，且只在同一 session/主题通道内成立。一句单独的文字保持原延迟，文字先 flush 完再发图仍是独立一轮，别人的图不会抢走这段文字。实现放在新文件 telegram_text_photo_pairing.py，adapter.py 本身只改了几行。</p>
+<p>ea07a81991 大文件上传不再报假失败。Bot API 服务器要等整个请求体到齐并处理完才回 sendDocument/sendVideo，而网关不管文件多大都用固定 60 秒读预算加 300 秒总时限，独立发送路径（hermes send、cron、agent 的 send_message）用的是 Bot 的 20 秒通用读超时。慢上行、自建 Bot API 服务器上的大文件，或 Telegram 处理得慢的小文件，都会返回超时然后其实已经送达，重试还多一份。新增 telegram_media_budget.scaled_budgets，按磁盘载荷以 128 KB/s 估算传输时间加到读写超时上，总时限加 1.5 倍（上限 1 小时）；URL、file id 和内存字节仍用固定预算。独立路径的超时告警现在说明 Telegram 可能仍然会送达。</p>
+<p>a01962192d 轮询冲突改成可重试，网关能自己回来。409「terminated by other getUpdates request」是抢那一个单写者轮询位，不是配置错误。适配器内部已重试 5 次共 200 秒，用完就把它标成不可重试，于是既不入重连队列、失联平台检查也被同一个标志挡住：网关继续服务其它平台，Telegram 永远钉在致命状态，进程也不退出让服务管理器重启。实测一次四分钟内三次重启的链条在 Telegram 侧留下僵尸 getUpdates 会话，新网关烧完 5 次重试后 Telegram 死了 31 分钟，只能手动重启，而那时裸 getUpdates 早就返回 ok。现在标成可重试，走指数退避（30、60 秒，上限 300 秒）每次换新适配器，真有两个实例在抢的时候仍有 attention 升级把问题暴露出来。</p>
+<p>427d4411cf cron 静默投递不再留下「正在输入」。带 job_id 和 notify 元数据的投递在 cron.delivery.notify 为 false 时，_retrigger_typing 的 notify 守卫不触发，适配器在没有 typing 循环归属的消息之后又把 Telegram 那 5 秒计时器续上，定时消息落地后气泡还挂着。带 job_id 的发送现在和 notify 发送一样算终态，富文本和 MarkdownV2 两条路径都改了。</p>
+<p>0b3d6928f2 每个照片爆发和相册通道只认一个已解析的主题。</p>
+<p>2ee26b0176 照片批次不再把路由到不同主题的事件合并。</p>
+<p>82c8defdac 被下一张照片吸收的问题保留它恢复出来的主题。</p>
+<p>d8b78f8d56 一个主题里的照片不会占住同一个用户在另一个主题里的问题。</p>
+<p>81b593f464 照片配对能找到被观察分组的发送者、本主题的文字和以图片命名的文档。</p>
+<p>36c840f7fa 回复里输入的文字留在 event.metadata 之外，原生准入才认这些回复。</p>
+<p>55da77e75a 照片回复和语音回复并排时，语音不会混进 clarify 的答案。</p>
+<p>8c21eb44c2 拆成多段发出的文字回复，每一段都能回答 clarify。</p>
+<p>95c1a2bf41 被回复的语音能进 STT，缓存不了的会给一条说明。</p>
+<p>946e1d4a83 入站 getFile 卡住改为重试，不再直接丢掉附件。</p>
+<p>5cee680b59 群里被观察到的照片会告诉 agent 文件在哪、怎么看。</p>
+<p>bf3e0a3d5c 用户第一次绑定主题时的爆发或相册仍算一轮。</p>
+<p>57a234a7cf ignore_root_dm 恢复工作，顺手删掉那行死掉的 pretty_tables 文档。</p>
+<p>ebc5412211 ignore_root_dm 保留没有主题的新话题开场。</p>
+<p>6c649241f9 ignore_root_dm 保留被拆开的命令文字续段。</p>
+<p>0095dc10cd 网络恢复之后不再留着冲突事件开着。</p>
+<p>e1ce6f757f 流式预览按最终消息的 MarkdownV2 模式编辑。</p>
+<p>工具：默认延迟加载与参数校验</p>
+<p>5d74914538 text_to_speech 默认进延迟列表。它的 schema 每次请求 577 个 token（ElevenLabs 变体 1245），而大多数会话根本不会说话。Fable 5.2 和 qwen3.8-27b 上的现场 A/B 两个臂都是 12/12 第一次调用就带对参数命中，扣掉 20 token 的目录行，每次请求净省 557 个 token。同一提交还修了两个桥接副作用：自动语音回复在桥接调用 text_to_speech 之后会再念一遍，桥接生成器的音频（或图片、截图）不会挂到回复上，tool_name_by_call_id 现在能解析单条目 tool_call。</p>
+<p>853ee49d6f manage_connections 默认进延迟列表。它每次请求 1563 个 token，日活安装里只有约 3% 会用到（占全部工具调用 0.03%，opt-in 遥测，10 月 27 日到 11 月 8 日）。早先一次尝试失败，原因是目录那行「Connect the user to apps.」没提 MCP 服务器，弱模型改用终端去装（20 次里 18 次掉到 10 次）；那句改成同时点明两件事后，三个模型上的任务里延迟版和常驻版打平。代价是连接类任务多 1.2 到 2.2 次模型调用，已接受；tools.tool_search.defer 显式配置仍然覆盖默认列表。</p>
+<p>8300964930 内置工具缺必填参数直接拒，未知参数点名。像 search_files 不带 pattern 以前照跑还返回结果，拼错或凭空多出来的参数被静默丢掉，模型以为某个选项生效了。现在每个内置工具前面有一道检查：缺 required 参数在 handler 之前就拒，报出字段名（schema 枚举时给可选值）和合法参数；schema 没声明的参数照样原样传给 handler，结果里多一个 _warning 点名。不剥任何东西，老形状由各工具在注册时声明（skill_manage 和 memory 的扁平形状、delegate_task 的单任务形状、patch 的 V4A、terminal(code=)、video_generate(video_url=)）。只管内置工具，MCP 和插件工具、开放或联合形状的根 schema 一律原样通过。</p>
+<p>2b7a6ceca5 延迟调用的参数按服务出去的动态 schema 校验。text_to_speech 延迟之后，通过 tool_call 调 ElevenLabs 的嗓音搜索会被拒：桥接拿静态注册表 schema（required 只有 text，没有 find_voices），而 tool_describe 提供的是动态那份。image_generate 和 cronjob_manage 同样的缺口一起补。</p>
+<p>6bbe4a6c78 按真名调用延迟工具改走 tool_call 路由。工具搜索开着时延迟工具不在 tools[] 里，直接按真名调用只会拿 valid_tool_names 做模糊修复，被拒成「does not exist」，白费一轮还算一次无效工具；一个 Claude Sonnet 上的网关一周里约 8% 的 process_manage 尝试踩这个。现在桥接激活、名字在会话的延迟集合里、参数能解析成对象时，就地改写成 tool_call 并算作修复调用，后面照常走作用域检查、schema 探测、插件钩子、护栏和审批。</p>
+<p>7043a92648 execute_code 里的读取永远返回文件内容。单元格里调 read_file 时，若这段内容之前被读过（模型读过或单元格里已读过一次），会返回「自上次读取以来未变」的占位，取 content 直接 KeyError，再重复几次撞上 BLOCKED。现在两条细胞派发路径把工具调用标成程序化：这样的读取永远带内容，不计入连续读写循环护栏，也不记成已展示给模型，模型自己之后的读取仍能拿到文本，读后写的护栏照常生效。</p>
+<p>47213dc5ac 只有空 pattern 才被拒。原来的拒绝逻辑会把 pattern strip 掉，搜制表符或空格被当成空模式拒了；它又按字面 content 目标判断，未知或 null 目标配空 pattern 仍会返回每一行。现在除 files 外每个目标都拒空 pattern。</p>
+<p>929ebb2d21 延迟工具的旧别名同样走 tool_call 路由。</p>
+<p>2fd5066fdd 插件 validate 的探测 ctx.state 用 PluginState 的真实形状。</p>
+<p>64e10d9b95 插件 validate 的探测服务属性可以当路径用。</p>
+<p>插件目录（701 条提交在动目录，新增目录条目 207 个）</p>
+<p>c5480b37f1 hermes-phone-use 进目录，让 agent 操作手机。</p>
+<p>e2d36267a1 走 music 这个新 scope 的插件：uzu-language 做 beat。</p>
+<p>eefc48e9fe computer-view 原生插件，看电脑屏幕的视图面板。</p>
+<p>7ff09e02d0 hermes-jobs 进目录，pin 在 v0.3.0，装上是 Google Calendar 的求职看板。</p>
+<p>d48527358a blind-accessibility-reader 进目录，面向盲人和低视力用户的朗读插件；同批还按目录规定先披露、再 pin 到具体提交。</p>
+<p>837817bcd4 seedguard：密钥防火墙，插件黑客松投稿。</p>
+<p>535d663406 OpenBao 作为密钥来源接进目录。</p>
+<p>333622abbc publora 上架。</p>
+<p>66f5145912 sabbath、7544a97087 psychopomp 由同一位作者陆续进目录。</p>
+<p>091b6b8ed6 penthera 进目录。</p>
+<p>1e29137d22 Benchline 进目录。</p>
+<p>3763eec0b1 agent-autocommit 进目录，让 agent 自己提交。</p>
+<p>27e2b2d73f Hermes Guard v1.1.1 进目录。</p>
+<p>51c849c9d3 Dress Rehearsal 进目录。</p>
+<p>其他同批上架的还有 redactgate、ros2-console、storage-utility、pit-crew、screentime（都是插件黑客松投稿）、CipherVault、leash、load-lock、unified-inbox、SessionCrew、atlas、1toolring、mascot-guide、Grammarly、kaggle-competitions、meeting-copilot-live、undo-send、dsh-pet、Dress Rehearsal 一类，以及 exchangerebel、shelly-direct、pinpoint、live-artifacts、BlindCouncil、GroundControl、ultimate-dashboard、emailfig、pinocchio、waifu-sprites、idm-radio、hermes-superagent、Spacewise、ros2-console、ask-ledger、othigai、ghost-subscriptions、claw-messenger、precog、customs、adplug、hermes-session-signal、superlist、mentionagent、aegis-gate、factkit、fledge、SkillCheck、shopmate、CUPS print-tools、PatchReview、attest、Proof Lens 等条目。</p>
+<p>网关与投递</p>
+<p>a84db0dcad 活着的 Docker 沙箱里受权限限制的 MEDIA 文件会先交还再投递。根沙箱 chmod 600 的交付文件，在持久容器活着时在宿主上是 root:root 0600（handback 只在拆除时发生），网关撞上 EACCES，每个平台都退化成一条失败提示。validate_media_delivery_path 现在通过那个 bind-mount 了它的活 root 容器把文件交还给宿主用户（只交一个普通文件，find -P，记录下来下次根容器回收），沙箱保持 no-new-privileges 和原来的 cap 集合，文件保持原模式。</p>
+<p>7cdf34e59b MEDIA 交还搬到事件循环之外，且不拖累回复。路径检查恢复成纯检查，Docker 交还在过滤之后用 asyncio.to_thread 跑（profile 作用域走 contextvars），失败返回 False 而不是从回复抽取里抛出去；被观察媒体的说明追加在完整 context_note 之后。</p>
+<p>8471f614b4 cron 的上传超时按文件大小加宽。cron.standalone_send_timeout_seconds（60 秒）和实时适配器的每个附件上限，现在都按文件上传时间（128 KB/s）乘 1.5 倍加宽，和 Telegram 网关的口径一致；尺寸计算提到 gateway.platforms.helpers 共用，纯文字发送仍用配置值。</p>
+<p>1400400907 被判成致命的轮询冲突改为有界退避重连，然后挂起，不再无限期钉住平台。</p>
+<p>b1a6350602 超长的工具进度条目整条展示一次，即使被拆成多次输出。</p>
+<p>8c59fc13ed 进度行的非洪水类失败有界重试。</p>
+<p>156553f4ea 洪水窗口内的第二次内容重置把没发出的剩余部分带出来。</p>
+<p>dac69b91ba 被洪水窗口扣住的超额进度气泡只欠一次。</p>
+<p>643d285d2f 插件改写语音回复之后，它仍然是 clarify 的答案。</p>
+<p>25b9dcd6ee 打字的 clarify 答案就是打的那段文字，只有被回复的语音会让位。</p>
+<p>7c7ad90982 用户侧关闭仍待处理时留下的便条能跨重启保住。</p>
+<p>97bc2a734f 后台工作完成后会恢复没被查看的本地父会话。</p>
+<p>连接、Profile 与 Web</p>
+<p>3dbdf86402 另一个 Hermes agent 可以通过 dashboard 的 peer 路由调这个 agent 的接口。通行证是给这一个 agent 的短期凭证，调用方不必再持有 API_SERVER_KEY：/api/peer/&lt;path&gt; 和 /api/peer/p/&lt;profile&gt;/&lt;path&gt; 把请求转发到本机回环上的网关 api_server，用的就是该监听器校验的那把 key，key 不出机器，也没有新端口对外监听。每个路径要通行证里带的权限：agents:message 覆盖 hermes peer 用到的健康、能力、会话与聊天、运行、运行事件、停止，agents:control（含 message）覆盖其余面向用户的接口。没列出的路径永远不转发：cron 触发、平台事件入口、RoomLink 授权、/health/detailed。通行证走新的 provider 能力（supports_peer_pass / verify_peer_pass）校验，与 verify_token 分开，所以一张通行证不能授权另一个 provider 的 token 路由。控制类动作写进 dashboard 认证审计日志，api_server 把持有者记成 job origin 里的 peer_principal，任务比通行证活得久也能归因。网关睡着时返回 503 带 Retry-After，收到之后又丢掉的请求返回 502 且不带重试提示。</p>
+<p>4b81eaddc0 /api/status 报 peer_access：这个 agent 接受哪一版通行证契约，没有支持 peer pass 的 provider 时报 0。签发方只给会校验通行证的 agent 签。</p>
+<p>2d05b3a208 没有 scope 声明的 Portal token 不再当成 dashboard 会话。</p>
+<p>332ac8000e hermes profile create 改走运行中的网关。命令行是最后一条还在自己进程里建 profile 的路径，现在向服务当前 profile 的网关发 profiles.create RPC（和桌面端同一条），并打印网关给的收据。有就绪网关就交给它（只做发现，不会为这个专门启动一个）；没有、或本地网关卡在旧字段（-32601 / 4000）就退回进程内创建。HERMES_TUI_GATEWAY_URL 指定网关时由那个网关建，连不上或太旧一律报错，绝不在本地偷偷建。profiles.create 顺带加了 clone_config（--clone 不带源时复制调用方的 profile）、sync_imports 和 report。同一提交修掉一个并发问题：网关在一个进程里接管所有终端的创建，而 create_profile 用 profiles/.&lt;name&gt;.staging-&lt;pid&gt; 暂存，两个同名创建会互相删对方的暂存目录，输的那个抛原始 OSError（Errno 66 / ENOENT）而不是「已存在」；现在 provision_profile 围绕核心创建加了按名字的锁。</p>
+<p>e845643a73 在已被删除的 shell 上重建 profile 时，把该写的命令写出来。</p>
+<p>ef5e65f842 URL 创建跑在终端所在 profile 上，只有这次创建自己造的 profile 才写包装脚本。</p>
+<p>81cad244f4 网关创建保持拒因类型，检查收据，只包装本地 profile。</p>
+<p>51c551aa47 在另一个 home 里校验选择时保持 multiplex 语义。</p>
+<p>28c4b4a6a5 二级作用域里的启动 home 就是启动 home。</p>
+<p>0c6d08e1e0 打不通的已保存网关不再饿死本地 socket。中继原来用 asyncio.to_thread 解析每个请求的目标，于是每个发往已保存 SSH 网关的请求都把默认执行器的一个线程压在连接的隧道锁上，等 ssh 15 秒连接超时，然后再用之前读到的条目自己拨一次。请求比 15 秒一条来得快就能把默认执行器（min(32, cpu+4) 个线程）填满，其它所有走它的东西排队：本地 /api/ws 握手、legacy RPC 派发、察觉移除的 store watcher。应用显示离线，而只走 async 的 /api/status 还能答；删掉连接也停不下来，每个已经在等的线程还会再拨一次已移除的宿主。现在目标解析和 socket 凭据跑在中继自己的线程池（gateway-reach），同一连接解析中的请求在事件循环上等这次解析，删除之后的请求读注册表直接 404 不再拨号。</p>
+<p>79fb37f8a9 dashboard 检查已存在运行的会话，并在密钥来源里找 profile 的 key。</p>
+<p>d6e9e0b8f0 dashboard 按网关实际绑定的端口访问 api_server。</p>
+<p>性能（2 条）</p>
+<p>cfe09695de 机器人房间视图只读日志增量，并靠组变化通知推进。groups.changed 推送直接推进打开的 room，轮询退成兜底：会推送的后端 15 秒一次，旧后端和被转发的 2 秒一次；读失败、路由重连、租约失败都回到 2 秒或立刻重试。所有调用方同一时间只做一次房间读，各自在自己的读完成后返回；变更的收敛会顶掉在飞的那次读，动作前的答案不会落在后面。日志从游标读并做连续性检查，新的权威纪元或日志变短就整读一遍。bot driver 由房间写入唤醒，不再等 5 秒空闲轮询。</p>
+<p>4ed14253ea 每个 groups.changed 只换来一次房间读。一个窗口对同一个后端持有多个 socket（主连接、房间租约、其它），_broadcast_global_event 把同一帧写给每一个，于是每次推送都多排一次 groups.state 读、什么新东西也没读到（实测 15 次推送 30 次状态读）。现在每帧带上 broadcast_id（进程的 replay 纪元加计数器，进程生命内唯一），房间视图跳过已经读过的 broadcast_id（SDK 的 LruCache 保留最近 64 个）；没有 broadcast_id 的旧后端照旧读。</p>
+<p>安全、技能与其它</p>
+<p>303b2ce86b godmode 技能不再教 agent 加载 Hermes 的 .env。它第 12 条坑原本让 agent 在 execute_code 里 load_dotenv 加载 profile 的 .env，因为子进程没有 provider key；这等于把启动 profile 的所有原始密钥交给脚本，废掉子环境清理和「技能不得声明 provider key」的拒绝，路由轮次里还会读启动 profile 而不是被路由的那个。那条改成「子进程故意没有 provider key，密钥由技能自己的 setup 提供」。技能扫描器同步收紧：读 provider key 名（各 provider 的 api_key_env_vars 加 OPTIONAL_ENV_VARS 里的 provider secrets）在技能扫描里升为 provider_key_env_read，等级 high；对 HERMES_HOME 或 ~/.hermes 调 load_dotenv/dotenv_values 是新加的 high 发现项 hermes_env_dotenv。插件扫描不变，因为插件在进程内跑、读自己的 key。</p>
+<p>843a2e39e9 技能里的凭据规则改为一次 tokenize 读取 .py 文件。</p>
+<p>cbab32f78e provider key 告警跳过注释和字符串里的读取。</p>
+<p>04b3f4eb90 技能里 Hermes .env 规则只看 dotenv 调用内部。</p>
+<p>a9ac999de2 Hermes .env 规则去掉否定后顾。</p>
+<p>46c3569424 provider key 告警跟随子环境清理。</p>
+<p>d1f6d7fcc9 Hermes .env 规则只匹配真实的 Hermes 路径。</p>
+<p>0077e3bc0d provider key 告警只读 env 调用实际读的那个名字。</p>
+<p>07a145253a kanban 的宿主白名单按名字而不是前缀放行 XDG 基础目录。</p>
+<p>596e68e99b kanban 把负责人完整的作用域绑进 worker 启动环境。</p>
+<p>fb0c056dc1 登录会话的 agent 和展示 socket 留在 worker client 环境里。</p>
+<p>7c18b53d1b kanban 把实例的配置部署和托管目录留在 worker 环境里。</p>
+<p>97afdde64b kanban 在宿主白名单之前剥掉启动 profile 的 .env 残留。</p>
+<p>bfb78fac65 kanban 把宿主锁和安装策略留在 worker client 环境里。</p>
+<p>23e5493cb0 kanban 给另一个 profile 的 worker client 只交宿主相关的管道。</p>
+<p>fed7d68cba 沙箱镜像改为每个稳定版发布后重建，外加每周一次。</p>
+<p>77e16d5f0f 绿灯发布里的沙箱运行在等待时不会再被取消。</p>
+<p>3bcd071226 供应链扫描不再把被移动的行算成新增。</p>
+<p>322b801d33 pm 等待 Windows 扫描器占位再暂存 pnpm。</p>
+<p>fb5d314b10 pm 在丢掉 ARM64 载荷的 x64 CRT 助手时等待扫描器占位。</p>
+<p>0d75d1c8fe 头部探测的释放不再被探测锁阻塞。</p>
+<p>8d88747ac6 离线守卫内重新扫描探测的 inode 再关闭。</p>
+<p>2f28bd0570 关闭一个 home 下所有句柄时释放头部探测的文件描述符。</p>
+<p>c50101e5f5 进程内 state.db 打开统一走 connect_tracked。</p>
+<p>a05daaf87e 被丢弃的输出不算写操作，excuse 那一轮加上界。</p>
+<p>57f80b0d2c 段表改成线性时间，且不拒绝 main 本来就不拒的写法。</p>
+<p>d86c187532 段末尾的右括号不是 case 分支。</p>
+<p>791d75f43b 服务器守卫改走命令位置，而不是在全行任意位置匹配名字。</p>
+<p>0e89d1b883 守卫的 excuse 收紧到命令本身和它真实的参数。</p>
+<p>01ba05c91b 守卫直接放行数据类命令，而不是罗列一堆启动器。</p>
+<p>56ac7b5d51 跟随类参数只在 logs 之后才算数，包管理器的普通选项可以排在前面。</p>
+<p>79fb91216e 日志跟随者不接受位置参数，包管理器子命令必须排第一。</p>
+<p>3f86dbce09 null 设备重定向必须是完整的目标。</p>
+<p>08677d5828 tail --fol 算作跟随。</p>
+<p>1963111f1f 守卫不再拒绝 main 本来就会跑的写法，跟随机与管道规则更简单。</p>]]></description>
+    </item>
+    <item>
+      <title>Hermes 日报 2026-11-11：发送超时的口径重做，Windows 启动器会自我修复</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-11</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-11</guid>
+      <pubDate>Wed, 11 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 10 日 06:30 ~ 11 月 11 日 06:30 合入 main 的提交，共 1297 个 commit（不含 merge），另有 4 个 merge。新增 113 个功能、271 个修复、2 个性能优化。口径按合入 main 的时间算，不是 commit 作者时间。</strong></p>
+<p>📌 今日要点：</p>
+<p>流式发送超时之后到底算不算发出去了：超时被报成「投递不确定」，补发带重复标记，既不静默也不重复。</p>
+<p>谁能回答一张卡片：选择卡片和 /update 弹窗只认发起人，能批准的人也能拒绝，非管理员在任何入口都答不了。</p>
+<p>Windows 启动器在系统更新之后会自己重渲染，提权客户端不再起一个把普通窗口全锁死的高权限网关。</p>
+<p>Telegram 富文本的反引号配对改线性扫描，32 KB 回复不再把事件循环卡住几秒；表格里粘在中文上的反引号不再被当成撇号。</p>
+<p>模型侧 Gemini 4 Carbon 进列表、Gemini 3 以上默认走 Interactions 接口；Claude Mythos 5.2 补上 fast 模式和一百万上下文。</p>
+<p>桌面端：Pin 菜单、引擎更新文案与 macOS 自动化权限</p>
+<p>a1f78bcc82 平铺视图的标题菜单把 Pin 传成空函数，菜单项渲染成可用但点了什么都不发生，而同一块的标签右键菜单是正常的。现在两处共用 toggleTilePin，按持久的 lineage-root id 打 pin。</p>
+<p>ed4d3c9245 Windows 的 llama.cpp 固定版本加上 VC++ 运行时之后，所有已装引擎对新的锁文件都算过期，但标签还是 b11671，更新行读起来是「新版本 b11671 可以安装，你现在就是 b11671」，点下去会重新下载整个引擎。现在标签一致时会直说这一版开始附带运行所需文件、更新会重新下载引擎。</p>
+<p>8202995026 桌面端用 hardened runtime 签名，但两个 entitlement plist 都没有 Apple Events 权限，发 Apple Events 直接返回 -1743，Automation 的 TCC 弹窗也不出现，所有 AppleScript、osascript 自动化被挡住（Apple Notes 没有别的编程接口）。两个 plist 都补了，并加进 JS 侧的权限回归测试。</p>
+<p>4ba8bcc613 Projects 的折叠全部按钮用的 codicon-collapse-all，在标题栏 13 像素下看着像歪掉的三条杠；换成同一套图标里的三条横线，尺寸和旁边的眼睛、刷新对齐。</p>
+<p>d249faf242 Capabilities 页的 profile 选择器并进标签行，省掉一行高度。</p>
+<p>插件目录：753 条提交在动目录</p>
+<p>27fdbf19c7 新增条目例子：hermes-windows-certificates，查哪些证书存储里有什么、哪些已经过期。</p>
+<p>9682e56646 同批的 hermes-windows-firewall，看三个防火墙配置文件哪个开着、每条规则放行或挡住什么。</p>
+<p>f4dadb0269 hermes-windows-network，哪个网卡在用、某个网卡为什么没网、在等什么。</p>
+<p>b675c21f66 国内平台方向的一条：feishu-new-topic，飞书里开新话题。</p>
+<p>471448eae1 hermes-gruvbox，给桌面端六个 Gruvbox 主题。</p>
+<p>668cf74889 pixel-hq，把多个 bot 的状态做成游戏化的舰队视图，桌面端插件。</p>
+<p>ebf8f0a01b kindle-scribe 等个人工具类条目同批上架。</p>
+<p>41030d9dbb plan-usage 同批上架。</p>
+<p>f62eb5025b 目录的等级标注也在走：nvidia-switchyard 被列到 verified 等级。</p>
+<p>020e8a0d50 条目字段名整理的一次落地：waterloo-jane-street-qr 的 repository、subdirectory、commit 三个键改成 repo、subdir、sha。</p>
+<p>网关：发送超时之后到底发没发出去</p>
+<p>16fdcfab50 流式发送超时（平台其实没收到）以前被算成已显示，收尾的正式发送也被压掉，聊天就静默了或者只剩看不见的尾巴。现在这种发送报成「投递不确定」，交给投递账本记成失败行，补发时带「可能是重复」的标记：不静默，也不会出现没有标记的第二份。</p>
+<p>298e49b684 预览在一行代码中间被超时切断时，续写会从单词边界开始，把赋值和缩进丢掉，两条消息都不完整。代码块里的切断点现在移到整行开头，缩进保留。</p>
+<p>8a552157f8 代码块里的超时发送不再整段重发，也不会凭空造一行代码。</p>
+<p>5356aa4cb7 预览里已经写着完整答案时，收尾那次发送不再重发一遍。</p>
+<p>18773a878e 超时的流式预览或者新最终消息不会显示两次。</p>
+<p>4b36fa71d0 确认丢失时，被封存的溢出队列首条不再丢。</p>
+<p>33f3b4de74 超时的流式发送被 Telegram 再切分一次时，没发出的尾巴会补完。</p>
+<p>ccd32b6d63 回复里的图片批次失败，只重试链接还没发出去的那几张，已经发过的不会重复。</p>
+<p>95d2983d6f 被拒的回复图片（不安全、下载失败或超过上限）改为把链接和说明作为文字发出去，不再整个人间蒸发；语音转写的去重先按大小分组，只对同尺寸的组做哈希。</p>
+<p>0ac1878360 同一条语音挂在两个缓存路径下时只转写一次。</p>
+<p>网关：谁能回答一张卡片</p>
+<p>bf77c21427 选择卡片（/model、/reasoning、/fast、上限开关）和 /update 的 Yes/No 以前只查聊天白名单：开了 allow_admin_from 的群里，被拒了 /reasoning 的成员能点管理员的卡片把设定应用掉，管理员 /update 的弹窗也会被任何人的下一句话当成回答。现在发卡片时记下发起人，别人点会被拒，打字则当普通消息处理。</p>
+<p>0fcc78fc0d 正在跑 /update 的时候第二个人再发 /update，以前会无条件重写 marker，回答权被换到第二个人身上，发起人被自己的弹窗拒掉。现在还等在途的 marker 会直接回「已经有一个更新在跑」，不写 marker 也不起第二个进程。</p>
+<p>f330f74f73 只能打 approve 的成员以前批得了却拒不了，因为 deny 只认 deny 权限。拒绝不是更危险的答案，现在 deny 认 approve 或 deny 任一权限，批准仍然只要 approve。</p>
+<p>2a47b7e2f1 /whoami 和 /help 会把 /deny 列出来给有批准权限的成员看。</p>
+<p>ba27ce30dd 有批准权限的成员现在也能手打 /deny。</p>
+<p>17dd06937e 开了 allow_admin_from、approvers 是通配时，非管理员被拒了 /approve，却还能靠打一个裸的 always（还会写进 profile 级白名单）、点任意适配器的 Allow、或者回答 /reset 一类斜杠确认来通过。现在全部走同一个 may_answer 判定。</p>
+<p>a0263579b6 没有定义发起人的 clarify 回到「谁都能答」的旧行为，避免把没写 authority 的卡片锁死。</p>
+<p>59659c24c8 排队追问里的第二个人发言，以前会以回合发起人的身份执行；现在按自己的发送者走。</p>
+<p>b5d8d2ee63 别人的 steer 或 redirect 混进正在跑的回合时，这个回合不再声称有唯一身份，以免审批归错人。</p>
+<p>网关：Windows 启动器与只读后端报告</p>
+<p>129755bcfb 新命令给出 gateway migrate 的后端报告：列出本机的 hermes serve 和 dashboard 后台服务（systemd 用户与系统单元、Nix 的 hermes-backend、launchd 作业、s6 槽位、容器、桌面端 SSH 与本地后端、detached 和手工起的进程），每个服务的是哪个 HERMES_HOME，将来迁移会做什么、为什么现在什么都不做；支持文本和 JSON，退出码 0，不停止不重启不写服务文件。</p>
+<p>bf11054845 报告本身不写单元、plist、账本，也不开网络连接，但正常启动记账（HERMES_HOME 布局、安装记录、日志、临时目录清理）仍会先跑；帮助文本和文档把这句说清楚了。</p>
+<p>70d8be5dfb 启动器写的是当初那版安装的绝对解释器路径，Store 版的解释器在 WindowsApps 下面带版本号，Store 一更新就删掉，而没有任何东西重新渲染启动器：启动文件夹那次每次登录弹 WSA 80070003，有计划任务时 ensure 会跑死掉的任务、等满超时，每次更新后都卡在「Gateway starting (deadline)」，直到重跑 gateway install。现在 Windows 发现流程先看启动器名的解释器还在不在，不在就按模板重渲染，只动文件。</p>
+<p>7a54fea7f8 ensure 遇到已经 ready 的 owner 会在 Windows 发现之前就返回，所以死掉的启动器只有在没有网关在跑时才会被修。现在 ready 返回前先修 owner 的启动器，只在 Windows 上生效。</p>
+<p>5744a702e2 上面那条先被回退：它的回归测试在两条原生 Windows 通道都挂了，Linux 上（哪怕强制成 win32）却能过。</p>
+<p>40f94121ca 随后恢复：真因是测试 fixture 把任务名写成带下划线的 Hermes_Gateway_，生产代码本身没问题，fixture 修好后生产改动逐字节原样回来。</p>
+<p>1b903d5a3a 修另一个 home 的启动器时，工作目录取的是进程当前 profile 的目录，会把 profile 目录写进根启动器；现在按目标 home 取。</p>
+<p>08bd8a24cb 以管理员身份跑的桌面端或终端在没有计划任务时会继承高权限令牌，起出一个提权网关，之后每个普通 Hermes 窗口都被 gateway_elevated 拒掉：实测有人的非管理员桌面被这样一个网关锁了 8.5 小时。现在提权客户端直接得到 client_elevated 和「正常启动 Hermes 或先装一次计划任务」的修法。</p>
+<p>Telegram：富文本渲染与表格</p>
+<p>d37a4a036c 内联代码的反引号配对正则每遇到一个没闭合的串就要扫到文本末尾，32 KB 的富文本回复每次草稿刷新都能把事件循环卡住几秒；现在只找反引号，闭合端按长度索引二分查，26 万条随机输入与旧正则行为一致。</p>
+<p>77d6c24afd 正文里的双美元符号不会跨代码块或者段落开启公式，避免整段被当数学吞掉。</p>
+<p>a9ec0d8c5f 行内没闭合的三个反引号当普通文本处理，里面的美元金额正常转义。</p>
+<p>ededca00f9 粗体里孤立的星号保持可见，代码区的美元转义改成一次线性扫描。</p>
+<p>3fe02d3a40 富文本消息里的井号编号按字面保留，不会被当成别的东西。</p>
+<p>6395d8e967 表格里代码片段带的竖线保留，只有粘在单词上的反引号才在单元格边界停。</p>
+<p>71cd1d5c39 第二轮修的是「粘着反引号当撇号」的判定：它把反引号外面的 CJK 也算成撇号，于是「运行 ps aux 加竖线 grep py 即可」这种内容被切成三格；现在只在真正的英文缩写、或者前后都是单独一个词时才不当代码。</p>
+<p>Telegram：洪泛窗口、打字状态与断线补发</p>
+<p>7222595b82 流式草稿和删除不再占聊天的洪泛窗口，删除也不再在一个排满的窗口里原地等。</p>
+<p>5948ab52e2 打字状态是每会话在跑，但 Telegram 按聊天计费：私聊里多个话题共用一个 chat id，会同时往一个聊天里刷 sendChatAction，还绕过洪泛窗口和共享发送槽。现在每聊天每 2 秒最多一次、在窗口内保持安静、发之前占住发送槽；实测一个聊天三个话题会话 6.5 秒内从 12 次降到 4 次。</p>
+<p>761605f0d0 被标成发送路径降级而拒掉的最终回复，以前只有重连换适配器或重启时才从投递账本里补发；而 Telegram 的轮询阶梯通常原地自愈，没人告诉 runner，回复就一直躺在失败行里。现在自愈那一刻就扫一次账本，按平台加 profile 补发。</p>
+<p>81f2c6850c 失败行落在恢复之后的那种时序竞态也会补发。</p>
+<p>ed74264afe 客户端会把长粘贴切成几条消息发出来，间隔可能超过 0.3 秒，于是第一段自己成了一个回合、剩下的当 steer 插进来。超过 1024 字的粘贴现在等 1.5 秒收后续（接近 4096 那档等 2 秒），普通长度的快路径不变。</p>
+<p>模型与工具链</p>
+<p>5d1435e625 gemini-4-carbon 进了 gemini provider 的模型列表和 Google 的定价快照，费率和 Gemini 4 Argon 一样；思考档位、长解码和 Interactions 默认都按 gemini-4 家族走。</p>
+<p>e4a0f8732b Google 要求集成默认走 Interactions API，新模型和新能力也只在那边发。gemini_api 留空（自动）时，Gemini 3 及以上和带 latest 的别名走 AI Studio 的 Interactions；Gemini 2.x 仍留在 generateContent（它用 thinkingBudget 控思考，Interactions 没这个字段），Gemma、Vertex express 和代理地址不动；providers.gemini.gemini_api 写 generate_content 可以切回去。</p>
+<p>fbe9216c11 上面那条的传输层实现，落在 gemini provider 插件里。</p>
+<p>e53ed669b2 Anthropic 的 fast 模式文档把 Mythos 5.2 和 Fable 5.2 列在一起：speed=fast 走 Claude API，输入 16、输出 80 美元，费率与 Fable 5.2 相同；/fast 对它可用，原生 Anthropic 请求会带上 speed 和 beta 头。</p>
+<p>46f669702f Mythos 的规格和 Fable 一样，但上下文条目没有匹配到，claude-mythos-5-2 落到 200K 的兜底上；现在 claude-mythos 和 Bedrock 的 anthropic.claude-mythos 都标成 1M。</p>
+<p>10533b43c8 不用开一个 agent 会话就能查兜底链每条能不能用：静态模式只做解析和凭据判定，不发请求；加上 live 参数后每条静态就绪的条目发一次最小请求，走兜底真正用的那个客户端（Anthropic Messages、Codex Responses、Bedrock、ACP 各自的线），SDK 重试关掉，空答案和模型不符都算失败，凭据不打印、错误文本脱敏，任一不就绪退出码 1。</p>
+<p>7cb31a003e 新接口 GET /api/skills/hub/updates 列出有上游更新的 hub 技能。</p>
+<p>fe7e28b843 建 profile 统一走 provision_profile 之后，CLI 和 dashboard 还在传旧的选项：只有桌面端和 TUI 的 RPC 会复制启动 profile 的键，于是用 hermes profile create 或者从 dashboard 建的 profile 没有 provider，第一次聊天就失败。现在默认和桌面端 bot 页一样，共享密钥与账号（bot 令牌和 allowlist 剥掉，auth.json 共享不复制，模型继承），两个退出方式保留。</p>
+<p>d02cce93db 没有查看者的本地会话里，后台委派结果只写成一条笔记、不起回合；子代理失败时父会话的计划就一直卡着（实测一个会话因为 provider 拒绝卡了 48 分钟）。现在只要有子任务失败，最终结果就作为父回合跑一次；成功的、用户主动停的、早期通知仍然只是笔记。</p>
+<p>ec3249919a 被唤醒的父会话再次派发到同一个确定性失败，会以新的委派 id 继续自我唤醒，没人计数：一次账单故障里，45 秒内 23 个失败单元、46 次父模型调用。现在无人看守时连续失败唤醒最多 3 次，之后写成笔记；查看者回来或用户发消息后重新计数。</p>
+<p>c76545d636 空闲回收判断的是原始 owner_task_id，传进去的却是环境缓存键，于是有后台进程的会话沙箱照样被回收，进程的轮询器继续对着已关闭的环境轮询，完成通知永远不来。现在按「环境里有没有在跑的进程」判断，每条收尾路径先结算进程。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-10：目录提交一天 600 条并突破 2 MiB 上限，Telegram 与网关成批收口</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-10</link>
