@@ -22,9 +22,98 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 107 期 · 46592 个提交 · 每日自动更新 ·
+<p class="meta">共 108 期 · 48545 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-13" class="day">
+      <h2>Hermes 日报 2026-11-13：MCP 子进程与跨 profile 文件路径不再漏凭据，子代理崩溃后能接着跑</h2>
+      <p><strong>本期覆盖 11 月 12 日 ~ 11 月 13 日合入 main 的提交，共 1953 个 commit（不含 merge），另有 36 个 merge。新增 224 个功能、465 个修复、6 个性能优化。口径按「合入 main 的时间」统计，不是 commit 作者时间。这一期 224 个新功能里有 220 条是插件目录条目，真正的功能只有 4 条；修复集中在安全收口（MCP 凭据隔离、文件读写护栏、dashboard 与登录）、平台投递（飞书准入、WhatsApp bridge 鉴权、Telegram 富文本）和桌面端模型路由。</strong></p>
+<p>📌 今日要点：</p>
+<p>安全：stdio MCP 子进程不再继承 Hermes 自己的凭据，文件读写护栏覆盖所有 profile 与 Windows 的各种路径写法，dashboard 写路由和基础认证会话同步收紧。</p>
+<p>平台：飞书的合成回合（表情、卡片点击）开始走准入规则，WhatsApp 本地 bridge 补上 challenge-first 鉴权。</p>
+<p>桌面端：模型选择、排队 pick 与粘性路由的一揽子修复，WSL 外链改走 rundll32 堵住 &amp; 注入。</p>
+<p>子代理：delegate 子代理在崩溃或网关重启后可从 state.db 记录续跑，兄弟子代理共享 prompt 缓存。</p>
+<p>新模型：gemini-4-hydrogen 与第四档思考等级 xhigh。插件目录新增 359 个 yaml 条目。</p>
+<p>桌面端（11 条 fix(desktop)，加 bot-desktop 共 12 条）</p>
+<p>排队 pick 与迟到回复的行为归位 3998bf9c97 / 4e923f5e48 / 52a54bce74 / e488bac79e / 82bf5a0e6a</p>
+<p>问题：一个忙会话上可以连续排队两次模型切换，网关按回合开始时应用。旧那次 pick 的回复如果晚到，会改写或清空新 pick 的排队记录，网关随后拒绝新 pick 时找不到记录，被拒的模型就继续套给每个新会话。另一条链：排队记录写在 config.set 落地那一刻的活动 owner 名下，A 的 pick 可能落进 B 的记录，回到 A 时它的拒绝或取消找不到记录；而「聊天在屏幕上」被当成「这次 pick 是它保存的」，于是从卡片排进队列、聊天随后在主窗格打开的那次 pick 被顺手放掉。第三条：被拒的下一轮 pick 只比对模型，另一个 provider 上同名模型的新 pick 也被交回默认。</p>
+<p>修复：排队记录、回滚账本和 pick 顺序号统一成一条规则——旧 pick 的迟到回复不覆盖已经应答的新 pick；记录在 pick 开始时的 owner 作用域下写入、读取和退场，跨 owner 的事件按连接和 profile 找到自己的作用域；释放要求模型和 provider 都对上；被拒或用户取消费用确认时，新会话交回设置里的默认模型。记录进了 profile 键控的存储家族，跟着 migrateTilesForProfile 迁移、跟着删除操作清理。</p>
+<p>效果：被拒的模型不再继续给新会话用，多 owner、多 tab、刷新之后行为一致。</p>
+<p>粘性模型路由 2c3269205d / d9689d5f90</p>
+<p>粘性意图与模型切换的显示分开恢复，运行时更新（重连、runtime 刷新）之后粘性路由不再丢。</p>
+<p>MCP 开关的解析口径对齐 decdd4d6ff</p>
+<p>问题：桌面端把 disabled / enabled 的值先 String() 一遍，`disabled: [true]` 变成 &quot;true&quot; 就被读成关；后端 _parse_boolish 认为列表不可解析、保持默认，服务器照跑。`enabled: [false]` 同理。</p>
+<p>修复：桌面端按后端的规则解析，bool、数字、单词才生效，列表、映射、null 走默认；共享用例表加了列表和映射行，后端读取测试也读同一张表。</p>
+<p>效果：设置页的开关状态和服务器实际启停一致。</p>
+<p>WSL 外链改走 rundll32 debaa81616</p>
+<p>问题：WSL 分支用 `cmd.exe /c start &quot;&quot; &lt;url&gt;` 打开外链，cmd 把查询串里的 &amp; 当命令分隔符，Node 的参数转义不会加引号，于是 agent 生成的 markdown 链接 `https://example.com/x&amp;calc` 会在 Windows 宿主上执行 calc；同时所有普通带两个参数的 URL 在 WSL 上都打不开（#126939）。加引号不是解法，cmd 在引号里仍然展开 %VAR%，而 URL 里满是百分号编码。</p>
+<p>修复：换成 `rundll32.exe url.dll,FileProtocolHandler`，它不是 shell，不把 &amp;、|、^ 当分隔符，也不展开 %VAR%；URL 作为单个 argv 元素交给默认协议处理器。另外加了 fail-closed 检查，拒绝引号、空白等。</p>
+<p>效果：WSL 上正常链接能打开，链接里的命令注入路径被堵掉。</p>
+<p>渲染进程 REST 收口 cfa0c07445 / 596083a851</p>
+<p>所有走渲染进程的 REST（hermes:api v1 与 registry 路由、profile 读取、存活探测、网关文件 data URL）收口到 fetchJsonForBackend，固定 origin 的拼接只保留一处；新测试用敌意路径过真实的 hermes:api 改写，证明没有改写能把 @ 主机夹带成站外地址。网关文件下载的 URL 拼接改走 joinBackendApiUrl。</p>
+<p>桌面沙盒的 Chromium 探测 6f239c9ef5</p>
+<p>沙盒镜像探测只找 chrome-linux/chrome 和 chrome-linux64/chrome，Playwright 在 arm64 上装在 chrome-linux-arm64/，所以 arm64 的 docker 沙盒里 browser_exec 报「沙盒镜像里没有 Chromium」，而浏览器其实在镜像里（#153626）。现在用 chrome-linux*/chrome 通配匹配。</p>
+<p>安全与凭据</p>
+<p>MCP：stdio 子进程不再拿到 Hermes 凭据（8 条，另 1 条健壮性、2 条 legacy 开关）</p>
+<p>023caf01d6 / b32517a921 / 47b12d216b / 8e846b9700 / 8d2e8b9f3e / 5c522f1f84 / 9dceab19ed / d11abb087e / ffdcc2aaa7</p>
+<p>问题：_build_safe_env 把外部密钥源（Bitwarden、1Password、命令助手）提供的每一个环境变量都转给每个 stdio MCP 服务器，其中包括 Hermes 自己的模型 provider key 和机器人/网关 token——同一个 OPENAI_API_KEY 写在 .env 里会被剥掉，存进 vault 就原样交给每个第三方服务器。而且原来的来源守卫只认固定黑名单名，vault 里的凭据换个名字照样进子进程：编号轮换键（DEEPSEEK_API_KEY_2）、凭据池行指向的变量（source: env:VAR）、&lt;NAME&gt;_&lt;PROFILE&gt; 的水合形式、黑名单外的适配器 token（WEIXIN_TOKEN）；model.api 和管理作用域 config.yaml 里展开的 ${VAR} 引用、插件声明的 adapter 密钥同样漏。</p>
+<p>修复：hermes_consumed_credentials 改成从消费者反推，每次调用按当前 profile 推导：黑名单与内部密钥、profile_channels.credential_env_keys、编号兄弟键、profile 持久化的 env: 池行、profile 别名目标、config 里声明的 key_env / api_key_env、model.api、以及 plugin adapter 的 required_env；凭据字段整值写成 ${VAR} 时改为读原始配置取名字；收集 *_key_env 指针时跳过 mcp_servers 自己那一块（服务器自己 env 里的 api_key_env 是它自己的字面量）。</p>
+<p>效果：第三方自己的 vault key 仍然照传，Hermes 的凭据不再进第三方子进程；文档 security.md 的 MCP 凭据章节（英文 + 简体中文）同步更新。另外 ffdcc2aaa7 修掉 backups 目录不可读且 config.yaml 坏掉时整个 stdio 服务器起不来的问题；19c4fe9737、6a846bc437 把 legacy 的 disabled: true 和 enabled 两个键统一到一个读写助手，避免开关显示已启用、服务器实际还关着。</p>
+<p>文件读写护栏覆盖所有 profile 3b6473ea63 / 94e0389cf4 / c7533b9aca</p>
+<p>问题：读拒绝清单（get_read_block_error）和写拒绝清单（secret 文件、mcp-tokens/、pairing/、vault/、state.db、sessions/ 等）只看活动 HERMES_HOME 和全局根目录，从默认 profile 用文件工具就能读 &lt;root&gt;/profiles/&lt;other&gt;/auth.json，或者重写它的 mcp-tokens/（#37617、#46411）。Windows 上还有另一种绕过：扩展长度形式 \\?\C:\... 和管理共享 \\localhost\C$、\\127.0.0.1\C$ 打开的是同一个文件，但基于名字的拒绝比较的是解析后的字符串、前缀还在，于是 read_file、write_file、search_files 能通过这些写法读写 mcp-tokens/、vault/、webapp/、browser-profile/ 和 auth.json、.env（#154282）。</p>
+<p>修复：两道守卫都遍历每个 profiles/&lt;name&gt; 主目录；Windows 上先把本地写法归一成盘符路径再比对，覆盖读拒绝、写拒绝分类器（含运行时自我保护）、审批门和沙盒镜像解析器。远程 UNC 主机和非管理共享按写原样保留，#45947 的约定（auth.json、config.yaml、webhook_subscriptions.json 在各处保持可写）不变。</p>
+<p>效果：跨 profile 读写密钥被拦住，Windows 各种等价写法不再绕过。配套性能改动 14ae1a182a 让 profile 主目录扫描从每个条目一次变成每次调用一次。</p>
+<p>dashboard：写路由、SSH 文件和诊断信息（7 条）</p>
+<p>894855d777 / f8f8256fd9 / 2663c26b96 / 685ddecfcc / 94ae73a8a2 / a77d2049cc / f0e552a480</p>
+<p>托管文件的读侧会隐藏 .env、config.yaml、auth.json 和 mcp-tokens/pairing，但 upload、upload-stream、mkdir、delete 和在线编辑的 /api/fs/write-text 只查路径包含，任何 dashboard 客户端都能覆盖或删除自己读不到的密钥（#85387）。现在每条写路由都走同一个 _is_sensitive_path 守卫，请求路径和软链解析后的目标都查（f8f8256fd9、2663c26b96 补的是请求路径这一侧）。同批还有：fs 的 read-text / read-data-url 拒绝敏感的 SSH 文件（685ddecfcc）；/api/status 对未验证调用者只返回错误码、音频 lease 响应和音频路由回复里的 provider 错误先脱敏（94ae73a8a2、a77d2049cc、f0e552a480）。</p>
+<p>dashboard-auth 会话（4 条）</p>
+<p>02ba28abd3 / 549bde85e4 / 3b0a5e728d / 6d1d3d508e</p>
+<p>基础认证的 token 只用配置里的 secret 签名，revoke_session() 是空操作，复制的 token 能活满 30 天；只换密码、保留显式 secret 时旧会话全部有效（#77186）。现在签名键由 secret 加用户名和密码派生（密码在内存里带随机盐哈希时用明文），每次登录带一个 sid，登出写进 dashboard_auth/basic-revoked-sessions.json 并让共享 secret 的进程重读；改凭据即结束所有会话。配套三条：登出同时结束缓存的 refresh 和长 TTL token（549bde85e4）；登出按 access token 吊销、Basic 跳过 refresh 重放缓存（3b0a5e728d）；登出代数只作用于被登出那次登录的请求（6d1d3d508e）。</p>
+<p>/stop 的授权 262ee21f4b</p>
+<p>问题：先中断再派发的命令绕过活动会话守卫——基础适配器先跑消息处理器、再取消正在跑的任务，而处理器的准入检查结论从未被采纳，于是共享同一 session key 的房间成员（线程会话默认不带 user 部分）都能中止受害者的回合。</p>
+<p>修复：取消分支之前先查注册的授权回调；被拒的发送者照常到达处理器、拿到 runner 自己的答复，owner 的回合继续跑；没有回调的适配器保持原行为。</p>
+<p>webhook 签名 ab5200213b / 08f6771569</p>
+<p>通用 V1 签名（X-Webhook-Signature，只对 body 做 HMAC-SHA256）没有时间戳绑定，抓到的 (body, signature) 在内存去重 TTL 过期后能无限重放；现在默认拒绝 V1，需要迁移的路由显式写 allow_legacy_v1: true（#84265）。V2（X-Webhook-Signature-V2 加 X-Webhook-Timestamp）和其它签名格式不受影响。路由层同样收口：ecb7c13a31 在没有显式 opt-in 时拒绝 legacy HMAC；5f1168512a 让 subscribe 更新时保留已存但无效的 signature pin，不会悄悄放宽成接受任意方案。feat 08f6771569 让路由能钉一种方案：signature: generic|github|gitlab|linear 只接受该方案的头部，其它家族一律 401，未知值 fail closed；`hermes webhook subscribe` 给新路由写 generic，`hermes webhook test` 按钉住的方案签名。</p>
+<p>Bitwarden server_url 校验 a9815a0bbe / 66632f5af3</p>
+<p>bws 子进程会拿到 BSM access token，而 server_url 原来什么字符串都收：钓到的设置答案或者提交进仓库的 http://attacker.example 会把 token 明文发出去（#77480）。现在要求 https、真主机、不带内嵌凭据，明文 http 只允许回环。校验最初只在取密钥的路径上，status 和 token 两条命令走 _list_projects 绕过去了；现在校验挪进唯一写 BWS_SERVER_URL 的 apply_server_url_to_env，父 shell 继承来的 BWS_SERVER_URL 也过这道检查。</p>
+<p>Skills Hub 跳转 f9c79425a7</p>
+<p>hub 的 GET 走连接期 SSRF 客户端只拒绝私网跳，从不查网站黑名单；会话外还会退回裸 httpx.get、完全没有 SSRF 检查。现在 _skills_hub_http_get 是唯一的跳转循环，每一跳都过 is_safe_url 和 check_website_access，再走会话客户端（没有会话时用一次性的 SSRF 安全客户端）。</p>
+<p>平台投递</p>
+<p>飞书：合成回合开始走准入（7 条）</p>
+<p>3373215e94 / 6c7df1ef9f / b95df1cb5d / cfdff9a59d / 431e95fef6 / e22583c7c3 / 3159a0091d</p>
+<p>问题：_handle_reaction_event 把用户对机器人消息的表情变成一轮合成 agent 回合，却从不问适配器的准入闸门——按 FEISHU_GROUP_POLICY=allowlist、admin_only、按聊天的 disabled、或 DM 白名单本来会被挡住的发送者，只要能在群里看到机器人消息、点个表情就能唤醒 agent。卡片按钮点击（非审批类）同样没有发送者检查。而且判断私聊/群聊时读的 chat_type 字段，lark-oapi 1.7.5 的 Message 模型里没有，于是每条表情都走 DM 分支、群策略从不生效；卡片那边拿 private/public 和 p2p 比较，每次点击都被判成群聊。另外投递配额在验签之前就扣掉了，未认证请求能把窗口耗光、让同地址的正常回调 429。</p>
+<p>修复：新增 _admit_reaction / _admit_synthetic，DM 复用 _admit，群聊走 self-echo 与 _allow_group_message（全局策略、group_rules、管理员）；私聊/群聊统一按 chat.get 的 chat_mode 判断，只有 p2p 算私聊，未知一律按群聊；quota 检查挪到 token/签名认证之后。卡片点击按每一个操作者 id 层级放行（open_id 之外补上 tenant user_id、union_id）；被拒时补一次性的「默认群白名单为空」告警，免得看起来像传输故障。还有一条：带 @机器人 的图片说明判断成命令时没有剥掉自我提及，文件正文被当成 goal 参数，现在复用同一个命令解析。</p>
+<p>WhatsApp：本地 bridge 鉴权（9 条）</p>
+<p>57893add23 / 0ef9c17630 / 30483519b8 / 0494ea5a8a</p>
+<p>问题：bridge 绑 127.0.0.1 并校验 Host 头，但回环不能证明调用者身份——任何本地进程都能 GET /messages 读全部来信，或 POST /send 以用户身份发消息；先绑端口、镜像 /health 的进程还能被当成 bridge 收养（#83395、#80096）。另外 creds.json 和 signal 密钥等于账号完全控制权、bridge.log 里还有配对二维码内容，而会话目录是普通 mkdir、Baileys 按进程 umask 写 key，022 下同机任何账号可读（#80090）。</p>
+<p>修复：challenge-first 鉴权——除 GET /auth-proof 外每条路由都要求 Authorization: Bearer（常数时间比较），/auth-proof 回 HMAC(token, challenge)，没有 token 的 bridge 直接退出，express.json() 在闸门之后才跑；每个会话一个 token，每次新起 bridge 换新 token。会话目录 0700、子进程 umask 0077、bridge.log 以 0600 打开并把已存在的收紧；因为 token 按会话走，别的 profile 在共用端口上的 bridge 永远过不了本会话的证明，现在只收割自己 pidfile 认领的 bridge，占位者报 whatsapp_bridge_foreign_session。</p>
+<p>Telegram：LaTeX 宏与长消息样式命令串</p>
+<p>ec28902374 / be00c0a085 / ed9d0aa7b0 / 4cdfa5c0dd</p>
+<p>LaTeX：gemma 这类模型在普通回复里写 `A \rightarrow B`、`$x \leq y$`，MarkdownV2 没有数学模式，格式化器把反斜杠转义，用户看到 `\rightarrow`。现在 telegram_latex.normalize_latex_macros 把常见符号宏映射成 Unicode，带宏的行内 $...$ 变纯文本后剥掉美元符；代码片段、代码块、文件路径（C:\in）、转义的反斜杠、未知宏和货币对保持原样。</p>
+<p>长回复样式：超过一条消息长度的回复在换行或空格处切开，切点可能落在 *加粗*、_斜体_、~删除线~、||剧透|| 中间，两半都带不配对的标记——发送路径被 Telegram 拒成 can&#x27;t parse entities、纯文本兜底把格式全剥掉；溢出编辑路径则把孤立的标记转义成字面量。现在切点会闭合未闭合的实体并在下一片重新打开，每片仍在 4096 UTF-16 单元内；cron 投递和 send_message 用同一套切法。</p>
+<p>实时位置：每次 GPS 刷新都是同一条消息的编辑，PTB 把编辑当新消息派发，于是每 30~60 秒（最长 8 小时）起一整轮 agent 并回一条。现在只有离开上次位置约 75 米、或在同一位置待满 15 分钟才起回合，时间取 Telegram 的 edit_date；停止分享的那次编辑不带新信息。</p>
+<p>媒体上传：原生媒体上传只试一次，连接错误或 Telegram 的 5xx 直接把「文件发送失败」的提示发给用户，上传发出后读超时还可能重发（照片被当文档重传，产生重复）。现在只对确定没发出去的失败（UNSENT 连接/池错误、SERVER_ERROR 的 5xx JSON）重试 3 次（1 秒、2 秒），请求已发出的失败标成 ambiguous、不重发、不报错，结果算 success。</p>
+<p>网关与会话状态</p>
+<p>eec7e828c0 / 305b1797b7 / 262ee21f4b（授权，见上）</p>
+<p>终端工作目录原来只记在进程内，跨轮生效但不跨重启，网关重启后聊天里的 cd 丢掉、下一条命令跑回 terminal.cwd（#41128）。现在每轮把目录写进聊天的路由条目元数据（terminal_cwd），找不到记录的第一轮只在目录仍存在时回填；本地后端才做，远程和容器路径不检查，/new 照旧从 terminal.cwd 开始。配套修掉 /new 留着旧 cwd 记录、把旧目录写进新条目，以及后端检查连带解析 TERMINAL_TIMEOUT/端口/Docker JSON、一个笔误就让整个回合失败的问题。</p>
+<p>cron 与 update</p>
+<p>7d4e50847d / 950bacd9d7 / 753ea6bb16 / b17b6a19f6 / 499e8dcf18 / b0f1a53f19</p>
+<p>cron 的 Telegram 独立发送可能写完才超时（PTB TimedOut、写到一半被重置），在 cron 外层超时之内就返回错误，standalone_in_flight 仍是 false，报告被排进队列，重连扫描又发一遍（#153474）。现在「可能已送达」的失败标成 delivery_uncertain，cron 当它在飞；连接根本没建立的失败照旧入队重放。另外 [[as_document]] 生效，图片按原始文件投递。</p>
+<p>update：hermes update 重启每个 profile 的网关走的是一个脱离的 restart watcher，它把自己继承的 updater 环境变量交给新网关；没有自己 TELEGRAM_BOT_TOKEN 的 API-only profile 于是启动了根机器人的实例、抢到轮询锁，默认网关的 Telegram 报 token already in use。只扣机器人 token 也不够，根 .env 里的模型 key 和 GITHUB_TOKEN 会跟着兄弟 profile 走，它用根代理的 key 跑模型；现在 watcher 走完整的环境来源剥离（启动 .env、已加载的 dotenv、密钥源、TERMINAL_* 桥接、gates），只在用户 shell 里 export 的变量仍然保留。中止恢复的重启路径同样改成用 profile 自己的环境。迁移失败也会保持 owed：配置迁移停在一个坏步骤时，两条完成路径都不把部分结果传给提交后的 owed-step 收据，新选项路径还会打印 Configuration updated!。</p>
+<p>子代理：崩溃或重启之后还能接着跑</p>
+<p>f21b52fc68 / 3c336ac979</p>
+<p>没有跑完、也不是被人停掉的子代理，现在会在 state.db 里留一条 resumable_subagents 记录：重建规格（goal/context、工具集、模型、会话 id、跑的端点、任务自己的路由请求）、owner 进程、停下来的 cwd 和它建的 worktree。进程内注册表没了（重启、崩溃）之后，delegate_task 的 continue 会回退到这条记录，重新解析路由、拒绝换端点，然后在它自己的 cwd/worktree 和转写记录上继续跑；continue 仍是一次普通派发，关闭聊天拒绝、容量、深度和 spawn 暂停都照常适用。每个停下的子代理按结果表分类（AUTO_AT / AUTO_ON_BOOT / ON_FIX / REPAIR_THEN_CONTINUE / HANDOFF），结果条目带上 failure_resets_at 和 usage_limit。网关关闭仍会中断子代理，但先做标记，所以它们读作「重启」（可恢复），用户或父代理的停止不钉住。启动恢复把 owner 已死的记录转成可恢复，并在恢复事件里点名可以继续的 subagent id。启动时的 worktree 清理（archive 模式和经典模式）跳过任何被活记录钉住的树；TTL delegation.resumable_ttl_hours 默认 48，上限 delegation.max_resumable 每 profile 32，最旧的丢 pin、不删除；delegation.auto_resume 默认 false。另一个方向：已经返回结果的子代理可以追问，delegate_task(action=&quot;continue&quot;, subagent_id, message) 按同一路由和工具集重建、历史从保存的转写加载，保持 subagent_id 和会话 id；正在跑的子代理被拒并提示改用 steer，路由解析到别的 provider 或端点的也被拒。</p>
+<p>配套缓存优化：e7ff451652 把子代理的 goal 和 context 改成第一条用户消息，system prompt 不带任何每任务内容，同一个父代理的子代理共享 sub_&lt;hash&gt; 缓存作用域（同时作为 prompt_cache_key 和 Codex 后端的 session_id 头），不再为共享前缀付全价；3f05542b8b 把第二个 system 断点放在会话 prompt 末尾（原来是临时尾巴之后），任务文本不同的子代理首次调用不再重写技能索引。</p>
+<p>模型：gemini-4-hydrogen</p>
+<p>df7147573d</p>
+<p>gemini-4-hydrogen 进 gemini provider 的模型列表和 Google 价格快照：每百万 token 输入 1.50、输出 7.50、缓存 0.075 美元。Hydrogen 有第四档思考等级 xhigh，在 Interactions、generateContent 和 OpenAI 兼容三个接口面上，xhigh、max、ultra 都会发这一档，长解码预算不变；Gemini 4 Argon 和 Carbon 拒绝 xhigh、保持 high。</p>
+<p>插件目录</p>
+<p>新增 yaml 条目 359 个、删除 8 个，条目总数从 1794 涨到 2145；subject 里带 catalog 字样的提交 1088 条，占本期 1953 条的 55.7%，其中提了新条目的 338 条左右，其余是版本 pin、指针更新、披露审核和字段整理。本期有点代表性的新条目：dossier（31d53c039e）、The Clearing（850760b0ba）、Chat View 桌面端聊天视图插件（149d88323a）、chatgpt-style 桌面主题（270abd45e7）、followup-chips 可点击追问建议（9b08ba6697），以及 catalog 新接的 modal provider（6d416c7a83）。目录条目基本由社区提交，配套大量「按评审意见重新 pin」的提交。</p>
+<p>性能（6 条）</p>
+<p>5d4b7a905f / d07a51c70a / 00f3b7bb3c / e7ff451652 / 3f05542b8b / 14ae1a182a</p>
+<p>Telegram 的 raw split carry 原来在每个边界把剩余分片重新拼接重扫，355 KB、满是转义星号的流式回复要 2.4 秒、卡在事件循环上；现在只在有未闭合标记时预读、反斜杠就地数，5 毫秒。truststore 的 OpenSSL 后端每次 wrap_socket / wrap_bio 都对同一个 context 重跑 set_default_verify_paths()，每条新出站 TLS 连接（Telegram 心跳、provider client、webhook）都重扫系统 CA bundle；现在按 context 记忆 cafile/capath/stat 签名，bundle 没变就跳过、变了重载。bots 的房间视图保留房间时钟并记忆派生状态。剩下三条见上面子代理与安全两节的缓存和扫描改动。</p>
+    </section>
+    
     <section id="2026-11-12" class="day">
       <h2>Hermes 日报 2026-11-12：托管沙箱权限改成白名单，Telegram 图文终于算一轮</h2>
       <p><strong>本期覆盖 11 月 11 日 06:30 ~ 11 月 12 日 06:30 合入 main 的提交，共 1134 个 commit（不含 merge），另有 3 个 merge。新增 133 个功能、171 个修复、2 个性能优化。口径按合入 main 的时间算，不是 commit 作者时间。</strong></p>
