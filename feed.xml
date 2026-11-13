@@ -5,8 +5,89 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 13 Nov 2026 07:00:20 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 14 Nov 2026 07:00:03 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-14：插件目录一次加 168 条，子任务被停后能自动续跑</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-14</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-14</guid>
+      <pubDate>Sat, 14 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 13 日 ~ 11 月 14 日合入 main 的提交，共 1598 个 commit（不含 merge），另有 83 个 merge。新增 120 个功能、542 个修复、2 个性能优化（feat/fix 按大小写不敏感的全量口径统计）。口径按「合入 main 的时间」统计，不是 commit 作者时间。这一期的功能里有 111 条是插件目录条目，真正的代码级新功能只有 9 条；修复的大头在网关（107 条 fix(gateway)）、dashboard（26 条）、终端（25 条）和子代理续跑（22 条 fix(delegate)）。</strong></p>
+<p>📌 今日要点：</p>
+<p>插件目录：新增 168 个 yaml 条目、删 2 个，条目总数从 2145 涨到 2311；新条目里既有加密钱包、共浏览、会话摘要这类桌面插件，也有电台、模型热切换之类的实验品。</p>
+<p>默认插件：catalog 条目可以标 default: true，官方或已验证层级的这类条目会装进每个 home，`hermes update`、首次启动和新建 profile 三个时机都会补齐。</p>
+<p>子代理：新增 delegation.auto_resume，被停掉的子任务会在限额重置或网关重启后自动续跑，父会话的决定永远优先。</p>
+<p>网关：session.list 支持游标分页和文本过滤，长会话列表不再只能看到最新 200 条；流式回复的密钥脱敏补了十几个边界。</p>
+<p>密钥与配置：写入方把明文密钥搬进 .env，config.yaml 只留 ${VAR} 引用；每个 endpoint 有了独立的 key 变量，切路由不再把 key 送到别的主机。</p>
+<p>插件目录：168 条新条目，总数 2311</p>
+<p>本期 plugin-catalog 目录新增 168 个 yaml、删除 2 个（proactive-agent 改名成 super-agent，coinfello 改名成 hermes-wallet），条目总数从 2145 变成 2311。新增条目里比较有意思的几个：</p>
+<ul>
+<li>agent-wallet（8200644fd2）——给 agent 用的加密货币钱包，交易走审批。披露里写明它会连公共 Monero 节点、blockstream 的 Esplora 接口和 Base/Polygon 的公共 JSON-RPC，只有在显式执行 signer install 时才从官方 release 下载 monero-wallet-rpc 并按代码里钉的 SHA256 校验，未钉版本的包直接拒绝。</li>
+<li>hermes-cobrowse（67571319fa）——多窗口共浏览画布加人在环的网页自动化，本地起一个 127.0.0.1 上的 studio，用 CDP screencast 做画面同步，可以八向调整窗口大小，DOM 状态里的密码和验证码会被抹掉。</li>
+<li>Answer Summary（d089b3e8b9）——长会话理解插件：每条回复上方给一段 AI 摘要，一键 Catch up 生成整场会话要点，右侧讨论侧聊可以换模型、并把结论交回主会话。</li>
+<li>whoami（c77dab5e58）——输入框里一个彩色胶囊，显示新会话会用哪个 profile，多 profile 用户不用再猜。</li>
+<li>Comfy Recipe（b764d19943）——ComfyUI 集成，首次使用可以自己装一套 ComfyUI，工作流、媒体准备都在 Hermes 里。</li>
+<li>RELAY Telegram（34c2e20853）——把进来的 agent 通话请求投到 Telegram，只有 owner 能看到 Accept/Reject 按钮，通过本地 Unix socket 和 bridge 通信。</li>
+<li>Hermes Attention v1.5.1（2a40af31b6）、hermes-agent-radio（本地电台）、smart-model-swap（大模型小模型按任务切换、自己起停 llama-server）等也在这批里。</li>
+</ul>
+<p>另外还有 22 条 fix(plugin-catalog)：重新钉 tag、把描述压到三句、把重命名的条目补回来之类。</p>
+<p>默认插件：default: true 的目录条目会装进每个 home</p>
+<p>7adcd5e76d 给 catalog 加了一个 default 字段。规则是：只有 official 或 verified 层级的条目能标 default: true，community 条目上的 default 会被解析器忽略、catalog 校验器直接拒绝。被标上的条目会在三个时机按 catalog 里钉的版本装好并启用：每次源码安装和 `hermes update` 结束时（所有 profile home）、首次启动的 boot bootstrap（给打包桌面端、Docker、Nix、Termux 这些不跑维护尾的安装）、以及新建 profile 时。装不上的会记成「欠着」，之后按一小时到一周的退避重试，退避判断在任何网络请求之前。每个 home 把装过什么记在 `_default_plugins_installed` 里，所以用户自己删掉或停用某个默认插件，后续更新不会又给他装回来；security.allow_lazy_installs 关掉的安装什么都不下。配套还有一批修复：默认插件不能在启动路径上装，要在 detached 子进程里装（66cc4ac033）；并发建 home、遗留记录、用户移除、Windows 作业调度都要能扛（577811d784）；重启后遗留的默认条目要按 home 自己的 pin 重试（1353fd7bd8）。</p>
+<p>插件脱敏：ctx.redact_text()</p>
+<p>6600bde0d9 给 PluginContext 加了一个 redact_text()。以前插件要脱敏（分享会话、抓编辑内容）只能私有 import agent.redact，而这是 catalog 明确标红的行为。现在插件可以直接拿到 Hermes 自己最强档的清洗器：前缀 key 用不可复用的占位符、掩掉凭据赋值、包含插件自己注册的模式、尊重 security.redact_secrets（除非 force=True）。配套 e8fc0d17e5 让这个方法连 URL 里的凭据也一并剥掉。</p>
+<p>子代理：delegation.auto_resume 自动续跑</p>
+<p>f1027e6340 引入 delegation.auto_resume（默认 false，需要手动开）。网关每 tick 扫一遍它服务的 profile，把到期的可续跑记录用和 delegate_task(action=&#x27;continue&#x27;) 完全相同的 claim + continue 路径续起来：AUTO_AT 在限额重置后触发，AUTO_ON_BOOT 在跑子任务的那个进程消失后触发。ON_FIX、HANDOFF、修复记录、用户主动 stop、过期或未 pin 的记录、嵌套子任务一律不碰。</p>
+<p>父会话永远优先：父会话不在了、主动结束、或者同仓库后又发起了新的 delegation，到期的记录就变成 superseded（保留、仍然可以手动 continue）；/stop、/new 和关闭会话会立刻打标；父会话自己 continue 会关掉那个子任务的自动续跑；对等待中的子任务调 delegate_task(action=&#x27;stop&#x27;) 会直接取消它。停止提示里会写清楚什么时候续跑、怎么取消。</p>
+<p>边界也是钉死的：每条记录最多 2 次自动尝试（每次尝试前计数，续跑把网关搞挂了也不会跨重启死循环）；容量受 delegation.max_concurrent_children 约束；每 tick 每个 endpoint 只续一次。</p>
+<p>d8bb741c11 补了交互语义：承诺了自动续跑的 stop 不给父会话发完成通知（状态在 delegate_task list 里看），过了期限或重试上限父会话才收到一次终态失败；只有显式 stop、会话结束或父会话自己 continue 才取消；崩溃后续跑会告诉子任务不要重复未确认的工具调用、并以 BLOCKED 收尾。配套还有 20 条修复：容量按 profile 算而不是整个网关（5169cdf2b1）、自动续跑永不覆盖父会话的 stop / /new / 替换（39a47df92e）、parent 自己的 continue claim 期间来的 stop 不丢（fb9c3aa914）、被父会话取消的子任务永远不上报（ec6c041810）、暂停 spawn 时自动续跑先按住（191d615b37）等。</p>
+<p>网关：session.list 支持游标分页与文本过滤</p>
+<p>f3303638f8：session.list 原来最多返回 200 条存下来的会话，也没法继续要更多，所以会话选择器翻不到更早的会话、也搜不到已加载行之外的内容。现在 stored scope 接受 query（标题或 id 文本，规则和 `hermes sessions list --search` 一致）和 cursor，返回 next_cursor 直到列表走完。cursor 里存的是最后检查过那一行之后的存储偏移，并绑定 workspace、query 和 include_hidden，runtime.describe 宣告 session-list-cursor-v1。两条配套修复：cursor 在极限过滤条件下也不超尺寸（159f73a162），以及没有 store 能容纳的 offset 直接拒（50a6d48b37）。</p>
+<p>网关：流式回复的密钥脱敏补边界</p>
+<p>一批 12 条带 streamed 的修复，集中在「流式输出时密钥有没有漏出去」：</p>
+<ul>
+<li>ea1acac6ff：开放标签的持有区间原来只回看 512 个字符，超过这个长度（STS SessionToken 是 600~2000 个 base64 字符，长的 JSON api_key/client_secret）标签就看不见，值被原样流出去。现在持有锚定在开放区间起点，向前找标签，成本只受标签窗口约束；长 token 还会从头探测，所以长 JWT/sk- key 也能扣住。</li>
+<li>5e55ffc2ef：长双引号值里后面出现的单引号会盖掉起始引号，导致 &gt;512 字符的带标签值原样落定；现在锚定在同类最后一个引号上。</li>
+<li>2cf8a64a91、b6a432add0、c9c5b3fb91、61bc71e7b6：引号值只在它自己的引号处闭合、最终文本按脱敏不动点对齐、脱敏之后不再追加文本、已落定边界不回退。</li>
+<li>91072ba560：实时尾部被遮住时，整份回复文件按整份恢复。</li>
+</ul>
+<p>这批修的是同一个风险的四个方向：流式分帧时密钥既不能漏、也不能因为脱敏把正常文本吃掉。</p>
+<p>桌面端：图片框、Electron 安全补丁、链接预取拦截</p>
+<ul>
+<li>dbb30e18eb：markdown 冷图片框预留 4:3，但图片的 max-h-full 解析到高度是 auto 的点击按钮上，于是被丢掉——一张 1080×1920 的图在 640×480 的框里画成 640×1138，盖住下面的段落。现在带框时点击目标继承框的高度，图片缩到 270×480，容器仍然贴着图片，下载按钮和阴影位置不变。</li>
+<li>c3b361c20d：上一条修完后，矮的横图或小图因为按钮内容垂直居中而落在框的下方（600×300 在 4:3 框里低 90px），下载按钮却还在顶部。现在带框的点击目标是顶部对齐的 flex。</li>
+<li>983586a64e / de0135e572：Electron 44.9.3 → 44.10.0 → 44.10.2。前者是 CVE-2026-111497（node2shell，已进 CISA KEV），44.9.3 带的 Node 24.22.0 存在该漏洞，44.10.0 换成 24.22.1；后者拿最新的 44.x 补丁。</li>
+<li>f4998baf8e：链接标题预取原来对渲染出来的每个 http(s) 链接都发起请求，包括工具返回值里能注入的链接，主进程只检查 scheme：局域网、回环、链路本地、CGNAT 和云元数据地址都会被 GET，带 token 的链接（magic login、OAuth code、签名 URL）也会在渲染时被消费。现在准入逻辑对齐 tools/url_safety.py，按 curl 的 inet_aton 各种写法、IPv6 包装、元数据主机名、.local、凭据参数列表分类，异步检查解析出的每个 DNS 答案，有私有地址就 fail closed；curl 那层去掉 --location，逐跳重新准入；隐藏窗口的会话直接取消被拦的请求。</li>
+<li>92e8e9d3b0 / 4aca2333c3：把 curl 钉在已校验的 DNS 答案上（--resolve、--noproxy &#x27;*&#x27;），favicon 也走同一套策略；设了 HTTPS_PROXY 时原来会在 DNS 之前就返回，导致 evil.example.com → 169.254.169.254 直接放行，现在无论走不走代理都先解析并校验每个答案。</li>
+</ul>
+<p>密钥与配置：明文搬进 .env，每个 endpoint 独立变量</p>
+<ul>
+<li>e5bdd74698（Fixes #77471）：`hermes config set model.api_key`（以及 auxiliary / delegation / custom provider 的 key）、dashboard 的主模型和辅助模型选择器、`hermes model` 的 aux 流程、新建 custom_providers 行，原来都把明文密钥写进 config.yaml。现在统一存到 profile 的 .env，用一个确定的变量名（HERMES_MODEL_API_KEY、AUXILIARY_&lt;TASK&gt;_API_KEY、HERMES_DELEGATION_API_KEY、HERMES_CUSTOM_&lt;HOST[_PORT][_PATH]&gt;_API_KEY），config.yaml 里只写它本来就支持的引用（${VAR} 或 custom_providers 的 key_env）。解析逻辑没变，已有内联值继续能用、不做迁移；新加的 HERMES_* 名字会像 AUXILIARY_*_API_KEY 一样从终端子进程环境里剥掉，所以把 key 从 config.yaml 搬出来不会顺手交给每个子进程。</li>
+<li>95f2010b73（Refs #77471）：从 endpoint 生成变量名时把 `- . / : _` 全折成同一个字符，于是 https://my-host.com/v1 和 https://my.host.com/v1 共用 HERMES_CUSTOM_MY_HOST_COM_API_KEY，第二次保存会把 key 送到第一个主机去。现在 endpoint 派生的名字后面追加 sha256 的 8 位十六进制（对规范化的 scheme/host/port/path 做哈希），名字派生的用 HERMES_PROVIDER_ 前缀，不会和主机 slug 撞。已有配置保持它引用的 ${VAR} 不变，只有新写入用新名字；store_secret 拒绝覆盖另一个 endpoint 正在读、值又不同的变量。</li>
+<li>21 条 fix(cli) + 26 条 fix(dashboard) + 5 条 fix(delegation) 都是同一个故事的边角：辅助模型切 provider 时丢掉旧路由的 key（e0535261a3）、dashboard 表单往返时丢掉 ${VAR} 引用的 aux key（945b0afdbc）、只改 delegation.base_url 的 URL 结果用上了父级的 key（5f0ce54a57）、dashboard 的 delegation 块在改路由时把旧路由的 key 丢到别处（32826b4d03）、等价的 HTTPS URL 之间也要留住辅助凭据（4206f9e0b9）等等。修完的行为是一致的：换主机就换 key，同主机只改路径就留住 key。</li>
+</ul>
+<p>终端：sudo 密码改走 askpass helper</p>
+<ul>
+<li>aa3155aa0a：原来的做法是给命令里每个命令位的 sudo 加 -S 选项，并在整条命令共用的 stdin 前面塞密码行。前面的命令如果读 stdin 就会吃掉一行密码；sudo 因为缓存 ticket 而没用掉的那一行，会被后面的命令读走甚至打印出来。现在命令开头先读且只读一行密码进 shell 变量，交给一个 detached writer 通过 FIFO 为每个被计数的 sudo 服务一次，命令的 shell 退出或超时后 +30 秒清理 writer、FIFO、helper 和临时目录；每个 sudo 变成 `SUDO_ASKPASS=... sudo -A ...`，剩下的 stdin 原样交给命令，密码也不再出现在命令文本里。</li>
+<li>de5f9fe23f：askpass 只在跑过能力探测命令的地方生效，而只有 local、Docker、SSH 后端跑那个探测，直连 Modal、Managed Modal、Daytona、Vercel 一直用 stdin 形式——密码行可能被同一条命令里的后续程序读到。现在 askpass 序言自己做那些检查（对命令里出现的每个 sudo 命令字跑 `SUDO_ASKPASS=/bin/false &lt;word&gt; -A -V`、检查 /bin/cat、/bin/rm、/bin/sleep 可执行、FIFO 建好后先写一个无害 helper 试跑），失败才回退到 stdin 形式。</li>
+<li>4b8f2aea6c、0c78a86b39、2d88ddcbf2 等：同时询问的多个 sudo 排队逐个投递、按命令实际调用的 sudo 检查（含 shell 函数和别名）、每个 sudo 检查跑在子 shell 里。</li>
+</ul>
+<p>定时任务：手动运行不再把已投递的报告回显一遍</p>
+<p>一批 fix(cron) 收的是同一个 bug 的各种形态：手动跑一个 cron 任务时，如果报告已经投递到目标，完成消息里就不该再贴一份到当前会话。ca32450ef3 指出原来用 last_delivery_error 判断，而部分失败（一个目标成功、另一个被拒）或者附件掉了也会设这个字段，于是已经发出去的报告又被复制进调用它的话题；现在单独记 last_delivery_reached_none（有错且零目标送达）。7b7c6fed30 补了「投递结果丢失」的形态：Telegram sender 丢了 ack 返回 delivery: uncertain，或者 sender 抛异常，都算已送达。f7933cfa1d 走 gateway.platforms._shared.delivery_state 的共享契约，PARTIAL 失败也算目标已送达，同时仍然报错、仍然不排队重放。另外 b4ef70b13e 保证投递真失败时手动运行保留输出摘录。</p>
+<p>性能与安装包：macOS 打包瘦身</p>
+<ul>
+<li>e9607bf4e9：macOS 上的 v0.22.0 无法通过应用内更新升到 ZIP ≥1 GiB 的包——它带的 Electron 40 的 Squirrel.Mac 会把整个 ZIP 读进一块 buffer，超过 1 GiB 就崩（electron/electron#55089），而 rc.2-v0.23.2 的 ZIP 是 1,447,529,425 字节，光 Chromium 压缩后 177 MB。Chromium 本来就是可选默认（install.sh --skip-browser 可以不要，浏览器工具在找不到时会自己装一份钉住的版本），所以 macOS 的 payload 现在不带它，首次用浏览器时下载（195 MB）；Windows 和 Linux 的包照旧内置。</li>
+<li>96e4107167：安装包大部分体积来自 payload 的 uv 缓存又装了一份 venv——31,771 个 archive-v0 文件和 venv 里的已安装文件逐字节相同，压缩后 297 MB。现在非 Windows 的 staging 把这些文件换成指向 venv 副本的相对链接；安装器改写过（RECORD）或放到别处（.data）的保留；uv seed 仍然重建缓存内的链接，越出缓存就复制字节，机器级缓存不会留下指向会被更新替换的 payload 的链接。MSIX 包不支持链接，Windows 不变。</li>
+</ul>
+<p>其他值得一提的</p>
+<ul>
+<li>b2f627c75a：共享网关上恢复 /handoff（从另一个提交 cherry-pick 回来）。</li>
+<li>5778b814b3：relay 承载的会话恢复后，继续走它前面的那个 relay，而不是走别的路径。</li>
+<li>333080de1f：Telegram 长回复被拆条上限截断时，同一份内容不会再发两遍（溢出 SendResult 带上 split_capped，消费者把被截断的投递认作与最终文本匹配）；配套 c0947beeda 给发送和编辑溢出路径都加上了分条上限。</li>
+<li>平台投递侧还有 15 条 fix(telegram)（状态指示器不再覆盖运营者写的文本、不再毁掉 bot 短描述、BotFather 在线改动在断开时不被覆盖）、9 条 fix(slack)（Connect 事件按装机的 workspace 解析、拒绝外部组织 DM、文件分享前先验分享者）、8 条 fix(whatsapp)（采纳的 bridge 在 spawn 配置变化时重启、token 轮换被取消时留住会话锁）、7 条 fix(discord)。</li>
+<li>kanban 9 条 fix 都是 claim 的 fail-closed：profiles 导不出来时拒绝认领（dac2c11c5d）、重新指派后不再认领旧卡（bfad8669d9）、config 里 kanban 段不是 mapping 时直接拒绝（351a5a1ead）。</li>
+<li>安全侧还有 10 条 fix(skills-guard)：无效 UTF-8 字节不再让未扫描文件里填充的代码隐身（5ec3debefe）、coding cookie 只在真的改变解码文本时才算命中（27dad7d5dd）、扫描崩溃时 fail closed（5986955478）。</li>
+</ul>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-13：MCP 子进程与跨 profile 文件路径不再漏凭据，子代理崩溃后能接着跑</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-13</link>
