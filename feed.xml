@@ -5,8 +5,242 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 15 Nov 2026 06:59:42 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 16 Nov 2026 06:51:51 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-16：审批与脱敏大扩围，终端目录被删不再卡死</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-16</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-16</guid>
+      <pubDate>Mon, 16 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 15 日 ~ 11 月 16 日合入 main 的提交，共 379 个 commit（不含 merge），另有 31 个 merge。新增 2 个功能、279 个修复、3 个性能优化。贡献者 34 人。这一期代码层面的新功能只有两条，重心在加固：审批、脱敏、权限边界三块加起来接近两百条提交。</strong></p>
+<p>📌 今日要点：</p>
+<p>危险命令审批扩围：osascript 关闭文档不保存、注册表写入、Hermes 自己的数据目录被 shell 动词处理，现在都要先问人。</p>
+<p>凭证脱敏补上真实文件：~/.aws/credentials、.netrc、.pgpass、.npmrc、.pypirc、.git-credentials 不再明文返回；只打印私钥的一部分也会整段打码。</p>
+<p>终端工作目录被删掉之后不再卡死，工具自己的超时也不再被通用的 420 秒上限砍掉。</p>
+<p>登录过期的错误卡片会点名主 provider 并给出可运行的重新登录命令，而不是只报备用的错。</p>
+<p>文件接口不再列出或返回凭证文件（含符号链接绕过），MCP 的只读标记每次重新发现都会核对。</p>
+<p>重点条目：</p>
+<p>审批系统：AppleScript 关文档必须问人</p>
+<p>01ee1b34fb fix(approval): always ask a human before osascript can discard unsaved work</p>
+<p>2d4513abd4 fix(approval): always ask before AppleScript closes a document without saving</p>
+<p>问题：旧规则只有一个正则，要求裸 osascript 和 saving no 出现在同一行。quit、delete、按键、do shell script &quot;rm ...&quot;、heredoc、管道、封装器、变量展开全都能绕过去；而且一旦回答过「本次会话」，之后所有关闭都会被预授权。osascript 可以驱动 agent 从来没打开过的应用，被关掉的文档（active presentation、front document）属于操作者本人，close … saving no 连应用自己的 AutoRecovery 一起丢掉，没有恢复路径。</p>
+<p>修复：换成 tools/approval_applescript.py 里一个失败即拦（fail closed）的分类器，不解析 AppleScript 语法，只判断：程序里出现了能关闭、退出、保存、删除、移动、写入、点击、发送按键或执行 shell 的动词，就标记；JXA 程序一律标记；命令行上看不出程序内容的（脚本文件、管道或重定向进来的 stdin、$VAR/$(...)/反引号展开、未加引号的 heredoc、通过 sh -c / eval / env -S / ssh / xargs / find -exec / 解释器调起来的 osascript）也标记。这些条目跳过守护模型，直接找人确认，表面只给「本次」和「拒绝」两个选项，CLI、网关卡片、选中的传输、待处理记录都一致。</p>
+<p>效果：只读的字面量脚本不误伤——macOS 上 open 的 raise 阶梯用的前台应用查询、activate、display notification、get the name of every disk 都照旧放行。</p>
+<p>审批系统：注册表写入也要提示</p>
+<p>066208f43b fix(approval): prompt on registry writes, not just registry deletes</p>
+<p>6650dd335e fix(approval): gate regedit /s and registry writes through sp/ni/Set-Item/New-Item</p>
+<p>319ae7a4c6 fix(approval): match registry writes whatever the parameter order, and Set-Item&#x27;s si alias</p>
+<p>638a50859d fix(approval): gate PowerShell mkdir/md registry key creation</p>
+<p>问题：以前只有 reg delete 和 Remove-ItemProperty -Force 被拦。reg add/import/copy/restore/load、setx、Set-/New-ItemProperty 会改机器的持久状态（Run 键、HKCU\Environment），却不需要任何确认；approvals suggest 也没把注册表类当危险，因为一次注册表写入比批准它的那个会话活得久。</p>
+<p>修复：这些写动词加到删除规则旁边，读动词保持安静；regedit /s 和各种参数顺序、Set-Item 的 si 别名、PowerShell 的 mkdir/md 建键都覆盖。</p>
+<p>效果：在 Windows 上改注册表这件事，现在和删文件同级对待。</p>
+<p>审批系统：Hermes 自己的 home 和受保护库</p>
+<p>94f991f473 fix(approval): prompt before shell verbs destroy the Hermes home or its stores</p>
+<p>68fbe4b994 fix(approval): catch store overwrites before redirections and SQL in heredocs</p>
+<p>6e6c299b81 fix(approval): anchor Hermes store rules at command position, match only the store</p>
+<p>0612c32f51 fix(approval): prompt on overwrites inside Hermes credential trees</p>
+<p>问题：对 HERMES_HOME 本身、对受保护的库（state.db、sessions/、vault/、mcp-tokens/ 等）执行 rm/unlink/shred/truncate/mv，以及 cp/install/rsync/dd/tee/重定向写上去，都被自动批准——旧规则只特判了 config.yaml 和 .env，解析出来的家目录折叠又跳过了裸的家目录词。sqlite3 的写动词同样拦不住，而且判据是「有没有 WHERE」，where 1=1 一样会把行清掉。</p>
+<p>修复：受保护库清单移到 hermes_cli.home_data_layout，文件工具的写入拒绝和 shell 闸门共用一份定义；sqlite3 改成按动词判定；重定向和 heredoc 里的 SQL 也能被看到。等级是「提示」而不是硬拦，因为备份和 doctor 流程合法地会碰这些路径。</p>
+<p>效果：agent 想改动 Hermes 自己的数据，得先经过你。</p>
+<p>审批系统：绕过的写法逐个补</p>
+<p>260e4331a4 fix(approval): flag a bare ~/.ssh create/link target anywhere in the command</p>
+<p>1adc893302 fix(approval): fold a depth-1 user home (e.g. /root) in dangerous-command detection</p>
+<p>d632a968be fix(security): touch/mkdir/ln rules match the named file, not its siblings or a -r reference</p>
+<p>c184e88837 fix(security): touch/ln rules still match when a redirect follows the target</p>
+<p>b1689ea4ff fix(security): keep approval-gated writes inside HERMES_WRITE_SAFE_ROOT; anchor the /root fold; drop /etc from touch/mkdir/ln</p>
+<p>707f4fbe13 fix(security): a quoted home prefix followed by more path is a subtree, not the home</p>
+<p>a2a5d0778b fix(security): keep the credential deny when an rc name is symlinked onto a credential</p>
+<p>9c6994ee2c fix(security): one shell-rc inventory, per-class write approval keys, anchored touch/mkdir/ln rules</p>
+<p>28db38b2ef fix(approval): stop hard-blocking quoted rm subtrees, literal heredocs and sudo -l carriers</p>
+<p>bbf4ce487f fix(approval): keep literal heredoc text, sudo list bundles and quoted rm separators off the floor</p>
+<p>245a635b05 fix(approval): peel busybox applets and scan payloads behind peeled wrappers</p>
+<p>1bc4f93e2c fix(approval): peel wrappers and scan carried commands for the hardline floor</p>
+<p>1fb7c971ca fix(approval): dequote verbs behind peeled wrappers and separators for the hardline floor</p>
+<p>387940407b fix(approval): keep $(...) paths, verb-prefixed scripts, sudo -k and timeout -- on the right side of the floor</p>
+<p>727583383b fix(approval): hardline protected dirs with a trailing slash or a ../* climb</p>
+<p>b9ca8f3252 perf(approval): make the command-position groups possessive so blank-line runs stay linear</p>
+<p>问题：这一批是同一种形状的两面——危险写法漏检，和正常写法误报。漏检的例子：mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh、ln -s /tmp/k ~/.ssh 这种把 .ssh 自己当创建/链接目标的写法，旧正则只匹配 .ssh 后面跟斜杠或结尾；/data/root/.bashrc 被错误折叠成 /data~/.bashrc；引号包起来的路径前缀后面还有更多路径时，被当成整个家目录而不是子树；shell rc 文件被符号链接到凭证文件上时，凭证拒绝就失效了。误报的例子：touch -r ~/.bashrc new 只是读时间戳，ln -sfn ~/.bashrc ~/.bashrc.bak 命中的是兄弟文件，touch ~/.netrc.example 也不是凭证，但都会被要求确认。</p>
+<p>修复：创建/链接规则要求 rc、凭证、Hermes 的 .env、config.yaml 这个名字结束整个 shell word，并跳过 -r/--reference 的操作数；&lt;&gt; 也算 word 结束，ln 目标后面的重定向尾巴用 possessive 处理；单段家目录只在路径开头折叠；一台机器上的 shell rc 清单统一到一处，写入审批按类别分 key；hermes 的写入安全根在审批豁免后仍然生效（以前 --yolo 或者一次批准之后，~/.ssh/config 和刚纳入的 rc 文件能绕过安全根）；/etc 从 touch/mkdir/ln 的规则里拿掉。</p>
+<p>效果：审批从「更严」变成「更准」——危险写法拦住，正常写法放行。性能上命令位置分组改成 possessive 之后，400 个换行加 50 个 busybox 的输入从 30 秒降到 0.14 秒。</p>
+<p>脱敏：常见密钥文件不再明文返回</p>
+<p>03593a3538 fix(redact): mask secrets when reading well-known credential files</p>
+<p>fd0655ab84 fix(redact): mask quoted/spaced credential-store values, cover ~/.aws/config and _netrc</p>
+<p>0211b27368 fix(redact): mask unspaced multi-word INI passwords in credential stores whole</p>
+<p>445d699ab2 fix(redact): accept configparser&#x27;s `:` delimiter in credential-store INI lines</p>
+<p>2fd57b4403 fix(redact): treat PowerShell gc and -Path:&lt;file&gt; reads as credential-file reads</p>
+<p>e79ade1967 fix(redact): classify PowerShell Get-Content credential reads</p>
+<p>9ac5852c95 fix(redact): close netrc/.pgpass/shell-test gaps in the credential-store passes</p>
+<p>29eefffa54 fix(redact): mask every netrc password on a line, not only the first</p>
+<p>81fd6d89e5 fix(redact): mask an .npmrc auth value that only starts with a ${VAR} reference</p>
+<p>229aff5e9b fix(redact): keep npm ${VAR} env references readable in .npmrc</p>
+<p>问题：read_file 和 terminal cat 只把 .env 文件、shell rc 文件、Hermes 的 config.yaml 当敏感文件。读 ~/.aws/credentials、.netrc、.pgpass、.npmrc、.pypirc、.git-credentials，会把里面存的密钥明文返回。这些文件大多数不是 KEY=value 格式，光靠 env 那套规则遮不住。</p>
+<p>修复：用写入拒绝名单已经在用的同一份清单来归类敏感文件（.aws 下只把 credentials 算敏感），并给这些文件的行格式单独加一遍脱敏：netrc 的 password token、pgpass 的字段、URL 里的 user:password、npmrc 的 _authToken、INI 的 password = x。terminal 那条路径现在也把 secret_file 传进去，两个入口共用同一套处理。后续又补了引号/空格包起来的值、configparser 允许的冒号分隔、一行里有多个 netrc password、npmrc 里以 ${VAR} 开头的值（变量引用本身保持可读）。</p>
+<p>效果：agent 读你的凭证文件时，看到的是打码后的内容。</p>
+<p>脱敏：私钥只打印一部分也打码</p>
+<p>4ab322fc4f Inspired by Poke: redact every line of a private key, even when only part is printed</p>
+<p>016ef9178b fix(redact): register double-escaped JSON private-key lines</p>
+<p>7e46a6ee1e fix(redact): keep an unpadded status line after a partial key print</p>
+<p>3cefb336df fix(redact): mask a partial key print whose last body line is short</p>
+<p>6807753d04 fix(redact): register key lines of a PEM held inside service-account JSON</p>
+<p>问题：私钥的正则要求 BEGIN 和 END 同时出现，所以 head -n 5 id_rsa、tail -n 5 id_rsa 这种只打印一部分的写法，会把中间每一行明文吐出来。Devin 十月发布说明里做过同一件事（「当保存的密钥里含私钥时，每次都逐行打码，哪怕只打印了一部分」），这里的缺口形状完全一样。</p>
+<p>修复：线性走一遍行，在孤立的 BEGIN（向后）或 END（向前）armor 行旁边把那段 base64 遮掉；服务账号 JSON 里那份 PEM 的每一行也登记进黑名单；双转义的 JSON 私钥行、最后一行偏短的、以及钥匙打印之后不带 padding 的状态行都覆盖到。</p>
+<p>效果：只打印私钥的一部分不再是绕过路径。</p>
+<p>脱敏：secret source 的值在模型出口按精确值遮掉</p>
+<p>16e81d2841 fix(redact): mask applied secret-source values by exact value on model egress</p>
+<p>d7a716e1bb fix(redact): classify published source values lazily so startup can&#x27;t latch redact_secrets on</p>
+<p>a0c194afcb fix(redact): classify source values by shape only; unregister revoked masks</p>
+<p>d547e72963 fix(redact): keep a failed re-pull&#x27;s live value masked; stop masking ordinary config</p>
+<p>d87ef51ec7 fix(redact): don&#x27;t register a secret-named setting that holds a plain word or hostname</p>
+<p>4bb6d1a863 fix(redact): register plain-word passphrases under MYSQL_PWD/SSHPASS</p>
+<p>46cd35802d fix(redact): unregister a routed profile&#x27;s masks when its secret sources are removed</p>
+<p>8d998ee865 fix(redact): unregister a routed profile&#x27;s masks when every source is disabled</p>
+<p>问题：secret source（Bitwarden、1Password、command）把值填进环境变量之后，这些值从来没有进过任何脱敏器。一个没有明显凭据形状的值——vault 里的不透明字段、放在 DATABASE_URL 里的 DSN——会从终端输出、文件读取、记忆上下文、工具结果原样送到模型供应商那边。而且多 profile 时，profile B 的值可能被登记进 profile A 的桶里，B 的输出反而没被清洗。</p>
+<p>修复：env_loader 在两个快照点（进程级 apply 和 routed profile 水合）把每个 home 已应用的值发布给 agent/redact_secret_sources，redact_sensitive_text 无条件清洗它们，和 vault 填充同等待遇；从不调用脱敏器的工具（MCP、web、插件）由 make_tool_result_message 清洗结果文本。单位按 hermes_home_key 区分，多路复用网关不会拿 A 的值去遮 B；每个值一个有限的单位，47 行的密钥不会把自己的前几行挤出去；armor 行不单独登记；批量 blob 里 DEBUG=true 这类平常的单词值不会被注册成全局子串清洗。</p>
+<p>效果：即使密钥没有「密钥的样子」，只要它是你应用过的一个 secret source 给出的值，就会在模型出口被遮掉。</p>
+<p>脱敏：几种常见凭据形状补齐</p>
+<p>68e81e4f8d fix(redact): mask bare Google OAuth refresh tokens (1//0…)</p>
+<p>07fcd4e31e fix(redact): mask query passwords in driver-suffixed DB URLs</p>
+<p>86a1ad9a87 fix(redact): also mask passwd= and sslpassword= DB URL query params</p>
+<p>174ed53532 fix(redact): mask libpq query password suffix after semicolon</p>
+<p>3d5c4eaa4b fix(redact): end a DB URL query password only at &amp;, # or whitespace</p>
+<p>fc73b06fb9 fix(redact): stop DB URL query scan at quotes/angle brackets; keep templates</p>
+<p>8ad7e62d4f fix(redact): keep a template DB URL query password from hiding a ; sibling</p>
+<p>5b3168ea01 fix(security): mask passwords in DB URL query strings</p>
+<p>7052cf8615 fix(redact): mask glued refresh tokens split by control chars</p>
+<p>d9cdc8126a fix(redact): mask control-split and glued Google refresh tokens</p>
+<p>993b33e0c0 fix(security): keep multiline redaction units intact</p>
+<p>b94d8c33dc perf(redact): make the INI credential-store pass linear on long keyword lines</p>
+<p>问题：Google 的 access token 和 GOCSPX- 客户端密钥都有前缀规则，但 refresh token（那个长期有效的）只有在紧挨着 refresh_token 这个键时才被遮住，裸的 1//0… 会从工具输出、日志、请求转储里原样通过。DB URL 那边，SQLAlchemy 的 postgresql+psycopg2://、mysql+pymysql:// 会把查询参数转发给驱动，所以 ?password= 一样是数据库凭据，但旧规则不认带驱动后缀的写法。</p>
+<p>修复：refresh token 以 1//0 锚定、要求至少 20 个字符（占位符 1//refresh、整除、URL 路径段不受影响），被控制字符拆开或粘在一起的变体也能认；DB URL 的查询密码支持带驱动后缀、passwd= 和 sslpassword=、libpq 分号之后的写法，扫描在引号和尖括号处停下，模板里的占位符保持可见。</p>
+<p>效果：脱敏规则跟着凭据的实际形状走，而不是跟着某一个键名走。</p>
+<p>性能：脱敏对长行从平方级降回线性</p>
+<p>b94d8c33dc perf(redact): make the INI credential-store pass linear on long keyword lines</p>
+<p>问题：INI 那一段脱敏的正则把密钥词夹在两个可回溯的 key 匹配里，所以一行很长、又有密钥词、又没有可用的等号（比如 &quot;token&quot; 重复很多次）时是平方级：8 万字符要 12.7 秒，而 origin/main 上只要 0.004 秒。这段代码在每一次读敏感文件时都会跑（.env、shell rc、config.yaml、各种 stores）。</p>
+<p>修复：key 那段改成 possessive，密钥词放到回调里检查，&#x27;(?&lt;=api) (?=key)&#x27; 保留「api key = X」这种拼写。用 70 万行随机数据对比，匹配集合不变，8 万次输出和改造前逐字节一致。</p>
+<p>终端：工作目录被删掉之后不再卡死</p>
+<p>0ee90ecc4b Port from lobehub/lobehub#20735: run in a usable directory when the terminal cwd is gone, and say so</p>
+<p>ab8c56c09b fix(tools): recover a deleted terminal cwd before the command script is built</p>
+<p>be73ce8e76 fix(terminal): resolve a relative workdir against the session cwd before the dead-cwd check</p>
+<p>8f95f721bf fix(terminal): keep the cwd fallback per command; refuse a missing explicit workdir</p>
+<p>3e605f17ba fix(terminal): name the missing working directory instead of the chmod hint on a wrapper cd failure</p>
+<p>问题：会话的工作目录被删掉（命令删了自己的目录、临时目录被清理、挂载掉了）之后，这个会话就卡死了：包装器里的 builtin cd -- &lt;cwd&gt; || exit 126 在命令执行之前就失败，每次调用都是如此，直到网关重启为止，而提示是一条误导人的「chmod +x」。根因是恢复逻辑在 _run_bash 里跑，那时 execute() 已经把脚本建好了、把 cwd 写进包装器了，而且它看不到终端工具从会话记录的 cd 状态传下来的显式 cwd。</p>
+<p>修复：execute() 在建包装器之前先用 _usable_cwd() 解析出有效目录（本地后端把死目录换成一个可用的最近祖先，沙箱不动），并在工具结果里带一条一次性的 cwd_fallback 说明（后台 spawn 也带），让模型知道相对路径现在落在别处；会话记录会在下一次观察到 pwd 时自愈。相对 workdir 按会话 cwd 解析（以前按 Python 进程的 cwd 判，合法路径被换成 TMPDIR，打错字的反倒跑了进去）；模型显式指定的 workdir 缺失时直接拒绝、退出 126 并说明命令没有执行（以前会被换成父目录，rm -f ./*.txt 就删到了上一层）；并发命令之间不再抢同一条 fallback 通知。这个改动是从 lobehub 的 PR 移植的。</p>
+<p>工具：自身超时优先于通用上限</p>
+<p>e1ac37eba1 fix(agent): generic tool deadline no longer clips a tool&#x27;s own timeout</p>
+<p>问题：两个 runner 把单次调用统一限制在 420 秒（timeouts.tools.sequential_call / concurrent_batch），但有些工具自己的 schema 给了更长的预算：terminal 承诺前台最多 600 秒（FOREGROUND_MAX_TIMEOUT）并尊重 TERMINAL_TIMEOUT，process_manage action=wait 按自己的 timeout 阻塞。结果前台 terminal(timeout=600)——这是明确允许、而且低于会被提升成后台进程的上限——会在 420 秒被杀掉，报 &quot;timed out after 420.0s&quot;，一点输出都没有；工具自己的超时本来会返回已收集的部分输出加退出码 124。process_manage action=wait 更糟：后台进程还在跑，模型什么也没拿到，又发一次同样的请求。</p>
+<p>修复：工具可以声明一次调用合法阻塞多久（ToolEntry.deadline_floor，按参数算出来），两个 runner 把通用上限提到批次里最长的那个声明再加一点余量，让工具自己的超时先触发。没有声明的工具保持现在的边界，声明也不会在通用上限被关掉时凭空造出一个 deadline。</p>
+<p>桌面端：登录卡片里的命令不再被裁掉</p>
+<p>08af1809f5 fix(desktop): keep the external sign-in command inside its card and selectable</p>
+<p>296d83885f fix(gateway,desktop): name the primary only when the fallback was refused, and keep the prompt out of a selection</p>
+<p>问题：登录步骤是网格项，一行命令会撑开它的最小宽度，把后半截命令、复制、取消、「我已经登录了」全挤到卡片被裁掉的边缘外面，而且把窗口拉宽也没用；另外复制登录命令时连前面的 $ 提示符一起选中，粘出来不能直接运行。</p>
+<p>修复：这一步跟着卡片收缩、命令在自己的框里换行、文字重新可选；$ 提示符保持不可选。配合 fallback 的改动，只有备用确实因为鉴权被拒时才显示主 provider 的登录卡片，备用遇到限流或请求过大时保留它自己的重试卡片（重试、重置时间、压缩）。</p>
+<p>登录与 fallback：错误卡片点名主 provider</p>
+<p>2baaeeba9d fix(fallback): surface the primary provider&#x27;s expired login when the backup fails</p>
+<p>31e1a40d5f fix(fallback): a per-model cooldown or a missing CLI is not reported as a lapsed primary login</p>
+<p>3c2bc1376f fix(fallback): a primary configuration error is not reported as a lapsed login</p>
+<p>9a9ac475fc fix(fallback): redact the primary&#x27;s error in the exported primary_auth_failure descriptor</p>
+<p>9bb39e8f01 fix(fallback): lead a failed turn with the primary&#x27;s sign-in before the held transform runs</p>
+<p>deb7cc3643 fix(gateway): keep the primary&#x27;s failed login with the turn and the route that resolved it</p>
+<p>2a13871e1f fix(fallback): compare the backup&#x27;s query decoded, as its client sends it</p>
+<p>0e183f91e5 fix(fallback): a backup endpoint seen without its query still counts as that backup</p>
+<p>3d47f8114c fix(fallback): compare the backup endpoint with its query when deciding whether the turn runs it</p>
+<p>26fc044a6a fix(fallback): a fallback on the primary&#x27;s provider but another endpoint still leads with the primary</p>
+<p>3655730b19 fix(fallback): drop the primary&#x27;s failure when the turn runs another endpoint of the backup&#x27;s provider</p>
+<p>9dbcb6274c fix(fallback): compare the route before a channel or session override, where the failure is taken</p>
+<p>319938fa5a fix(fallback): drop the primary&#x27;s failure when the turn&#x27;s overrides change the resolved route</p>
+<p>fcabfe38bc fix(gateway): keep primary re-login hint on the resolved backup account</p>
+<p>fecec6b485 fix(gateway): a failed turn after a lapsed primary login names the primary on its error card</p>
+<p>1bb7e2e196 fix(auth): a CLI-login plugin&#x27;s sign-in card and re-login hints show the login command it declares</p>
+<p>f8c9405b84 fix(auth): quote a declared login command for the Windows shell</p>
+<p>dbf1cfd05e fix(auth): build a CLI plugin&#x27;s sign-in hint from a declared login_args, never by running the CLI</p>
+<p>b162412219 fix(auth): keep the hermes model fallback when a Windows login command needs quoting</p>
+<p>ae363cd53f fix(cli): show a runnable re-login for external CLI plugins without an auth handler</p>
+<p>459594df2a fix(cli): stop minting `agy auth add &lt;slug&gt;` for handler-less external-process plugins</p>
+<p>5dea35e53c fix(gateway): hold a newline-split refresh token in streamed frames</p>
+<p>d06890be87 fix(gateway): let a bare trailing number settle in streamed frames</p>
+<p>问题：主 provider（比如 Anthropic）的登录过期时，resolution 阶段悄悄换成备用 provider，然后备用因为余额不足失败——错误卡片只描述备用的问题，用户完全看不出真正的原因是主号要重新登录。而且卡片上的「重新登录」按钮会去登备用那个。</p>
+<p>修复：主 provider 的 AuthError 如果是「重新登录能修好」的那一类（不是配额、不是权限、不是可重试），会带一个 PrimaryAuthFailure（provider、错误、可精确执行的重新登录命令）戳在 fallback runtime 上，网关（消息平台和 launch-policy 路由）、API server、oneshot 都把它带到 agent；网关每一轮清一次，缓存的 agent 不会一直留住一个已经解决的登录失败。失败的那一轮会先写「&lt;主 provider&gt; 需要你重新登录：运行 hermes auth add anthropic」，再写备用自己的问题，卡片上的按钮复用给真正需要的那个 provider。主 provider 的错误在导出的描述符里也会脱敏。</p>
+<p>顺带的误判修正：Anthropic 的 per-model 冷却以前不带错误码，外部 CLI 没安装也能通过同样的过滤，结果备用失败时会告诉用户去重新登录，而登录其实还好好的、CLI 根本没装；现在这两个码都归入「不是登录问题」。主 provider 的配置错误同样不再被报成登录过期。external_process 插件以前被告知去跑 hermes model——那个流程确实会跑厂商 CLI 的登录，但接着会问模型、把 provider 存成 model.provider，于是给 fallback 用的时候备用变成了主；现在改为读插件自己声明的 login_args（比如 claude auth login），没声明的还是 hermes model，有 auth_handler 的还是 hermes auth add。Windows 下带参数的登录命令会被正确加引号。网关的流式帧解析也修了两处：刷新 token 被换行拆开、帧尾单独一个数字。</p>
+<p>文件接口：凭证文件不再被列出或返回</p>
+<p>9df2be82d6 fix(dashboard): hide OS/CLI credential stores from the managed Files API</p>
+<p>395d0a7759 fix(dashboard): refuse credential stores reached through a symlink in the Files API</p>
+<p>2a6da65198 fix(dashboard): hide credential stores from the SSH workspace /api/fs/list</p>
+<p>5a67d908d4 fix(dashboard): casefold the resolved-path credential-store check on macOS/Windows</p>
+<p>9aa0111881 fix(dashboard): guard requested SSH credential-store path before serving resolved target</p>
+<p>5ecb229dbb fix(dashboard): judge the SSH requested path as normalize resolves it</p>
+<p>a6b2aab2c9 fix(dashboard): run the desktop fs read/write credential checks off the event loop</p>
+<p>6c97f363db fix(dashboard): run the managed download/stream/upload-stream credential checks off the event loop</p>
+<p>70ae41f8dc fix(dashboard): run the locked-root /api/fs read guard off the event loop</p>
+<p>61641ce432 perf(dashboard): resolve a listed directory once, walk only symlink entries</p>
+<p>问题：Files API 的默认管理根是 $HOME，但拒绝名单只认识 Hermes 自己的库，所以 ~/.netrc、~/.npmrc、~/.ssh/、~/.aws/、~/.kube/、~/.config/gh/ 都能被列出、读取、下载、写入。符号链接能绕过：~/.ssh 指向 ~/keys 时，两边都能读到；SSH 工作区的目录列表只过滤噪音名字，远端家目录的 .netrc/.ssh/.config/gh 会按名字列出来；macOS/Windows 上大小写不同的路径能让解析后的检查漏过去。</p>
+<p>修复：判断从 agent.file_safety 推导，不再手抄一份——家目录下的单文件库变成 HOME_CREDENTIAL_FILES（和写入拒绝名单共用），目录按连续路径组件匹配，所以 .config/gh 这种两段路径能命中、又不会误伤无关的 gh/ 目录；一个 _is_sensitive_path 同时覆盖 list/read/download/write 和桌面端的 /api/fs 路由。链过去的真路径等于或落在任何一个守护家目录的凭证库里时也拒绝。检查从事件循环挪到工作线程：守根解析要为每个守护家目录 stat 一遍凭证库，以前内联跑，挂载慢的时候 /api/health 一起卡住。</p>
+<p>效果：性能上目录列表只对符号链接做 realpath，5000 个条目的目录从 13 倍慢回到正常。</p>
+<p>MCP：只读标记每次重新发现都核对</p>
+<p>93c62f225c fix(mcp): refresh readOnlyHint on every rediscovery, not only first registration</p>
+<p>a472723f73 fix(mcp): re-check trust gate when rediscovery drops readOnlyHint</p>
+<p>cdc9eda1fd fix(mcp): resolve a missing trust record in the hint-flip re-check like the gate does</p>
+<p>d66b054fcd fix(mcp): re-check the read-only hint under _rpc_lock and refund refused first attempts</p>
+<p>92eed80306 fix(mcp): re-check the trust gate before a recoverer&#x27;s retry too</p>
+<p>8066f68a4c fix(mcp): invalidate omitted tools&#x27; stale read-only hint on reconnect</p>
+<p>问题：已经注册过的服务器重连时（回收的 stdio 被唤醒、临时掉线、会话过期 / stdio 重生 / OAuth 恢复），会重新列工具，但注册那段逻辑在记录信任元数据之前就返回了，于是缓存的 readOnlyHint=True 会活过一个「现在报告这个工具能写」的会话，信任门也不会重新触发。另外 handler 在拿到调用会话之前就做了信任检查，若服务器是懒启动或在 acquire 期间重连，重新发现报告工具可写，派发却照旧进行、没有征求同意。</p>
+<p>修复：每次重新发现都刷新标记（不重新注册），缺信任记录时按闸门的口径处理；第一次被拒的 stdio 重试会退掉闸门记的账，也不再算一次熔断计数（是 Hermes 自己拒绝的，服务器什么都没做）。真的从只读变成可写、又是未信任服务器、又没有记住的授权时，派发前再问一次。</p>
+<p>提示缓存：一个会话一个时钟</p>
+<p>4a89bc6c02 feat(cache): one prompt-cache clock per session; Nous 5m ceiling as data</p>
+<p>4162ecf11f fix(cache): worker prunes and micro-compactions invalidate the clock</p>
+<p>270d6dfd08 fix(cache): owner stamps the worker clock generation in the usage receipt</p>
+<p>453d6b9fb2 fix(cache): advisory clock reads, worker generation, saved-route check</p>
+<p>58886fc81e fix(cache): coverage deadlines, guaranteed vs estimated ends, durable generation</p>
+<p>e612fbedc6 fix(cache): profile ceiling is keyword-only; tolerate agent stubs without base_url</p>
+<p>08e08386f9 fix(cache): resume fallback only for sessions that touched the cache</p>
+<p>问题：每个需要回答「这个会话的缓存提示什么时候过期」的地方都各自从 _cache_ttl 重新推导，路由切换、fallback、会话轮换、压缩之后各处的结论并不一致。</p>
+<p>修复：统一到 agent/prompt_cache_clock.py:cache_window()。每次成功的尝试会记下实际发出去的那一档（cache_control 的 ttl、prompt_cache_options.ttl、prompt_cache_retention，从发出去的载荷里读）、发送时间，以及响应证实的档位（Anthropic 的 cache_creation.ephemeral_5m/1h_input_tokens、OpenAI Responses 的 cache_write_tokens_details.ttl_30m/12h_tokens），normalize_usage 保留这份分档而不是丢掉。每条路线的规则是一张小 handler 表：原生 Anthropic 靠分档证实；OpenRouter 上的 Claude 是声明（实测尊重 1 小时）；有天花板的路线做 clamp；其他 Anthropic 协议网关按 5 分钟估算；OpenAI GPT-5.6 及以上靠 ttl_30m/12h 证实或声明文档里写的 30 分钟下限，5.6 之前按 30 分钟估算（in_memory 是 5 分钟）；隐式缓存是未知。路线切换、fallback、会话轮换、压缩都会让它变成未知。</p>
+<p>效果：路线 TTL 天花板变成数据（ProviderProfile.prompt_cache_max_ttl，Nous 出厂是 5m——Portal 上游大约 7 分钟后丢掉 1 小时、按 5 分钟计费），可以用 config 的 prompt_caching.route_ttl_ceilings 按 provider 覆盖，Hermes 不再向 Nous 申请 1 小时；时钟作为可空的 sessions.prompt_cache_clock 持久化，恢复会话时懒加载。/context 里显示 Prompt cache: warm until HH:MM（1h, proven）、expired … ago 或 unknown。</p>
+<p>Cron：任务生命周期守护与升级残留清理</p>
+<p>337c164443 fix(tools): refuse literal-PID kills of the supervised gateway itself</p>
+<p>a981860729 fix(cron): lifecycle guard: allow SIGUSR2 stack dump; peel redirects; open nested payloads</p>
+<p>8f4d4a0b24 fix(cron): allow nonlethal Stop-Process -WhatIf previews</p>
+<p>fb48931764 fix(cron): exempt Stop-Process -WhatIf only for a single plain statement</p>
+<p>617bba2512 fix(cron): a trailing-colon parameter takes -WhatIf as its value</p>
+<p>893c3948aa fix(cron): check spps, the Stop-Process alias, against the gateway PID</p>
+<p>30aba44d41 fix(cron): lifecycle guard: kill group target after a PID; Stop-Process value options</p>
+<p>4e008c89c7 fix(cron): read every word after the first kill operand as a target</p>
+<p>5f04566b38 fix(cron): skip redirections between kill&#x27;s arguments</p>
+<p>30031a0b06 fix(cron): match &lt;&lt;&lt;, &lt;&lt;- and &lt;&gt; whole when skipping kill&#x27;s redirections</p>
+<p>186f5b6bfa fix(cron): lifecycle guard: more literal-PID spellings</p>
+<p>51dfa80e89 fix(cron): scrub pre-upgrade stamps on idle sibling jobs when a run saves</p>
+<p>9356b60844 fix(cron): scrub pre-upgrade sticky stamps on every run outcome</p>
+<p>c6cfef0ece fix(cron): sanitize retained pre-upgrade failure after successful run</p>
+<p>问题：网关自己是被守护的进程，但唯一能识别它的线索是命令里出现 hermes/gateway 这样的词或解释器镜像；kill/taskkill/Stop-Process 直接给一个字面 PID 的时候，两条线索都没有，于是一个 agent 会话可以在没有任何 drain 的情况下杀掉自己的网关。</p>
+<p>修复：本地后端把 os.getpid() 传进去（同一个 PID 命名空间，探测那一步已经证明这个进程就是被守护的网关），扫描拒绝执行等于这个 PID 的字面操作数，包括 sh -c 载荷和引用脚本里的。别的 PID、kill -0/-l 探测、taskkill /S、远程后端、cron 调用都不变，动态 PID（$(pgrep ...)）不解析。同时保证正当用法不被误伤：kill -USR2 &lt;网关 PID&gt; 是文档里写的 faulthandler 堆栈转储，保留；只有在给出信号之前才把 -0 当探测（信号之后的 -0/-12 是进程组目标，顺带关掉了 kill -9 -0 P 这个误报）；PID 操作数按文本比较，4300 位以上的数字不会让 int() 抛错、中断引用脚本的扫描；命令词之前的重定向会被剥掉，eval / powershell -c / cmd /c 的载荷进递推。</p>
+<p>另一类是升级残留：一次运行结果的写入会持久化整个 jobs.json 库，不只是正在跑的那个 job，所以旧版本留下的 sticky 失败记录会一直挂着；现在每次写入都清理（连 idle、暂停的兄弟 job 一起），保留诊断信息和暂停状态。</p>
+<p>插件目录：新增条目</p>
+<p>9c0b71e7b2 feat(plugin-catalog): add commonly-hermes-plugin</p>
+<p>18e659dfc9 fix(plugin-catalog): commonly-hermes-plugin pins its own repository</p>
+<p>467b8f7d12 fix(plugin-catalog): commonly-hermes-plugin re-pinned; its server asks before writes</p>
+<p>4c02a30498 Add plugin &quot;dosbox-mcp&quot;</p>
+<p>bfb9cba15b Update dosbox-mcp to 0.2.4</p>
+<p>dff513a89a Update dosbox-mcp to 0.2.3</p>
+<p>9dffcfbaa2 plugin-catalog: glasses-platform 0.6.8</p>
+<p>5b2295174b plugin-catalog: glasses-platform 0.6.9 (reword a docstring example the install scanner flags)</p>
+<p>8783054ef6 plugin-catalog: shinjuku pins db1ced6 (0.1.1: setup lines for Windows, Git listed as a prerequisite)</p>
+<p>Windows：Git for Windows 2.53.0.3 → 2.56.1</p>
+<p>a95f462421 fix(pm): bump the pinned Git for Windows 2.53.0.3 -&gt; 2.56.1</p>
+<p>01f14fafc9 fix(update): probe the pm-store PortableGit tree and clangarm64 in the trampoline self-heal</p>
+<p>1a55ec3398 fix(update): order pm-store PortableGit trees by version, not by name</p>
+<p>094f187c9d fix(pm): drop the revision from first-build PortableGit asset names</p>
+<p>问题：2.53.0.3 早于三个 Git for Windows 安全版本：2.56.0.3（eMudhra CA 事件、Git LFS CVE-2026-105803）、2.56.0.4（内置 brotli 1.2.1，CVE-2026-111497，可以经 libcurl 的 br 编码触发）、2.56.1（git 的 recursive-clone 远程代码执行 CVE-2026-111760 以及另外五个）。</p>
+<p>修复：固定版本提到 2.56.1。2.56 把 x64 的 MSYS2 前缀从 mingw64/ 搬到 ucrt64/，所以 trampoline 自愈的 git-core 候选项、非登录 bash 的 coreutils PATH 目录、桌面端打包 PortableGit 的豁免都要覆盖 ucrt64（mingw64 保留给已有安装）。第一次构建的 PortableGit 资源名不再带 revision，pm-store 里的 PortableGit 树按版本排序而不是按名字。</p>
+<p>execute_code：输出溢出文件不再保留凭据</p>
+<p>ad63dc4e5c fix(code-execution): sanitize stdout spills and harden spill-path handling</p>
+<p>143142f210 fix(code-execution): bound the cell-spill read in bytes, not runner characters</p>
+<p>27ec5b6452 fix(code-execution): log the cell-spill republish failure instead of a bare catch-all</p>
+<p>eb1b37dbc2 fix(code-execution): read the cell spill as utf-8-sig; gate POSIX spill tests with platforms</p>
+<p>9582474d5f fix(code-execution): keep group bits when tightening an existing cache/exec</p>
+<p>问题：execute_code 超长的 stdout 会落盘，让模型用 read_file 分页读；但两个落盘点都写原始输出——宿主侧的 _spill_full_stdout 在 _clean_output 剥 ANSI 和脱敏之前就写了，会话内核那侧用普通 open() 写进自己的临时目录（会跟随符号链接）。而结果里的警告还让模型去读那个文件，等于把内联结果已经遮掉的凭据留在了磁盘上。</p>
+<p>修复：_spill_full_stdout 先剥 ANSI、按代码文件脱敏再写，目录 0700、文件 0600、创建和替换对符号链接安全。收紧已有 cache/exec 目录的权限时只去掉 world 位，不再抹掉共享组模式（HERMES_HOME_MODE=2770）给的组权限。</p>
+<p>其他杂项</p>
+<p>@url 引用里的 SSRF 和密钥 URL 拒绝、web_extract 的策略拒绝，现在会显示出来，不再静默失败（ed1f43c1f3、50637d5747）。插件扫描器不再把 Python docstring 里的内容当成高危（2a51b76696、fc562d87b7、d1b46d718f）；威胁扫描能识别「忘掉你之前的所有指令」这类越狱写法（e25161a074）。docker 镜像清理里 uv 缓存的世界可写 .lock 文件改为去掉 world 位而不是删除（a98abb3868、927796fc0d）。独立的 npm 包有了自己的发布年龄门槛（203e533631）。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-15：browser_vault 验证码可在聊天里输入，网关新增 tickets 命令</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-15</link>
