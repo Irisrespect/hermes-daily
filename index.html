@@ -22,9 +22,70 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 111 期 · 52019 个提交 · 每日自动更新 ·
+<p class="meta">共 113 期 · 52987 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-18" class="day">
+      <h2>Hermes 日报 2026-11-18：状态库持久层换成新的 SQLite 后端，插件目录一天新增 70 条</h2>
+      <p><strong>本期覆盖 11 月 17 日 ~ 11 月 18 日合入 main 的提交，共 801 个 commit（不含 merge），另有 10 个 merge。新增 89 个功能、152 个修复、0 个性能优化。统计口径是「合入 main 的时间」（11-17 10:50 ~ 11-18 06:30），不是 commit 作者时间。</strong></p>
+<p>📌 今日要点：</p>
+<p>状态库：state.db 的持久层重写成一套新的 SQLite 后端，一个 state.db 一个 holder、读写分离，子代理记录与可恢复子代理表落库，旧的 SessionDB 保留成兼容外壳（stand-in）。</p>
+<p>插件目录：一天新增 70 个条目，包含 glide（Tern UI + /glide 引导）、elm（本地可审查记忆 + 记忆感知路由）、hermes-cinema、eventmem 等，另有 nagaai / aigrow / azure-mai-image / aipg-community / Bitquery 等 provider 与乌克兰语语言包。</p>
+<p>图像视频：GPT Image 2.6 的 Flare 和 Sunburst 进 FAL 目录；图生视频开始接受本地图片路径，工具层内联成 data: URL。</p>
+<p>稳定性：沙箱里工作目录被删不再让整条终端退出 126；备份发布前补 fsync，断电不再出半截 zip；codex 后端保留 zstd 默认，被拒的请求体有一次退回纯 JSON 重发。</p>
+<p>其它：`hermes --resume` 恢复你自己选的模型；飞书评论机器人五个工具重新连上 Lark 客户端；.env 读取拒绝改用 casefold，堵住 `.env.ſtaging` 这类绕过。</p>
+<p>状态库：持久层换成新的 SQLite 后端（本期最大改动）</p>
+<p>这一天的主要工作量在 state.db 的持久层。yoniebans 一个人在这个窗口里提交了 295 条，其中约 90 条是 persistence / storage / state 三个 scope 的迁移工作。</p>
+<p>新的 holder 层（c9f3a2ffd4）：一个 state.db 对应一个 holder，holder 持有写连接和写锁，写事务用 BEGIN IMMEDIATE 加抖动重放，另配一个有上限的读池，打开 WAL，带文件与 WAL 代数守卫、隔离区和关闭流程；注册表负责按进程发放 holder，避免同一份 state.db 被多个连接乱开。</p>
+<p>schema 侧（1156b1e343）：state.db 的 DDL、FTS 布局检查、列对账、数据迁移阶梯和打开时的 FTS 初始化都在这一层；打开时按声明的列做 reconcile，老库自动补列。</p>
+<p>存储接口与装配（4a66e4b1cd、7b70fdf001、70d8972759）：存储接口定义了核心记录、错误分类、profile 作用域和可等待视图；SQLiteBackend 在 holder 之上组装各 repository，services 在没有健康 store 时也能回答（损坏闩锁与就绪探测），persistence_assembly 是应用侧打开持久层的唯一入口。会话权威、绑定、协调和 worker 四族契约落在同一批提交里。</p>
+<p>子代理记录落库（382cd6d02a、7acb807daf）：delegation ledger 上新增持久化的子代理记录，resumable_subagents 表随 SCHEMA_SQL 一起创建，所以早在表存在之前打开的 store 也会补上这张表。每个动词都带 main 里的语句和绑定顺序：upsert 与限额检查、检查点、网关关闭标记、继续领取与交还、备注、过期与手动领取的取消、自动领取、开始、确认、拒绝结算、放弃并写失败完成行、会话子任务的级联作废、驳回。由读到的记录算出的写，会在自己的写事务里比对存储行，冲突就什么都不写并返回 route_moved。</p>
+<p>ledger 修剪（57d2c7f1ca）：修剪时保留还欠一次续跑的单元行（可恢复或已过期但报告还没交的子代理），删除和终态上限都不动它，因为子代理的放弃要从这行过账；待定上限照常计数和删除。</p>
+<p>交接结算（9b7fffd176）：request_handoff 加了 require_settled 选项，先在自己的写事务里跑结算检查（按排序后的运行时血缘做 require_idle，持有的 turn lease 或压缩锁按 session_busy 拒绝，未知或忙碌的执行按 HandoffUnsettled 拒绝），check_handoff_settled 给 watcher 用同样的检查，不写任何东西。</p>
+<p>上下文与用量（a4d4026690、df48af627d）：sessions 表在 transcript_revision 之后新增可空的 prompt_cache_clock TEXT 列，schema 历史记为第 33 条；usage.main 收据接受这个时钟，owner 在收据事务里把持久化上下文代数（提交时的归档行数）盖进时钟；/context 的 agentless breakdown 会报出保存的 prompt-cache 窗口。</p>
+<p>死锁修复（5f9465f2ec）：turn lease 的四个动词以前在写事务内部调用 holder()，如果这时 profile 清扫清了 holder 的注册归属，这次调用会重新向注册表申请，而注册表在等清扫收尾、清扫在等写锁——三方互等。实测挂死 150 秒。现在每个动词在写之前解析一次 holder，闭包用这个对象，写期间的清扫在写完之后完成。</p>
+<p>管理面（0b5c93ae43）与兼容外壳（6157959be7、461117acad、ccaf443f22）：store 管理与 profile 修复的 SQLite 实现；旧 SessionDB 变成 stand-in（可写 stand-in 先起 reaper 再获取 store，否则构造失败会漏掉一份引用导致 store 关不掉）；CLI 的会话读取按 profile 目录取 store、负 limit 表示全部（和 main 一样）、导出全部 66 列。</p>
+<p>插件目录：一天新增 70 条</p>
+<p>git 里这个窗口新增了 70 个 plugin-catalog/*.yaml（按 --diff-filter=A 数文件，另有 1 个 optional-mcps 的 Bitquery 条目），另外还有大量 re-pin 和描述更新。</p>
+<p>注意 secret-drop、prompt-firewall、passkey-gate 这几个只是窗口内 re-pin 的旧条目，不算新增。</p>
+<p>glide（c592a44137）：一次装上 Tern UI 和 /glide 引导。装上后 `hermes tern` 把聊天画成 Tern 界面，/glide 是一条引导链：识别机器和本地运行时、用你过去会话里「不对/其实/纠正」这类消息建纠正记忆（每轮通过 pre_llm_call 钩子引用最多三条匹配的纠正，用 BM25，不调模型）、技能路由目录、CPU hill climb、把小事卸载给本地 Ollama 估算省下多少。另有 /fleet /intel 只读面板、/rewind /undo /tree、Vim 输入、命令面板、可选实时语音。注意它和 hermes-tern 不能同时装，两者都注册 `hermes tern`。</p>
+<p>elm（3377d7277e、8e02eb4831）：本地可审查的记忆 + 记忆感知路由，0.4.0-preview 带 auto 模式和 /elm private。</p>
+<p>记忆与流程类：relatedb-memory、eventmem 记忆 provider、proactive-continuity（主动续接）、hermes-next-steps、OpenSOP 工作流、扫描类 scansift、covsift、music-listener、sound-cut 音频剪切、lazybird、twinpost、marcora、sleek、timetopost、paperlesson、paintcolormatcher、checkchinatransit、shiwake-ai、dafeiyu-companion、twzrd-intel、alphagrowth。</p>
+<p>工具与安全类：barrier-shield、chaos-takens、eigen（三个一起进目录）、hermes-watchdog、rule-injector、credential-pool-switcher、hermes-safeguard、hermes-regress、hermes-guests、hermes-compute-priority、hermes-cinema、hermes-baikal、panoptes、safari、scenemux、theta-edge-node。</p>
+<p>模型与服务 provider：nagaai（7dc3ae62fc）、aigrow（6580089b43）、azure-mai-image（600f276d5c）、aipg-community（AI Power Grid）、Bitquery（插件目录一条 909c5f2b7b，optional-mcps 目录一条 72c9d1d6b0）。</p>
+<p>语言包：乌克兰语 hermes-lang-uk（593f35c6e6）。</p>
+<p>下架：1guy 按作者要求从目录撤回（4f33931f5f），并从已经装了它的安装里召回（9f9de24f0e）。</p>
+<p>图像与视频生成</p>
+<p>GPT Image 2.6 进 FAL 目录（8f2c6064fa）：OpenAI 11 月 4 日发布 Images 2.6，fal 当天上线 openai/gpt-image-2.6 的 flare 和 sunburst 两个变体，各自有文生图和编辑入口。配置对齐 2.5：固定 medium 画质、4:3 预设、16 张参考图、token 计价不变。编辑白名单按 2.6 的 OpenAPI 取，2.6 不再声明 input_fidelity，这个键就去掉了；GIF/SVG 输出和 reasoning_effort 仍不上工具面，Hermes 继续要 PNG。已有默认模型不变，另有一个不变量测试把 2.6 的编辑载荷钉在 schema 声明的键上。</p>
+<p>图生视频接受本地图片（c237832474、5c4db986bb）：本地终端后端以前把模型给的本地文件路径直接塞进 JSON 载荷，FAL 和 OpenAI 兼容后端（DeepInfra）取不到这个路径，OpenRouter 直接拒绝，只有 xAI 自己内联本地文件。现在工具层把路径型来源内联成 data: URL，走的是 image_generate 给 FAL 用的那套带守卫的解析器（凭据存储守卫、图片嗅探、按托管网关的请求体预算缩图）；URL 和 data: 原样透传，schema 里写明接受本地路径。缩图只在真有请求体上限的 provider 上做。</p>
+<p>沙箱里工作目录被删，终端不再整条废掉</p>
+<p>问题（367ee3dfb4）：共享 wrapper 里是 `builtin cd -- &lt;cwd&gt; || exit 126`。会话 cwd 如果在 docker/ssh/modal/daytona/vercel 沙箱内部被删掉，wrapper 直接 exit 126，之后每条命令都废；之前 #138827 只恢复了本地后端的宿主侧。</p>
+<p>修复：wrapper 改为逐级回退——最近的已存在祖先目录，然后 $HOME，然后 /，并打印一个 per-session 标记，execute() 把它转成与本地路径相同的 cwd_fallback 提示交给模型。显式指定的 workdir 仍然拒绝（explicit_workdir_scope），和本地一致。</p>
+<p>配套：只有终端命令跟随已死的 cwd，文件工具保持严格（e979ba31ac）；agent 容忍被删的工作目录，/context manifest 共用同一个守卫（ccd0c7775f、92a157cf99）；沙箱任务删掉自己的 cwd 时进程跟踪继续存活（5d4f397214）；docker exec 从稳定工作目录启动（cd664e5abf），流式/长驻 docker exec 也从 / 起（92d60d77f6）；解析 cwd 标记不再把标记本身发出去，回退通知也不被截断（065f5abbb3）；code-execution 每次调用启动时不再把会话 cwd 带进自己的 scratch 目录（962f885501）。修的是 #62169。</p>
+<p>备份发布前补 fsync</p>
+<p>问题（d898fadb2a）：备份以前 rename 到位之前没有任何 fsync，rename 可能比数据先落盘。刚显示「Backup complete」就崩溃或断电，会留下一个大小正常的 zip，尾部（最后几个成员、中央目录、EOCD）读出来全是零：`zip -FF` 报缺 EOCD 签名，能救回的文件比备份报告的少。同样的模式还可能把同名上一份好备份顶掉。</p>
+<p>修复：rename 前先 flush 数据，rename 后再 flush 目录项。覆盖范围：全量 zip 备份（手动、更新前、迁移前，走 _atomic_output_path）、profile 与 kanban 的 tar.gz 导出（archive_safe.make_targz）、以及自动恢复所信任的快速快照（publish_private_tree；Windows 上先清掉 copy2 保留的只读属性，O_RDWR sync 才打得开）。</p>
+<p>配套：分阶目录同步失败就让快速快照直接失败（8b901e178a）；新建备份目录同时同步父目录（c95b4427ef）；archive_safe 保持只用标准库，以适配 python -S 的恢复路径（20eb3081fc）；curator 修剪旧技能快照前先 fsync（57e7b050cf）。</p>
+<p>codex 后端：默认继续用 zstd，被拒一次改用纯 JSON 重发</p>
+<p>问题：有一类确定性的压缩请求体 HTTP 400，某些中转/网关不接受 zstd 压缩的 Responses 请求（#148898）。</p>
+<p>修复的最终形态是保留 zstd 默认：允许 profile 显式退出 zstd（d6f73ca99a），被拒绝的请求体有一次退回纯 JSON 重发（0513e714a5）。中途有一版把默认改成纯 JSON（d94d5e3d7a），随后被 0513e714a5 改回 zstd 默认。另外，配置后端读不到压缩开关时保留 HTTP 客户端、保持纯 JSON（5dbf1039d0、02cc4ea88d）；400 的响应体读取失败也要关掉连接，答完的原始 body 及时释放（b076b5856c）。</p>
+<p>命令行与 TUI</p>
+<p>--resume 恢复你选的模型（73523661af、e09f4d00d8）：sessions.model 列会被第一个结算的调用改写成实际服务的 fallback 模型，所以「选了 A、失败一次、fallback 到 B」之后，`hermes --resume` 会用 B 的模型配 A 的 provider 恢复。模型选择收进一个共享 seam（SessionDB.session_resume_model，和 session_gateway_runtime 放在一起），TUI/桌面端的恢复路径与 CLI 的 stored_session_route 都读它。实测 A/B：选 qwen、404、main-grok 服务之后，main 恢复成 (main-grok, pickprov)，修复后恢复成 (pick-qwen, pickprov)。</p>
+<p>飞书评论工具恢复（67b3025978）：飞书评论机器人的五个工具（feishu_doc_read 和四个 feishu_drive_*）每次调用都答「Feishu client not available」。feishu_comment 把 Lark 客户端存在启动 agent 那个线程的 threading.local 里，而现在 agent 把每次工具调用放到 worker 线程跑，worker 拿到的是调用方上下文变量的副本，不是线程本地。现在客户端句柄是 tools/feishu_lark.py 里的 context variable，围绕 agent 运行 set/reset；gateway/turn_thread_reset.py 里按线程 key 的那行随之删掉。机器人回复本身一直没问题，它在工具之外发出。</p>
+<p>安全</p>
+<p>.env 读取拒绝改用 casefold（7d7a9705bf）：is_project_env_basename 和 get_read_block_error 以前用 str.lower() 比较文件名，而 lower() 保留 &#x27;ſ&#x27;，于是 `.env.ſtaging` 既过了读取拒绝、也过了媒体投递黑名单，但 APFS 打开时会当成 `.env.staging`。现在共享 helper 用 casefold()，读取守卫走它。文件工具同步：大小写折叠后的模式匹配保留原始小写命中（089bc9aee5），受保护的指令文件名按 APFS 的方式折叠（71b7be4bd7）。</p>
+<p>桌面端与文档</p>
+<p>桌面端技能目录的文档按钮改为打开技能指南，不再跳到旧目录（f461c64a29）；删掉 hub picker 字符串后重新生成 i18n key 列表（56b028603e）；网页侧的插件帮助也指向文档而不是旧目录（b36ffe9c68）；文档站移除旧的 /docs/skills 和 /docs/plugins 两个 hub 页（82e1b4553d）。</p>
+<p>依赖安全补丁</p>
+<p>oauthlib 4.0.0 → 4.0.1（high，GHSA-3jp2-3mrg-2vxc，经 requests-oauthlib 影响 Google Workspace / Google Chat）；joi 17.13.8 → 17.13.9（high，website）与 18.2.9 → 18.3.1（high，桌面端 wait-on）；follow-redirects 1.16.1 → 1.16.2（high，两处）；tornado 6.6 → 6.6.1（low，修三斜线开放重定向，经 python-telegram-bot webhook）；opentelemetry 1.45.1 → 1.45.2；serialize-javascript 7.1.2 → 7.1.4（website）；随之刷新 nix 的 pnpm-deps-hash。</p>
+    </section>
+    
+    <section id="2026-11-17" class="day">
+      <h2>Hermes 日报 2026-11-17（167 个提交）</h2>
+      <p><strong>本期覆盖 2026-11-15 ~ 2026-11-17 合入 main 的提交，共 167 个 commit，其中 merge 1 个</strong></p>
+<p>共 167 个提交合入 main（feat 5 · fix 77 · perf 0 · docs 5 · merge 1）</p>
+    </section>
+    
     <section id="2026-11-16" class="day">
       <h2>Hermes 日报 2026-11-16：审批与脱敏大扩围，终端目录被删不再卡死</h2>
       <p><strong>本期覆盖 11 月 15 日 ~ 11 月 16 日合入 main 的提交，共 379 个 commit（不含 merge），另有 31 个 merge。新增 2 个功能、279 个修复、3 个性能优化。贡献者 34 人。这一期代码层面的新功能只有两条，重心在加固：审批、脱敏、权限边界三块加起来接近两百条提交。</strong></p>
