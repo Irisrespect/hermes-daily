@@ -22,9 +22,177 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 113 期 · 52987 个提交 · 每日自动更新 ·
+<p class="meta">共 114 期 · 53191 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-19" class="day">
+      <h2>Hermes 日报 2026-11-19：提示缓存重做成一个生命周期，默认 1 小时档并主动剪枝</h2>
+      <p><strong>本期覆盖 11 月 18 日 06:30 ~ 11 月 19 日 06:30 合入 main 的提交，共 204 个 commit（不含 merge），另有 1 个 merge。新增 18 个功能、125 个修复、2 个性能优化。行内 commit date 跨 11-16 ~ 11-18（多数是 rebase 保留的原作者时间），按合入 main 的时间都落在这个窗口内。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>提示缓存重做成一个生命周期控制器：人打字的会话默认申请 1 小时档，机器会话留 5 分钟，每条路由的真实缓存行为从用量里学</li>
+<li>主动剪枝默认打开，长上下文会话的输入成本实测降 20%~27%</li>
+<li>空闲会话在 1 小时缓存过期前自动压缩，压缩丢掉的工具结果全部归档到磁盘</li>
+<li>桌面端 AppImage 的 agent 载荷改从每构建一份的稳定副本运行，退出后 CLI 链接和网关不再崩</li>
+<li>新增 GPT-6.2 Astra 和 Sol；Windows 网关的监听套接字不再被 AcceptEx 掉线连带关掉</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端（fix 14 条 + feat 1 条）</p>
+<p>AppImage 载荷改成稳定副本。Linux 桌面端跑 AppImage，每次启动挂载到新的 /tmp/.mount_*，agent 载荷、~/.local/bin 的 CLI 链接、桌面端拉起的网关全都从这个挂载点跑；app 一退出链接悬空，网关 30 秒内报 &quot;Fatal Python error: Bus error&quot;（解释器和扩展模块从消失的 FUSE 挂载里 mmap）。现在每个构建首次启动把 agent-payload 解包到 ~/.local/share/hermes/bundles/&lt;build&gt;/（按 version、commit、builtAt 命名，同 commit 重建也各自一份），之后都用这份副本。解包走 AppImage 运行时的 extract：spark-0 上 5.4 GB arm64 载荷 8 秒，而通过 FUSE 复制要 137 秒；落盘先写 .partial-&lt;pid&gt;-* 再校验条目/文件/链接数量与字节、写完成标记、rename 提交，崩溃/短写/并发写都会被拒。</p>
+<p>配套打包检查的 fix：符号链接按目标比较（此前一律记成 &quot;symlink&quot;，指错也能过，PM 的树摘要按链接文本哈希，重定向的工具链接在出厂包里会让 hermes pm doctor 失败）；payload 与准备树不一致、mapped payload 没到、afterPack 改过之后都要让打包失败；electron-builder 复制保留 .gitkeep 与空目录；列表符号链接要指向前移后的 CLI 链接；只剥离本 app 的 AppImage 挂载、且不能留在网关环境里；安装后的 gateway unit 跑的那份副本要保住；failed AppImage unpack 在从挂载复制前先清掉；systemd 引号写法的 copy 路径要能匹配。</p>
+<p>PTY 终端裸换行修复：PTY 已经在程序要换行处发 CR LF，裸 LF 必须只下移一行并保持列位置。convertEol 把每个 LF 强制改成 CR LF，破坏了全屏 TUI 的按行定位重绘（CSI row;3H 定位、清屏、发裸 LF 起下一缩进行）——滚动重绘后每行缩进处残留上一帧前两个字符（Th、Wh、&quot;Y）。用真实 TUI 编码会话经 node-pty/ConPTY 回放实测：convertEol 时 17 行残留，去掉后 0 行。agent 进程日志终端不是 PTY，保留转换。</p>
+<ul>
+<li>0a8e23bdf6|2026-11-18|BearHuddleston|feat(desktop): run the AppImage agent payload from a stable per-build copy</li>
+<li>d8d3ab74d3|2026-11-18|BearHuddleston|fix(desktop): compare symlink targets in the packaged payload check</li>
+<li>c3de2bfc28|2026-11-18|BearHuddleston|fix(desktop): clear a failed AppImage unpack before copying from the mount</li>
+<li>7cb4a04ebb|2026-11-18|BearHuddleston|fix(desktop): strip only this app&#x27;s AppImage mount from the gateway env</li>
+<li>254bd11cab|2026-11-18|BearHuddleston|fix(desktop): keep the AppImage mount out of the gateway&#x27;s environment</li>
+<li>2bc47272db|2026-11-18|BearHuddleston|fix(desktop): keep payload copies an installed gateway unit runs</li>
+<li>cca65cf2ff|2026-11-18|BearHuddleston|fix(desktop): keep payload copies an open Desktop uses</li>
+<li>d618296822|2026-11-18|BearHuddleston|fix(desktop): move CLI links forward from an older payload copy</li>
+<li>6dcd045c3a|2026-11-18|BearHuddleston|fix(desktop): fail the pack when the mapped payload never arrived</li>
+<li>91b7579910|2026-11-18|BearHuddleston|fix(desktop): check the packaged payload before afterPack changes it</li>
+<li>4ec66f1170|2026-11-18|BearHuddleston|fix(desktop): fail the pack when the packaged payload differs from the prepared one</li>
+<li>b5a470b7d4|2026-11-18|BearHuddleston|fix(desktop): keep .gitkeep files and empty directories through electron-builder&#x27;s copies</li>
+<li>84ee865bb2|2026-11-18|Wyzer|fix(desktop): honour bare LF in the PTY terminal (drop convertEol)</li>
+<li>6161a34409|2026-11-18|Teknium|docs(desktop): say which agent-tab streams still convert line feeds</li>
+<li>04fceafcc3|2026-11-18|chloecaffeinexo|fix(desktop): mark the prepared icons toolset CommonJS so Node runs the bundled icon-tool.js</li>
+<li>6f929bf85d|2026-11-18|BearHuddleston|fix(desktop): match gateway units that spell the copy path systemd-quoted</li>
+</ul>
+<p>提示缓存生命周期（feat 7 条 + fix 17 条 + refactor 4 条）</p>
+<p>默认档改成 auto：人打字的会话（CLI、TUI、桌面端、消息平台）默认申请 1 小时 Anthropic 缓存档，机器节奏的（子代理、side agent、fork、api_server、curator 等）留 5 分钟；迁移 54 把模板种下的 cache_ttl 5m 删掉（编号原是 53，与 main 上的 v53 clarify_timeout 撞号后重编号为 54）；后续三条 fix 把范围收紧，只在 prompt_caching 节点自己的模板行上删 5m，只在本地文件后端生效，migrate_config 和 save_config 写出的同值 5m 与用户 pin 一律保留。后台复审、/btw fork、side agent 在 auto 下都留在 5m；auto 在平台盖章后和请求时各重解析一次；一个 24 小时保留请求和本地端点永不按时钟冷剪。</p>
+<p>一个控制器管全程：agent/prompt_cache_lifecycle.py 取代 prompt_cache_warmer.py 的调度器和 cache_expiry_compaction.py 的判定（两个文件删除）。一次真实请求开出 3 次 keep-alive 预算；人打字的会话空闲时持续保温，机器会话只在工具跑时保温。预算耗尽后，在已证明/已声明 ≥30 分钟的窗口、上下文 ≥ 压缩阈值一半、且距上次压缩有增长时，由单一所有者认领一次（CLI idle tick / TUI ticker / 网关 watcher）；CLI 与 TUI 压缩完再给一份新预算。任何 miss 结束保温，未知时钟不抱任何期望；1 小时年龄上限被预算取代。</p>
+<p>规则跟 API 规范走：带 cache_control 标记的请求按 Anthropic 规范判定（所请求的 5m/1h 声明即信任，路由天花板仍会夹），不带标记的按 OpenAI 规范（30 分钟，读回即续）。第一次 keep-alive 未命中就把该路由这个会话的保温关掉（新消息和压缩不再重新武装，换模型/换 provider 或新会话才行），/context 追加 &quot;Keep-alives: off (one missed)&quot;；工具调用执行期间 keep-alive 继续，不计入 3 次空闲预算。</p>
+<p>Nous Portal 拿到完整生命周期（声明 1 小时）：原始探针把 13.2k token 的 1 小时前缀在空闲 7 分钟和 25 分钟后都从缓存读回，写入按 2 倍计费（5 分钟对照组重写了）；Nous profile 去掉 5 分钟天花板、声明 prompt_cache_max_ttl=&quot;1h&quot;，人打字的 Nous 会话遂按 1 小时档保温 x3、预算末尾/释放时压缩、冷返回时卸载。Nous 目录里为每一个接受显式 cache_control 且报了 input_cache_write 价的模型打标记（Claude、Qwen 3.7/4、Gemini、GPT-6 等）；qwen/qwen3.7-max 实测：不打标记的自动缓存在 4 分钟就失效，打 1 小时标记后空闲 13 分钟仍命中，写入按 1.25x。</p>
+<p>从用量学每条路由：agent/prompt_cache_routes.py 按 provider / host / model / 是否用标记存真实缓存行为（每 profile 一份 &lt;HERMES_HOME&gt;/cache/prompt_cache_routes.json，原子写，≤500 条，7 天过期），由时钟从每个折叠的响应喂入（正常回复和 keep-alive，不做探针）。两个一致样本后定规则：从不读回 → 不保温不打标记；每次命中都重写前缀 → 不保温；早失效 → 按学到的寿命保温（绝不越过档位），小于一分钟就不保温；自动缓存早死而显式缓存能读 → 打标记。/context 显示 &quot;Learned: &lt;rule&gt;.&quot;。</p>
+<p>回测发现的改进：keep-alive 未命中若被另一个上游服务（Nous 把同一个 Claude 模型分在 chatcmpl-* 与 gen-* 两个上游，窗口内有 70 次切换打断热缓存）或仍能读到稳定 system 前缀，算路由问题不算寿命问题，真 miss 要连续两次才结束保温；cache_ttl auto 从 5 分钟起、第一次超过 5 分钟的空闲间隙后的那条消息升级到 1 小时并保持到会话结束（只在时钟无保证且最后一次缓存触碰超过 300 秒时升级，热前缀上的标记永不变动）。</p>
+<p>其他：工具调用期间的保温默认常开（原 idle 模式和 cache_warming 开关删除，一轮的刷新总花费不允许超过它省下的那一次 miss）；warmer 改为读共享的 prompt-cache 时钟（一个寿命来源）；keep-alive 的 output cap 按实际发送预留（GPT-5/o-series 是 16）；keep-alive 按响应实际服务档计价；缓存边认领挪出网关循环、TUI 线程池有界、每次释放一次；一条被替换的运行在其后落地的 miss 仍结束该用户回合的预算；每客户端重放有界。</p>
+<ul>
+<li>8ef538374a|2026-11-18|100yenadmin|feat(caching): prompt_caching.cache_ttl defaults to auto</li>
+<li>16099a4dbb|2026-11-18|Teknium|feat(caching): one prompt-cache lifecycle controller: warm x3, compact, warm x3, expire</li>
+<li>bf6a59f336|2026-11-18|Teknium|feat(caching): Nous Portal gets the full prompt-cache lifecycle (1h declared)</li>
+<li>3a4fe9c53c|2026-11-18|Teknium|feat(caching): cache rules follow the API spec; first keep-alive miss ends warming for the session; keep warming while a tool runs</li>
+<li>5c8e2bfedf|2026-11-18|Teknium|feat(caching): apply the lifecycle rulings: no post-compaction warming, 5/6 timing, two cache specs, offload at expiry</li>
+<li>8116fa3e90|2026-11-18|Teknium|feat(caching): Nous models get cache markers when the catalog prices a cache write; 1h writes billed at the catalog rate</li>
+<li>579e25e022|2026-11-18|Teknium|feat(caching): learn how each route really caches, across sessions, from usage already received</li>
+<li>df702cab6b|2026-11-18|Teknium|feat(cache): backtest rulings — upstream-aware misses, 5m-&gt;1h tier at the first pause, learning-store guards</li>
+<li>fe55d8f341|2026-11-18|Teknium|feat(agent): the cache warmer reads the shared prompt-cache clock</li>
+<li>d8315dec32|2026-11-18|Teknium|feat(agent): cache warming is always on during long tool runs; idle mode and config knob removed</li>
+<li>d838613c5f|2026-11-18|teknium1|feat(agent): opt-in prompt-cache warming keeps the prefix alive through long tool runs (port of earendil-works/pi#9668)</li>
+<li>2828b82fa8|2026-11-18|Teknium|fix(caching): auto keeps the source tier and clamps per send; malformed prompt_caching never breaks startup; 1h writes over a 5m prefix price at 1h</li>
+<li>04ce720ea5|2026-11-18|Teknium|fix(caching): a keep-alive miss ends warming for the conversation, across agent rebuilds</li>
+</ul>
+<p>上下文压缩与主动剪枝（perf 2 条，feat 3 条，fix 17 条）</p>
+<p>主动剪枝默认打开：大窗口模型上「窗口 50%」比例阈值几乎不触发，旧终端输出/文件读取/网页抓取每轮重发。确定性、不走 LLM 的主动剪枝早已实现但默认关着（0 / 8000 / 4096）。新默认 proactive_prune_tokens 0→64000、min_result_chars 8000→1000、min_reclaim_tokens 4096→64000。选择方法：回放 80 个真实、从未压缩过的会话（40 开发 / 40 留出，开发集约 6100 次主模型调用），走真实 ContextCompressor、摘要打桩、按带缓存的价格（缓存前缀 0.1x、新 token 1.25x、任何历史重写全价）计费；开发集扫 18 组配置，最优在留出集确认。模型化输入成本：128K −3.8%/−6.8%，200K −0.7%/−3.2%，272K −8.0%/−6.9%，400K −23.7%/−26.2%，1M −24.1%/−27.0%；按 1 小时缓存写价（2x）算 1M 为 −20.3%/−23.5%。无报错、无新增溢出。代价：约一半旧工具输出仍保留原文（约 54%）。</p>
+<p>冷缓存也剪：prompt_caching.provider_cache_expired() 判断 provider 缓存已按路由有效 TTL（5m/1h + 30 秒余量）过期，此时重写不破坏仍付费的东西，prune_tool_results_only(cold_cache=True) 从 16K 可回收 token 就提交、不检查也不移动 64K 再生跑道、释放量记入下一个热 64K 门槛；新增 turn_proactive_prune 模块做共用调用点助手与回合起始冷剪。回放 80 个 1M 会话：5 分钟缓存下再省 11.5%/9.5%，1 小时缓存下 2.2%/1.9%，四格中无一会话变差。</p>
+<p>压缩存档与热前缀摘要：每次压缩把要缩短的每个工具结果逐字节写到 cache/pruned/，摘要器读到的 stub 带上文件路径；精简尾部降级的原文同样归档；写失败保留整条结果、压缩照常；沙盒后端不写盘保留普通 stub；已经带归档路径的 stub 不重复归档。cache_expiry 压缩的摘要改为在会话的热前缀上做（cache-parity fork：上一个请求的 system、tools[]、messages 连同缓存断点和 TTL，摘要指令只作为最后一条 user 消息，输出按压缩器预算截断），任何热路径失败回退普通摘要调用，触发时重读缓存窗口、不再热就跳过。其他压缩修正：第一回合保持完整、归档分页按 read_file 预算、被省略的短/重复字符串结果也归档、结构化结果在交接前归档、默认开启的剪枝不碰 checkpoint-gated 和无 store 的会话、只有冷剪默认生效并失败关闭。</p>
+<p>空闲会话提前压缩：一个人的会话空闲、1 小时窗口确认还热、上下文 ≥100k token 时，在窗口 0.9（54 分钟）处压缩，用户回来是小上下文而非冷启动全量重写；5 分钟窗口不做，机器/委派会话不做，回合内不做；走手动压缩管道 trigger=cache_expiry（不 force，冷却与断路器生效），所有者是 tui_gateway ticker（TUI 与桌面端）、网关 housekeeping watcher（消息平台）、CLI idle tick。思路来自 idle-compact 插件（#151785）。</p>
+<ul>
+<li>31c8fe2040|2026-11-18|kshitijk4poor|perf(compression): turn the proactive tool-result prune on by default</li>
+<li>4845516813|2026-11-18|kshitijk4poor|perf(compression): prune on an already-expired prompt cache too</li>
+<li>ebbaa5288e|2026-11-18|Teknium|fix(compression): archive every pruned tool result to disk; never prune the running turn</li>
+<li>6fa82ec035|2026-11-18|kshitijk4poor|fix(compression): close review gaps in the proactive prune</li>
+<li>351dc2af89|2026-11-18|Teknium|fix(compression): keep a session&#x27;s first turn whole; page JSON prune archives</li>
+<li>4500e1211b|2026-11-18|kshitijk4poor|fix(compression): keep the default-on prune out of checkpoint-gated and storeless sessions</li>
+<li>11c2db7ea1|2026-11-18|Teknium|fix(compression): cold-cache prune only by default; fail-closed guards</li>
+<li>100dd2b3ff|2026-11-18|Teknium|feat(compression): compact idle chats before the 1h prompt cache expires</li>
+<li>4adb21a64e|2026-11-18|Teknium|feat(compression): cache-expiry compaction summarises on the conversation&#x27;s warm prefix</li>
+<li>ae77ded2f9|2026-11-18|Teknium|feat(compression): every compaction archives the tool results it drops; pointers reach the summarizer</li>
+<li>d23dc1a507|2026-11-18|Teknium|fix(compression): cache-expiry compaction fires once per window, at the window</li>
+<li>02aa62d326|2026-11-18|Teknium|fix(compression): read &quot;cache already cold&quot; from the shared prompt-cache clock</li>
+<li>3537d88941|2026-11-18|Teknium|fix(compression): read the cold-cache clock from the store on a resumed session</li>
+<li>ac42c246fc|2026-11-18|Teknium|fix(compression): warm summary names its window by replayed position, writes no new cache entry, runs only when cheaper; large chats need growth before re-compacting</li>
+<li>ca5af141e8|2026-11-18|Teknium|fix(compression): warm summary names its window by call ids / occurrence, never by wire position; ambiguous windows take the normal summary call</li>
+<li>3fb034e85a|2026-11-18|Teknium|fix(compression): archive short and duplicate string tool results the summary removes</li>
+<li>ced11ca70e|2026-11-18|Teknium|fix(compression): the tool results inside the summary window are archived before the summary replaces them</li>
+<li>d922b62d28|2026-11-18|Teknium|fix(compression): summarize the original tool results first, archive after the summary</li>
+<li>47603fddcb|2026-11-18|Kevin Rajan|fix(compression): archive structured tool results before handoff</li>
+<li>512d876551|2026-11-18|Teknium|fix(compression): warm-prefix summary honours compression cancellation and explicit refusals</li>
+<li>5ffd3e5830|2026-11-18|Teknium|fix(compression): address review on the prune archive</li>
+<li>535ef5d24e|2026-11-18|Kevin Rajan|fix(compression): preserve unflushed tool originals before proactive prune</li>
+</ul>
+<p>模型（feat 1 条 + fix 6 条）</p>
+<p>新增 gpt-6.2-astra 与 gpt-6.2-sol：模型元数据、models_dev、reasoning_effort、codex 传输、计费、CLI 模型列表、Fast 区域表全部接入；两个模型走 OpenAI Ultrafast（service_tier=&quot;ultrafast&quot;），GPT-6.2 新增 EU Fast 区域但 Ultrafast 仍只限美国；GPT-6.2 的启动折扣写在 usage_pricing。配套：GPT-6.2 选项必须经 Codex 发现验证才出现、未发现的 Codex 选项不出现在桌面端与 ACP、Fast 费率与 Codex 资格按实际解析身份算、免费套餐保留 Codex 回退、隐式 OpenAI 默认值保持成本安全。</p>
+<ul>
+<li>786314cef1|2026-11-17|Vortex Openclaw|feat(models): support GPT-6.2 Astra and Sol</li>
+<li>444a6b8644|2026-11-17|Vortex Openclaw|fix(models): require verified Codex discovery for GPT-6.2 choices</li>
+<li>1a83150682|2026-11-17|Vortex Openclaw|fix(models): honor GPT-6.2 Fast rates and Codex eligibility</li>
+<li>730d593fe3|2026-11-17|Vortex Openclaw|fix(models): honor resolved Codex identity in ACP and Desktop</li>
+<li>864fd57c59|2026-11-17|Vortex Openclaw|fix(models): keep undiscovered Codex choices out of Desktop and ACP</li>
+<li>a312aea1ce|2026-11-17|Vortex Openclaw|fix(models): keep the Codex fallback available on free plans</li>
+<li>e3a4eb8bec|2026-11-17|Vortex Openclaw|fix(models): keep implicit OpenAI defaults cost-safe</li>
+</ul>
+<p>网关（fix 19 条）</p>
+<p>Windows 接受守卫：getpeername() 报 WinError 10014 时 CPython 会关掉监听套接字，桌面端拿到 connection refused 而网关进程还活着。守卫必须在 uvicorn 调 _start_serving 之前装到运行中的事件循环上；AcceptEx 掉了之后监听保持打开；监听队列里的 reset 也保住 listener；accept 提交期间的对端 reset 重试；失败的 accept 帧在重试前释放；shutdown 赢了投递就关掉已接受 socket；私有 hook 不可用时跳过守卫。</p>
+<p>receipt 恢复与诊断：从磁盘恢复的 receipt 保留其审批、cwd 与字段名；策略键被本构建丢弃的 receipt 能采纳；cwd 写成另一个平台写法的能恢复；model 被写成空的、source 是本地的那批（borealBytes、sys-dev-git 报告）能恢复；格式错误的 receipt 在字段诊断里点名而不是裸的 storage_unavailable；每个被拒的 storage_unavailable receipt 都按名字进日志一次；被丢弃的键集合各记一次；被拒的 receipt 点名是哪项检查拒的。另外：expiry watcher 的 store fake 应答 _persistence_for_key；shutdown drain 改成模块函数，partial runner 也能停；cache-expiry 压缩认领会话、绑定 profile scope、按会话跑作业、能触达 detached 会话。</p>
+<ul>
+<li>9a837ab292|2026-11-18|xxxigm|fix(gateway): keep the Windows listener open after a dropped AcceptEx</li>
+<li>0ba9d35ca9|2026-11-18|xxxigm|fix(gateway): install the Windows accept guard before the listener starts</li>
+<li>cd300c7b9a|2026-11-18|BearHuddleston|fix(gateway): keep the Windows listener through a reset in the listen queue</li>
+<li>db77e37729|2026-11-18|BearHuddleston|fix(gateway): skip the accept guard when the private hook is unavailable</li>
+<li>e42af44d9d|2026-11-18|BearHuddleston|fix(gateway): release the failed accept frame before retry</li>
+<li>5416cd59a5|2026-11-18|BearHuddleston|fix(gateway): retry peer resets reported during accept submission</li>
+<li>05a9a08ac6|2026-11-18|BearHuddleston|fix(gateway): close an accepted socket if shutdown wins delivery</li>
+<li>4ae451d412|2026-11-18|BearHuddleston|test(gateway): check frame lifetime without finalizing an open socket</li>
+<li>36e764be59|2026-11-18|Teknium|fix(gateway): a malformed receipt names its field instead of the bare storage_unavailable</li>
+<li>4bf5745dd0|2026-11-18|Teknium|fix(gateway): a restored receipt keeps its approvals, its folder and its field names</li>
+<li>c05aa63a0f|2026-11-18|Teknium|fix(gateway): every storage_unavailable receipt refusal reaches the log once, by name</li>
+<li>0043850d4c|2026-11-18|Teknium|fix(gateway): name each dropped receipt key set once, and pin the restore end to end</li>
+<li>89110078bb|2026-11-18|qby|fix(gateway): adopt a stored receipt whose policy keys this build dropped</li>
+<li>bc3f2dab79|2026-11-18|qby|fix(gateway): restore a receipt whose stored cwd is spelled for another platform</li>
+<li>5d5b1dc3da|2026-11-18|Kevin Rajan|fix(gateway): restore policies written with local source or empty model</li>
+<li>0579addc71|2026-11-18|viraj deshmukh|fix(gateway): restore receipts whose model the writers persisted empty</li>
+<li>7341d43d9e|2026-11-18|Kevin Rajan|fix(gateway): name malformed receipt JSON in field diagnostics</li>
+<li>71c395e505|2026-11-18|sys-dev-git|fix(gateway): a refused receipt names the check that refused it</li>
+<li>6feb69b405|2026-11-18|Teknium|fix(gateway): shutdown drain is a module function, so partial runners keep stopping</li>
+<li>6f4aa5e1f5|2026-11-18|Teknium|fix(gateway): cache-expiry compaction claims the session, binds its profile scope, runs per-session jobs, reaches detached chats</li>
+</ul>
+<p>插件兼容与安装（fix 4 条）</p>
+<p>Honcho 1.2.0（catalog pin，hermes-plugin-honcho/client.py:34）在模块顶层从 hermes_state_common 导入 TITLE_SOURCE_DERIVED 和 TITLE_SOURCE_LLM，但存储重构把该文件变成给旧更新器看的文本标记，导入失败、插件永不注册；MOVES 别名救不了（模块还在）。两个常量重新回到 hermes_state_common（值就是 sessions.title_source 存的，根模块不能 import SQLite 后端所以直接写出，测试钉住与 store 一致，旧更新器读的标记文本不变）。另外：import 被存储重构删掉模块的插件能加载；只保留 pinned catalog 插件 import 的 turn helpers，直到 v0.27.0。</p>
+<p>重跑安装脚本：在 v0.23.2 桌面安装上重跑 install.sh 会在「Building the hermes command and apps」处以 &quot;an update is still running&quot; 失败——桌面端宿主网关活得比 app 长，其启动步骤拉起脱离的默认插件安装器，那个子进程在新树上重新起来、欠着 source tail、抢更新锁并跑 source_completion.py --finish-update（Canary E2E 的一次运行里复现）。锁的存在是为了让叠加的完成串行化（#123376）。安装入口现在等活着的持有者（最多 30 分钟，每分钟报一次）再跑自己的 tail；带原因（锁不可写）的持有者仍立即拒绝，其他调用方照旧立即拒绝。Refs #157275。</p>
+<ul>
+<li>6cc221d9ad|2026-11-18|Teknium|fix(compat): the Honcho memory plugin registers again</li>
+<li>1f0103a89f|2026-11-18|Teknium|fix(compat): plugins that import a module the storage refactor removed load again</li>
+<li>b1db37d2b9|2026-11-18|Teknium|fix(compat): carry only the turn helpers pinned catalog plugins import, until v0.27.0</li>
+<li>05348a3094|2026-11-18|BearHuddleston|fix(install): wait for a running update instead of failing a re-run install</li>
+</ul>
+<p>存储（fix 10 条 + refactor 3 条）</p>
+<p>排序检索读到损坏的 FTS 索引时把损坏归到索引范围内，不再把整个会话库判成读故障；一个 pre-v3 release 重开过的 store 做一次原子 realign；rank 探针的瞬态 IOERR 重放读取而不是锁死，探针不确定就失败关闭；只读搜索句柄 fail open；marker realign 跑完后只记一次日志；browse 读在自己的连接上检查 schema 漂移、只开一次 state.db、失败时保留已有的 session-store 错误；lagging owned store 在全文索引也坏时保留它被点名的拒绝；realign 判定在锁下重读，_in_one_read 与 _display_set 共用。</p>
+<ul>
+<li>0316063447|2026-11-18|BearHuddleston|fix(storage): make the FTS realign atomic and diagnose ranked corruption on the failing snapshot</li>
+<li>2c0bde027b|2026-11-18|kshitijk4poor|fix(storage): keep FTS index damage index-scoped on ranked search; realign stores a pre-v3 release reopened</li>
+<li>15ad970a27|2026-11-18|kshitijk4poor|fix(storage): address review on the FTS rank-corruption fix</li>
+<li>68bb692467|2026-11-18|yoniebans|fix(storage): a browse read checks schema drift on its own connection</li>
+<li>8bd953b770|2026-11-18|kshitijk4poor|fix(storage): only a transient IOERR from the rank probe is retried; an inconclusive probe fails closed</li>
+<li>5b6696a012|2026-11-18|kshitijk4poor|fix(storage): carry the unattributed corruption on the probe&#x27;s IOERR, not via __context__</li>
+<li>6d3d757e5b|2026-11-18|yoniebans|fix(storage): a lagging owned store keeps its named refusal when its full-text index is also broken</li>
+<li>09ded63c4f|2026-11-18|kshitijk4poor|fix(storage): re-read the realign decision under the lock; share _in_one_read with _display_set</li>
+<li>018d1f9c27|2026-11-18|kshitijk4poor|fix(storage): a transient IOERR in the rank probe replays the read instead of latching</li>
+<li>86ba5a8a52|2026-11-18|kshitijk4poor|fix(storage): fail open on read-only search handles; log the marker realign once it ran</li>
+</ul>
+<p>CI / 测试 / 文档 / 插件目录</p>
+<p>Canary E2E 红榜跟踪：每个 canary commit 跑一个 claim 的 E2E 调用；自动跑已通过的 commit 跳过；被替换、排队、派发、跳过的运行不进红榜队列；artifact 按被测 commit 命名。Windows 安装/更新腿改到标准 runner，PM Bundle 恢复 Linux 腿，整树 lint 守卫在每个 PR 上跑。TUI：会话上限在一轮扫描中途被关掉时循环停止；上限计入被释放时压缩推迟的关闭。文档：bundled skills 用文件工具读写；存储 open_persistence_reader 的 check_drift 说明何时跑、不动什么。插件目录新增 1 条 remedigenius（re-pin 到 CE main 的 0.9.3 版），另有 nvidia-switchyard 0.1.1、memtomem 0.1.23 / 0.7.8 的 re-pin。</p>
+<ul>
+<li>27a78073d6|2026-11-17|BearHuddleston|feat(ci): the E2E red tracker follows Canary E2E runs</li>
+<li>8415003fba|2026-11-17|BearHuddleston|feat(ci): run a claim&#x27;s E2E calls on each canary commit</li>
+<li>829b7f0af8|2026-11-17|BearHuddleston|fix(ci): skip Canary E2E on a commit an automatic run already passed</li>
+<li>98d0fcb5f5|2026-11-17|BearHuddleston|fix(ci): name E2E artifacts for the commit under test</li>
+<li>a0812f5308|2026-11-17|BearHuddleston|fix(ci): queue a live tracker replay with the automatic runs</li>
+<li>796a412157|2026-11-17|BearHuddleston|chore(ci): run the Windows install/update legs on the standard runner</li>
+<li>b82eee3030|2026-11-18|BearHuddleston|fix(ci): run the tree-wide lint guards on every pull request</li>
+<li>2263438821|2026-11-18|BearHuddleston|chore(ci): restore the Linux legs of PM Bundle</li>
+<li>a66bd08e2e|2026-11-18|Raja Renga|Add remedigenius to the plugin catalog</li>
+<li>63ff0a5c11|2026-11-18|Raja Renga|remedigenius: re-pin to CE main b35dac3 (0.9.3) — marketplace review fixes</li>
+<li>f7e2898aae|2026-11-17|adhaile|plugin-catalog: bump nvidia-switchyard to 0.1.1 (NVIDIA Switchyard)</li>
+<li>e93b3da9a8|2026-11-17|memtomem|plugin-catalog: bump memtomem to 0.1.23 (memtomem 0.7.10)</li>
+<li>ef932c3147|2026-11-17|memtomem|plugin-catalog: bump memtomem to v0.7.8</li>
+<li>b5960c8fad|2026-11-18|Teknium|fix(tui): a session cap disabled mid-sweep stops the cap loop</li>
+<li>4975f384c4|2026-11-18|Teknium|fix(tui): the session cap counts closes deferred behind a release-time compaction</li>
+<li>56ddecf469|2026-11-18|Teknium|docs(skills): read, search and write files with the file tools in bundled skills</li>
+<li>91cb42b51b|2026-11-18|yoniebans|docs(storage): open_persistence_reader&#x27;s check_drift says when it runs and what it leaves alone</li>
+</ul>
+    </section>
+    
     <section id="2026-11-18" class="day">
       <h2>Hermes 日报 2026-11-18：状态库持久层换成新的 SQLite 后端，插件目录一天新增 70 条</h2>
       <p><strong>本期覆盖 11 月 17 日 ~ 11 月 18 日合入 main 的提交，共 801 个 commit（不含 merge），另有 10 个 merge。新增 89 个功能、152 个修复、0 个性能优化。统计口径是「合入 main 的时间」（11-17 10:50 ~ 11-18 06:30），不是 commit 作者时间。</strong></p>
