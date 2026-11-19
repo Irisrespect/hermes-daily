@@ -5,8 +5,179 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Thu, 19 Nov 2026 06:52:16 +0800</lastBuildDate>
+    <lastBuildDate>Fri, 20 Nov 2026 06:53:04 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-20：桌面端 Bot Chat 新增「等待队友」状态条，安装收敛成一问</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-20</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-20</guid>
+      <pubDate>Fri, 20 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 19 日 06:30 ~ 11 月 20 日 06:30 合入 main 的提交，共 714 个 commit（不含 merge），另有 9 个 merge。新增 54 个功能、211 个修复、1 个性能优化。其中 49 个「新功能」是插件目录的新增条目，产品侧的功能新增是 5 条。行内 commit date 跨 11-18 ~ 11-20（多数是 rebase 保留的原作者时间），按合入 main 的时间都落在这个窗口内。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端 Bot Chat 输入框上方新增「等待队友」状态条，底层是只读接口 bot_delivery.list，5 秒轮询按 inode+mtime+size 缓存只重读变过的收据</li>
+<li>首次运行 setup 从连问串收敛成一个问题，「免费，现在开始」这一行和桌面端领同一个 welcome trial</li>
+<li>GPT-6.2 的 Astra 和 Sol（含 Pro）进 OpenRouter 和 Nous Portal 的选择器；一批上下文窗口按厂商文档校准</li>
+<li>终端会话快照不再把密钥明文写盘，改走继承的管道传内存，本地后端 `true` 的耗时从 31ms 降到 15ms</li>
+<li>Vault 一个 scope 修了 41 条：密码和卡号不再以击键输入，改走带守卫的 JS 写入</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端：Bot Chat 的「等待队友」状态条（feat 1 条 + perf 1 条 + fix 8 条）</p>
+<p>一个 bot 通过 message_agent 派活给队友之后，在回复落地或者等待超时之前什么都看不到；队友如果停在只有用户能回答的澄清或审批上，那就没人知道它卡住了。现在 bot 自己的 Bot Chat 里、输入框上方有一张紧凑卡片，列出这个 bot 还没结算的每一条投递：队友头像和名字、排队中 / 已接手 / 处理中 / 等你回话（回答它的提问，或者批准、拒绝）/ 失败并带具体原因、以及等了多久。Open 跳到队友那个会话里待处理的卡片上，Dismiss 收起失败项。卡片只在 bot 自己的会话里、且网关支持该方法时渲染。</p>
+<p>底层新增只读接口 bot_delivery.list：读每个目标 profile 下 runtime/bot_live_delivery 的收据（作者 bot:&lt;sender&gt;），把每条未结算的投递报成 queued / claimed / working / waiting_on_you / failed（带 typed reason，语义不明的一律 unknown_outcome，永不重发）。归属者把目标 profile 的准入行和它打开的提示（PendingControls.waiting_kinds，一个不剪枝的读）接在目标自己的 owner scope 下。它不写、不认领、不取消、不重发。</p>
+<p>性能：状态条 5 秒轮询一次，以前每次把每个队友 profile 里所有保留下来的收据全读一遍——包括已结算的历史和其他发送方的——成本随机器人之间的消息量线性增长。收据是原子替换的，所以按目录做缓存、键是 (inode, mtime_ns, size)，只重读变过的文件，已结算的收据只缓存状态。什么都不删也不写。</p>
+<p>5 条桌面端 fix：状态条渲染在 composer 的 composer.top 槽里、在 composer 的 form 内部，共享 Button 不设 type，于是 Open 和 Dismiss 都是原生提交按钮——输入框里打了草稿点一下会把草稿发出去，现在两个都是 type=&quot;button&quot;；轮询失败以前 listDeliveries 对任何错误都答空列表，超时、掉 socket、存储错误都会把已知的投递换成空列表、把状态条藏起来，现在只有 JSON-RPC 的 method-not-found（老网关）才算空答，其他错误交给 query 保留上一次的行、置灰并提示无法刷新，年龄继续走；Open 以前会路由到发送方自己的会话，修掉了；失败行以前直接印原始原因码（Failed: provider_auth_or_access），现在每种 typed reason 都有各语言的平实文案、未分类的显示队友自己的错误行，年龄列也不再冻在第一次的值上；改用共享 Button 和已定义的 theme token。</p>
+<p>另有 3 条 bot-mode 侧的同族修复：重建到 main 之后旧的 session store 被删掉了，bot_delivery.list 在 import 阶段就失败、网关的 handler 表加载不起来，现在归属 join 改成从目标自己的持久化句柄读准入、从只读 persistence reader 读 sidecar 状态；一张存在但读取出错的待处理收据以前被当作外来文件跳过，列表因此变短、状态条把还在等的投递丢掉了，现在只有被删除或格式错误的文件才跳过，其他读取错误上抛成 storage_unavailable，状态条保留上一次的行并置灰；实测双 bot 场景里 bot A 给 B 发两条、B 的第一轮停在 clarify，两条都显示「等你回话」，但第二条其实是在等第一轮，现在只有准入就是当前运行的那个投递才标成等你回话。</p>
+<ul>
+<li>0692eb8477|2026-11-19|Teknium|feat(desktop): &quot;Waiting on teammates&quot; strip above a Bot Chat composer</li>
+<li>6190457161|2026-11-19|Teknium|feat(bot-mode): bot_delivery.list — read-only view of a bot&#x27;s unsettled teammate deliveries</li>
+<li>82282f480f|2026-11-19|Teknium|perf(bot-mode): bot_delivery.list re-parses only receipts written since the last poll</li>
+<li>36a0653d36|2026-11-19|Teknium|fix(desktop): teammate-wait Open and Dismiss never submit the composer draft</li>
+<li>4b4f87920d|2026-11-19|Teknium|fix(desktop): a failed teammate-wait poll keeps the last rows, marked stale</li>
+<li>b210b45834|2026-11-19|Teknium|fix(desktop): teammate-wait Open never routes to the sender&#x27;s own chat</li>
+<li>8226efabab|2026-11-19|Teknium|fix(desktop): teammate-wait strip uses the shared Button and defined theme tokens</li>
+<li>67738c7798|2026-11-19|Teknium|fix(desktop): teammate-wait failures read in plain words; ages keep counting</li>
+<li>27d203be8c|2026-11-19|Teknium|fix(bot-mode): teammate-wait reads go through the storage interface main now uses</li>
+<li>b115d1d6c9|2026-11-19|Teknium|fix(bot-mode): a teammate receipt that cannot be read fails the poll, not the row</li>
+<li>a630974610|2026-11-19|Teknium|fix(bot-mode): a delivery queued behind a teammate&#x27;s open question stays &quot;Queued&quot;</li>
+</ul>
+<p>桌面端其他（fix 6 条）</p>
+<p>模型药丸和菜单里的速度标签按当前档位支持情况显示：formatModelPillLabel 只检查 serviceTier === &#x27;ultrafast&#x27; 而不检查 fastMode，于是任何不支持 Ultrafast 的模型，只要 profile 配置里写了 agent.service_tier: ultrafast，就会渲染出「· Ultrafast」，哪怕 session.info 报的是 fast: false。现在 Ultrafast 和 Fast 都要过 fastMode 和模型能力（supportsFast、supportsUltrafast）两道门，从 config 预填的草稿也不会再显示不支持的标签。x64 的 AppImage 改在 Jammy 上构建、GPU 引擎在 Noble 上单独准备。另外会话搜索的三条：恢复出来的搜索行拿到正确的归属、行菜单上的 archive 动词真的执行、归档状态在搜索里被保留。</p>
+<ul>
+<li>f45ec34e0d|2026-11-19|BearHuddleston|fix(desktop): gate model pill and menu speed labels on active tier support</li>
+<li>06c0b83444|2026-11-19|BearHuddleston|fix(desktop): build the x64 AppImage on Jammy and stage its GPU engines on Noble</li>
+<li>52811481bc|2026-11-18|Ben Barclay|fix(desktop): give a restored search row its resolved owner</li>
+<li>236b8038f0|2026-11-18|Ben Barclay|fix(desktop): run the archive verb the row menu showed</li>
+<li>8a2499a64d|2026-11-18|Yuan Li|fix(desktop): preserve archived state in session search</li>
+<li>a1ee88d794|2026-11-19|demianad|fix(desktop): fall back when idle callbacks are unavailable</li>
+</ul>
+<p>安装：首次运行 setup 收敛成一个问题（feat 1 条 + fix 4 条 + fix(gateway) 3 条）</p>
+<p>以前 `hermes setup` 先问模式，进快装路径又依次问 Nous Portal 登录、终端后端菜单、消息平台清单、服务问题。现在只问一件事「你想用什么驱动 Hermes？」：导入过模型就多一行「保留我导入的模型」，welcome trial 可领就多一行「免费，现在开始：不要账号、不要 API key」，剩下是登录 Nous Portal、用自己的 key 或订阅（ChatGPT、OpenCode Go 等）、完整安装、空白起步。前四条选完就配好那个模型、其他全部默认，再印一段短提示（hermes model、hermes setup gateway、hermes tools、hermes desktop、hermes setup）。完整安装和空白起步的行为不变。</p>
+<p>免费那一行领的是每个操作系统用户一次的 welcome trial，跟桌面端领的是同一个，welcome_trial 多了一个领取入口 cli_setup，只在真终端里回答 setup 时才允许：stdin 和 stdout 都得是 TTY，不能在容器里、不能在 CI 里、不能是桌面端或 dashboard 拉起来的；其他限制（访客关闭、已有身份、已有 provider、机器用过）跟桌面端共用，领取失败就给出两个注册入口。</p>
+<p>fix：领了免费试用但没选 nous 时，一个没有安装器模型模板的 home 会被判成未配置——`hermes` 又把人送回 setup、`hermes chat -q` 直接 exit 1、`hermes setup` 把安装当成新的，现在 `_has_any_provider_configured()` 和 setup 的回头用户检查都算「已领试用」；安装器判断「平台连上了没」以前读菜单的状态文字，只在 config.yaml 里存了 bot（platforms.telegram.token）就漏判，现在问网关自己的 loader（load_gateway_config().get_connected_platforms()）；命名 profile 以前会因为默认 profile 领了试用而被判成就绪——在 strict_profile_scope 下 current_nous_state 会回落到根 auth.json，现在 anon_auth.own_trial_active 在 strict 下只读本 profile 的 auth.json；只有在平台连上之后才问网关服务；安装器 tee 输出时免费那一行也能用，摘要会写出免费模型的名字。网关侧：setup 里拒绝过的网关服务在安装器全程保持拒绝；--if-missing 保留安装选项并报告安装失败；存下来的「是」如果安装失败，安装器这一阶段也算失败。</p>
+<ul>
+<li>210d4625ba|2026-11-19|Teknium|feat(setup): first-run CLI setup is one question, free tier included</li>
+<li>9e7a1e2b59|2026-11-19|Teknium|fix(setup): a claimed free trial counts as configured; a bot saved in config.yaml counts as connected</li>
+<li>998d42dc5d|2026-11-19|Teknium|fix(setup): a named profile is not ready because the default profile has a free trial</li>
+<li>da41d30b2b|2026-11-19|Teknium|fix(setup): the installer asks about the gateway service only once a platform is connected</li>
+<li>e0e83037e1|2026-11-19|Teknium|fix(setup): the free row works when the installer tees its output, and the summary names the free model</li>
+<li>8dbe7ec0a4|2026-11-19|Teknium|fix(gateway): a gateway service declined in setup stays declined through the installer</li>
+<li>2d35fa75ed|2026-11-19|Teknium|fix(gateway): --if-missing keeps its install options and reports a failed install</li>
+<li>0d5fdd60da|2026-11-19|Teknium|fix(gateway): a saved Yes whose install fails also fails the installer stage</li>
+</ul>
+<p>模型：GPT-6.2 Astra 和 Sol 上架（feat 1 条 + fix 5 条 + fix(models) 6 条 + fix(gateway) 2 条）</p>
+<p>openai/gpt-6.2-astra、-astra-pro、-sol、-sol-pro 在 OpenRouter 和 Nous Portal 的 /models 上都已经是活的（1.05M 上下文、支持工具调用），但 OpenRouter 的精选清单（Nous 的清单从它派生）停在 GPT-6.1，两个选择器里都看不到这四个。现在四个 slug 加在 GPT-6 家族前面，远程模型目录清单重新生成，已安装用户不用等新版本。基础 slug 的上下文窗口、价格和推理阶梯此前已落地，OpenRouter 路由的价格也是活的。</p>
+<p>上下文窗口按厂商文档校准：#154406 审计发现 DEFAULT_CONTEXT_LENGTHS 里还有一批跟厂商文档不一致的行——gpt-5.6（Sol 的裸别名）落到 400K 的 gpt-5 兜底，OpenAI 文档写 1,050,000；grok-4.7 落到 256K 的 grok-4 兜底，docs.x.ai 写 500,000；grok-4.20（含 -multi-agent / -non-reasoning）列 2M，文档是 1,000,000；glm-5.3 / -flash 列 1,310,720、-flashx 列 1,048,576，智谱文档是 1M，现在统一 1,048,576。窗口比兜底值抬高的键进 _PRE_CATALOG_STALE_KEYS，老构建缓存的兜底值会被重新解析。另有 Claude Haiku 5.5 解析到 1M 窗口，NanoGPT 的窗口改成读它自己的详细 /models 而不是表，xAI 上遗留的 2M Grok 4.20 缓存被丢弃。</p>
+<p>探测这条链修 6 处：探测用的钥匙必须跟运行时实际发的一致——按策略该选哪一行探哪一行（least_used 和 random 下 peek() 返回的是群里当前那一行，跟 choose() 选的不同）、主端点用运行时那把 key、用模型块第一个可用的凭据、全无 key 的池在目录探测时也保持无 key、有凭据来源时不要再搭一个保存的 key、key_env 的凭据要带上。网关侧把 service_tier 的 fast 标志按路由门控发布到 session.info，冷消息路径复用本地 session_info 的路由查询。</p>
+<ul>
+<li>4c680fcb2f|2026-11-19|Teknium|feat(models): list GPT-6.2 Astra and Sol (+ Pro) for OpenRouter and Nous Portal</li>
+<li>59ba55cfe1|2026-11-19|Teknium|fix(model-metadata): match vendor-documented windows for gpt-5.6, grok-4.7, grok-4.20 and GLM-5.3</li>
+<li>59ca6bc2b3|2026-11-19|Teknium|fix(model-metadata): GLM-5.3 fallback is 1,048,576, the exact window every catalog lists</li>
+<li>83ee3c20b0|2026-11-19|Teknium|fix(model-metadata): NanoGPT windows come from its detailed /models, not the table</li>
+<li>b220d3e514|2026-11-19|Kevin Rajan|fix(model-metadata): discard legacy 2M Grok 4.20 cache on xAI</li>
+<li>0bccf86152|2026-11-19|Suhasan Kanagala|fix(model-metadata): Claude Haiku 5.5 resolves to its 1M context window</li>
+<li>53af6902a2|2026-11-19|Maciej Lisiewski|fix(models): probe the pool row the strategy would select</li>
+<li>5916b79f3d|2026-11-19|Maciej Lisiewski|fix(models): probe the main endpoint with the key the runtime sends</li>
+<li>806d59b4e1|2026-11-19|Maciej Lisiewski|fix(models): probe with the model block&#x27;s first usable credential</li>
+<li>b0d8fe9961|2026-11-19|Maciej Lisiewski|fix(models): keep a pool&#x27;s keyless pick keyless on the catalog probe</li>
+<li>07cb2b78bb|2026-11-19|emozilla|fix(models): send no saved key beside a credential source on probes</li>
+<li>cf642a7fb3|2026-11-19|emozilla|fix(models): send the model block&#x27;s key_env credential on main-endpoint probes</li>
+<li>8f289a6ca5|2026-11-19|BearHuddleston|fix(gateway): reuse local_session_info route lookup for cold messaging service_tier fast flag</li>
+<li>08d6a9117f|2026-11-19|BearHuddleston|fix(gateway): publish route-gated fast flag on service_tier session.info</li>
+</ul>
+<p>终端：密钥不再明文落盘，命令更快（fix 8 条）</p>
+<p>终端工具每条命令跑完会把 shell 导出的变量存到 hermes-snap-*.sh，下一条命令接着这个环境跑。profile 的 .env 里定义的每一个凭据、agent 在 shell 里导出的每一个 token（比如 Hermes Cloud 的服务凭据）都明文落在这个文件里，删了还会回来。</p>
+<p>现在密钥导出不走文件、走内存：dump 通过继承的管道把每个密钥交给宿主，下一条命令再以进程环境的形式收回去。shell 看到的东西跟以前一样（这次 export、下次能读），磁盘上的文件里没有任何值。判定为密钥的条件：profile 的 .env 或 secret 源定义过的名字、任何凭据形状的名字（token/key/secret/password/cookie/webhook/creds/client id，不分大小写）、值里带 user:pass@ 的 URL 形状名字；只读导出用 export -n 清掉，因为 unset 对它无效。</p>
+<p>同时更快：匹配在 bash 内部用一次 compgen -X 完成，不再逐变量 fork（#148406 那版慢 25 倍就是慢在这）；每条命令组 PATH 时不再为每个包重新解析一遍工具仓（约 11ms 降到约 1ms）；等待循环的第一次轮询间隔从 5ms 变成 1ms。本地后端上 `true` 的中位耗时：main 上 31ms，现在 15ms。POSIX 本地后端生效；Windows（没有 pass_fds）和远程后端保持原来的快照方式，否则用户的导出会在下一条命令里消失。</p>
+<p>配套 fix：继承来的 errexit 不会在恢复步骤里终结每条命令；bash 3.2 下只读的 SHELLOPTS 不进快照；密钥声明能通过管道传给下一条命令；快照和它的密钥成对选取、环境保持精简；密钥保持完整形状、只配自己那份 dump；review 找出的四个快照缺口都补了；session 导出在 noclobber 下也写得出去。</p>
+<ul>
+<li>c085276f1f|2026-11-19|Teknium|fix(terminal): keep secrets out of the on-disk session snapshot, and make commands faster</li>
+<li>b633351a34|2026-11-19|Teknium|fix(terminal): an inherited errexit no longer ends every command in the restore step</li>
+<li>c894727fba|2026-11-19|Teknium|fix(terminal): keep the read-only SHELLOPTS out of the snapshot (bash 3.2 errexit)</li>
+<li>f08b66adf6|2026-11-19|Teknium|fix(terminal): secret declarations reach the next command through a pipe</li>
+<li>704705ba8d|2026-11-19|Teknium|fix(terminal): pick a snapshot and its secrets together, keep the env small</li>
+<li>995d7ea9b7|2026-11-19|Teknium|fix(terminal): secrets keep their full shape and their own dump&#x27;s pairing</li>
+<li>2077a798de|2026-11-19|Teknium|fix(terminal): close the four snapshot gaps review found</li>
+<li>8a5207efc2|2026-11-18|Teknium|fix(terminal): keep session exports under noclobber; make two test files host-independent</li>
+</ul>
+<p>Vault 填充：一个 scope 41 条（fix 41 条）</p>
+<p>主线是登录填充的可靠性和密钥不出页面。</p>
+<p>密码和卡号不再以击键输入。Input.insertText 会落到浏览器处理它时焦点所在的地方，而一个在关闭的 shadow root 里的 frame 对 frame 探测和焦点检查都不可见，所以它能在检查之后、按键之前抢走焦点。现在密钥值一律走带守卫的 JS 写入、写在它被打标的控件上；只有登录标识符（和地址文本）才用可信击键。这也结束了逐个按键重打密码的做法——那种做法被打断会留下一个前缀，跟精确值脱敏对不上。地址值同样改成 JS 写，不再击键。</p>
+<p>登录标识符以前交给 agent 的普通输入工具，值写进 DOM 但框架不认：掩码手机号字段上页面留着文字、React 的 state 还是空，下一次击键就把字段重渲染回前缀。现在填充也写标识符（with_identifier 默认开，传 false 保留只填密码的行为）。批量 insertText 在有输入掩码的字段（手机号、日期）会丢字符，因为掩码是流式处理的；现在读完再比对，不一致就清空后逐字符重打（间隔 60ms），所以掩码字段要么正好是校验过的那个值，要么报 fill_reverted。另外：标识符只找密码所在的表单；声明的 login autocomplete token 优先于 password label 排除；孤立的无标签文本框当作登录标识符；无标签标识符框用击键而不是 JS 写；标识符不要落到 enter_code 会取验证码的框里，回退也不要碰 one-time-code 和 new-password 框。</p>
+<p>安全侧：每个携带密钥的页面脚本都要过 origin 守卫并绑定页面会话；送到 origin 检查跑的那个会话和通道上；每次可信插入之前重新检查绑定的通道、重新接受 Bot Desktop 的租约；焦点通过 shadow root 读、并且检查选中的选项；没有页面会话可以绑定就直接拒绝填充；页面脚本的判定按值返回，不走页面自己的 JSON；页面定义的 then 不能回答判定；报告通道被换走或被接管是真正的原因，而不是报成检查失败；有 frame 的页面走 JS 写、在焦点检查处拒绝 frame；只往焦点检查跑过的那个文档里输入；read-back 每 10ms 采样并要求在一个稳定窗口内保持；掩码重写只有保住 +、月份、年份、或者只是把同样的数字重新分组时才接受，疑似手机号按号码读。</p>
+<p>检查用的标记在操作每次退出时都清掉（包括 enter_code 和「什么都没接受」的填充），每个填充有自己独立的标记属性、只清自己的。</p>
+<ul>
+<li>ffe768e280|2026-11-19|Maciej Lisiewski|fix(vault): never send the password or a card value as a keystroke</li>
+<li>237e337ec7|2026-11-19|Likivik|fix(vault): fill the login identifier and retype masked fields key by key</li>
+<li>60fe64abd6|2026-11-19|Maciej Lisiewski|fix(vault): write saved address values by JS, never as keystrokes</li>
+<li>9b5fc7ffc4|2026-11-19|Likivik|fix(vault): type vault secrets with trusted input after asserting focus</li>
+<li>098c25485f|2026-11-19|Maciej Lisiewski|fix(vault): refuse a fill when the supervisor has no page session to pin</li>
+<li>23e56d747b|2026-11-19|Maciej Lisiewski|fix(vault): origin-guard and session-pin every secret-bearing page script</li>
+<li>0b6a1170a4|2026-11-19|Maciej Lisiewski|fix(vault): recheck the pinned channel right before each trusted insert</li>
+<li>6ffdbe88c5|2026-11-19|Maciej Lisiewski|fix(vault): keep the identifier out of a box enter_code would take the code into</li>
+<li>798022e772|2026-11-19|Maciej Lisiewski|fix(vault): keep the identifier fallback off one-time-code and new-password boxes</li>
+<li>19bc3574f8|2026-11-19|Maciej Lisiewski|fix(vault): give a page with a frame the JS write, refuse a frame at the focus check</li>
+<li>9ee2507d99|2026-11-19|Maciej Lisiewski|fix(vault): remove inspection stamps on every exit of the operation that made them</li>
+<li>362be4b836|2026-11-19|Likivik|fix(vault): carry the value in the input event and read the fill back</li>
+<li>847e934f3e|2026-11-19|Maciej Lisiewski|fix(vault): type the unlabelled identifier box, not write it by JS</li>
+<li>474d29c869|2026-11-19|Likivik|fix(vault): treat a lone unlabelled text box as the login identifier</li>
+<li>46677d21ce|2026-11-19|Maciej Lisiewski|fix(vault): pin trusted typing to the validated page session, check focus per key</li>
+<li>e30acfe013|2026-11-19|Maciej Lisiewski|fix(vault): report a moved channel or a takeover as the cause, not as a failed check</li>
+<li>ad676ec0f9|2026-11-19|Maciej Lisiewski|fix(vault): re-admit the Bot Desktop lease before every trusted keystroke</li>
+<li>e031b54365|2026-11-19|Maciej Lisiewski|fix(vault): read focus through shadow roots and check the selected option</li>
+<li>265c88f772|2026-11-19|Maciej Lisiewski|fix(vault): read a saved phone identifier back as a phone</li>
+<li>4ccdb56cf3|2026-11-19|Maciej Lisiewski|fix(vault): look for the identifier only in the password&#x27;s form</li>
+</ul>
+<p>插件目录：一天新增 63 个条目</p>
+<p>按 git 的新增文件数算（git diff --diff-filter=A），这期新增 63 个 plugin-catalog/*.yaml，是 714 条提交里最大的一块：54 个 feat 里有 49 条是目录条目，另外还有大量 re-pin 和版本 bump（plugin-catalog 前缀 70 条、catalog 前缀 66 条、fix(catalog)/fix(plugin-catalog) 16 条）。有代表性的：memrack（记忆架 provider）、swarm-studio、deapi、composer-predictions（桌面端输入框预测）、Threadpacket、hermes-lectern、hermes-officecraft、hermes-atlas-evolution、verand。同一窗口里另有 103 个已存在的目录 yaml 被改动（re-pin 到新版本、版本 bump、披露段落修正）。</p>
+<ul>
+<li>94688a1e77|2026-11-19|Kesuek|feat(plugin-catalog): add memrack (memory rack provider) - v0.11.1</li>
+<li>c66486b2d3|2026-11-19|Pujan|feat(plugin-catalog): add swarm-studio plugin</li>
+<li>612718111d|2026-11-19|dawidope|feat(catalog): add deapi</li>
+<li>62d8501b95|2026-11-19|xuhuawork|feat(plugin-catalog): add composer-predictions desktop plugin</li>
+<li>ecbc3550ad|2026-11-19|olshen|feat(plugins): add Threadpacket to the catalog</li>
+<li>9e362f754f|2026-11-19|dansolutions1-build|fix(plugin-catalog): re-pin verand to 1.1.1 (skill metadata flattened)</li>
+<li>36aba92d73|2026-11-19|Otsoa Dubief|plugin-catalog: tenure 1.1.0 → 1.1.1 (secrets typed in terminal commands masked)</li>
+</ul>
+<p>TUI：裸 OSC 8 链接不能再伪装指向（fix 5 条）</p>
+<p>从上游 agent 项目移植过来的修复：不可信文本可以夹带裸的 OSC 8 超链接序列，终端会把它渲染成真的链接，于是屏幕上写着 docs.python.org、Cmd/Ctrl 点下去打开的是别的网址。助手文本、工具行、系统消息早就脱敏过才进 &lt;Text&gt;，但模型推理（Thinking 面板）和别的直接交给 &lt;Text&gt; 的字符串没有。实测：让本地回环模型的推理里带 `ESC]8;;https://evil.example/phish BEL docs.python.org ESC]8;; BEL`，修复前终端把 evil.example 的链接真的画出来，修复后只画标签文字。</p>
+<p>修复点在每个文本节点都要过的那一处（squash-text-nodes.ts）：链接只能来自 &lt;Link&gt;（ink-link），纯文本节点里的 OSC 8 一律丢弃、保留标签。配套 4 条：按固定点剥离，避免删完又拼出新链接；改成一次性线性扫描，不再固定点循环；从拼接后的文本整体剥离，不是逐节点；未闭合的 OSC 8 不再把后面的文字一起吃掉。</p>
+<ul>
+<li>e4919bc141|2026-11-19|Teknium|fix(tui): a raw OSC 8 link in plain text can no longer disguise its target</li>
+<li>31641ff7fc|2026-11-19|Teknium|fix(tui): strip raw OSC 8 to a fixed point so removal cannot splice a new link</li>
+<li>b402850ef0|2026-11-19|Teknium|fix(tui): strip raw OSC 8 in one linear pass instead of a fixed-point loop</li>
+<li>6433f52186|2026-11-19|Maciej Lisiewski|fix(tui): strip raw OSC 8 from the joined text run, not per text node</li>
+<li>91b539d666|2026-11-19|Maciej Lisiewski|fix(tui): an unterminated raw OSC 8 no longer hides the text after it</li>
+</ul>
+<p>Linux 打包：按 glibc 底线审计发行包（feat 1 条）</p>
+<p>Linux 桌面端包只能在宿主 glibc 和 libstdc++ 提供它所有 ELF 文件需要的符号版本时才跑得起来，一个用新发行版编译的库会静默地砍掉所有老发行版的支持。新脚本 scripts/bundles/glibc_floor.py 直接读每个 ELF 的 .gnu.version_r（不依赖 readelf），跑在 electron-builder 解包出的 app 上，超底线就让打包失败：x64 是 GLIBC_2.35 / GLIBCXX_3.4.30（Ubuntu 22.04、Debian 12），arm64 是 GLIBC_2.39 / GLIBCXX_3.4.33（Ubuntu 24.04、Debian 13）；x64 的 llama.cpp CUDA 和 ROCm 引擎单独一个上限（GLIBC_2.38 / GLIBCXX_3.4.32），因为上游是在 Ubuntu 24.04 上编的，这两个引擎只在 24.04 及更新上跑。拿真实的 arm64 构建 686 个 ELF 文件跟 readelf -V 对过，3325 个版本名没有差异。</p>
+<ul>
+<li>afb03ddd2d|2026-11-19|BearHuddleston|feat(bundles): audit a packaged Linux app against its glibc floor</li>
+</ul>
+<p>上下文压缩：归档引用读取去掉 2 万条上限（fix 7 条）</p>
+<p>referenced_archive_refs 以前最多读 20001 行，超过 2 万就答「不知道」，清扫于是把 cache/pruned 和 cache/spillover 里的文件全留着；每个剪枝存根行都算进这个数，一个忙一点的 home 就轻松越过，之后再也不清扫。现在一次读一行、不设上限，内存由引用集合决定；数据库出错仍然答「不知道」，清扫仍然 fail-closed。另外：独占写失败后清掉这次调用自己创建的部分归档（撞到已存在的文件时保留、默认的 spillover 覆盖行为不变）；回读一个归档要重新指向那个归档；工具结果存根里保留模型需要的细节；剪掉的每个结果要配到自己前面那次调用、流式引用读取要注册；热重载的剪枝下限夹住并说清真正的 no-op 原因；沙箱后端的归档要落到沙箱能读到的地方。</p>
+<ul>
+<li>e7e66a1120|2026-11-18|Electric Sheep|fix(compression): read every archive reference row, without the 20,000 cap</li>
+<li>6a5cee0598|2026-11-18|Electric Sheep|fix(compression): clean up failed exclusive archives</li>
+<li>752162a52c|2026-11-18|Electric Sheep|fix(compression): point a read-back of an archive at that archive again</li>
+<li>4a45994971|2026-11-18|Electric Sheep|fix(compression): keep the details a model needs in tool result stubs</li>
+<li>8e8b582423|2026-11-18|Teknium|fix(compression): match each pruned result to its own preceding call; register the streamed reference read</li>
+<li>ade65d4507|2026-11-18|Electric Sheep|fix(compression): clamp the hot-reloaded prune floor; name the real no-op reason</li>
+<li>beabd04e63|2026-11-19|kshitijk4poor|fix(compression): sandboxed backends archive pruned results where the sandbox can read them</li>
+</ul>
+<p>其他值得一提（fix）</p>
+<p>Discord 斜杠命令改成跟原始注册表比对（#104399）、命令安装类型按应用 Installation 设置下发、混合漂移时 upsert 并在同步前刷新应用信息、应用信息缓存跟随它的客户端并限时重取。飞书从 raw_mode 而不是 raw_type 推导会话类型，卡片点击的会话类型从缓存解析并逐一尝试 operator id 形式，卡片 mixins 改成包内相对导入以便热重载能到 cards/。profiles 的主目录边界不再重建被移走的命名 home，Windows ACL 修复也守在同一个边界上。aux 计费按真正服务这次调用的凭据定价、同 provider 重试按实际服务的客户端定价、配置重载失败时保留成本估算、配置后端不可用时保留用量行。审批路径上修了一批 Git Bash 里 home 末尾转义空格/转义反斜杠的折叠逻辑。</p>
+<ul>
+<li>4bd86568d0|2026-11-19|Jarvis|fix(discord): diff slash commands against the raw registry #104399</li>
+<li>779cee6e68|2026-11-19|kshitijk4poor|fix(discord): set command install types from the app&#x27;s Installation settings</li>
+<li>43d97a6b61|2026-11-19|winple|fix(feishu): derive chat type from raw_mode, not raw_type</li>
+<li>b3d632df07|2026-11-19|winple|fix(feishu): resolve card-click chat type from cache and try every operator id form</li>
+<li>054f33c1df|2026-11-20|kshitijk4poor|fix(profiles): home initialization never recreates a moved named home</li>
+<li>1a310620c3|2026-11-19|Maciej Lisiewski|fix(aux): price an aux call with the credential that served it</li>
+<li>f443631dda|2026-11-19|Kevin Rajan|fix(aux): keep cost estimates when config reload fails</li>
+<li>91fd29679e|2026-11-19|Aling33|fix(approval): gate config edits through a Git Bash escaped-space home path</li>
+</ul>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-19：提示缓存重做成一个生命周期，默认 1 小时档并主动剪枝</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-19</link>
