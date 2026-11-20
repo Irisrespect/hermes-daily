@@ -5,8 +5,154 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Fri, 20 Nov 2026 06:53:04 +0800</lastBuildDate>
+    <lastBuildDate>Sat, 21 Nov 2026 06:52:12 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-21：桌面端流式渲染 19 项优化，回复结束不再重解析整条消息</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-21</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-21</guid>
+      <pubDate>Sat, 21 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 20 日 06:30 ~ 11 月 21 日 06:30 合入 main 的提交，共 192 个 commit（不含 merge），另有 6 个 merge。新增 14 个功能、105 个修复、19 个性能优化。行内 commit date 跨 11-16 ~ 11-21（多数是 rebase 保留的原作者时间），按合入 main 的时间都落在这个窗口内。另有 2 条无 scope 前缀的 fix（/learn 深链安全）未计入上面的分类统计。</strong></p>
+<p>📌 今日要点：</p>
+<ul>
+<li>桌面端流式渲染 19 项优化：回复结束时不再重解析整条消息（50KB 从 755~819ms 降到 10.5ms），块缓存不再留 256 份流式前缀（200KB 回复常驻堆 40.6MB → 0.5MB）</li>
+<li>切 profile 换成不遮内容的阶段性指示器，路由查询失败不再另开一个 socket 干等 20 秒（以前约 40 秒遮罩后报超时）</li>
+<li>暂停/继续这条链路修了 10 处，网关已报完成的回复不再因正文像错误而被判失败</li>
+<li>Gemini 4 Neon 进目录并支持 xhigh，Vertex 选择器补上 Hydrogen / Carbon / Neon，Vertex 的 xhigh 不再被降成 high</li>
+<li>插件设置在终端可改（hermes plugins config），webapp.host 可以写本机一个具体 IP 并同时监听 loopback</li>
+</ul>
+<p>重点条目：</p>
+<p>桌面端流式渲染（19 个性能优化 + 1 个新功能，作者 ghgoodreau）</p>
+<p>回复结束不再重解析整条消息。`isStreaming` 以前放在 `components` 的 useMemo 依赖里，回复一结束组件表就换身份：Streamdown 的 Block memo 逐键比对全部失败，每个块把没变过的 markdown 重新跑一遍 remark/rehype，适配器还铸出一个新的 code 组件类型，整个代码子树重新挂载。现在流式状态走 MarkdownStreamingContext，只有两个消费者跟着重渲染，components 在结束前后保持同一身份。实测 50KB 回复从 755~819ms 降到 10.5ms，5KB 从 110~154ms 降到 6.5~6.7ms，结束那一瞬的块解析次数从 13 次降到 0 次；以打开又闭合的代码围栏结尾的回复，最后一个围栏结束后仍然原位切成 Shiki 高亮，DOM 节点不变。</p>
+<p>块分隔器不再留每个流式前缀。parseMarkdownIntoBlocksCached 以前把每次刷新的全文都塞进 256 条精确 LRU，一条流能同时留 256 份完整前缀和它们的块数组。现在当新文本取代同一血统的上一个尾部时，那个尾部会离开精确缓存，活着的尾部保留数组身份（Streamdown 的分块 memo 需要它），回退到旧前缀按编辑处理、重新词法分析，结果与之前一致。流一条 200KB 回复（5001 次刷新）的常驻堆从 40.6MB 降到 0.5MB，50KB 从 11.9MB 降到 0.2MB。</p>
+<p>调度节奏。可见窗口的流式刷新下限从 33ms 提到 40ms：71 轮对话里匹配到的一条原生回复实测渲染脚本工作量少约 20%、渲染任务量少约 12%，文字增长速度仍是每秒 25 次。隐藏窗口画不出任何东西但每次刷新照样跑 store 更新和 React commit，现在没有语音消费者时按每秒 4 次批量；朗读、语音播放、STT/TTS 租约保留原来的刷新率，因为它们要离屏读正文。隐藏窗口一条 300 词的回复实测任务时间 2897~3147ms 降到 808~831ms，脚本时间 2669~2861ms 降到 617~649ms。刷新下限的判定收成一个纯函数 streamFlushFloor，可见、隐藏、语音占用、超时拉伸四种情况各有单测。</p>
+<p>同一个批次里的其他条目：每个增量只 patch 流式尾行，不再 `.some` 扫完 `.map` 重建整条 transcript；实时增量按生产端的 liveDelta 标记分流，不再对整条 transcript 做深比较；markdown 预处理移出流式刷新的紧急渲染路径；预览控制台的高度更新每帧合并一次、预览面板不再订阅控制台高度；语音电平表移出 composer 渲染路径；触发词状态在检测到的 token 没变时保持引用；两个流式看门狗共用一个已武装的截止时间；agent 终端积压改成分块 deque；结算后的 markdown 解析结果留在有上限的缓存里；工具调用 id 只在仓库缓存未命中时去重。</p>
+<p>新功能：长帧直方图。以前 slow_frame 每档每天封顶 5 条（渲染端）、50 条（后端），起点 100ms，卡顿的一天读出来就是「5」，轻微掉帧完全看不见。现在 hermes.desktop.long_frames.sum 把每个可见窗口的帧按 50-100ms / 100-250ms / 250ms-1s / 1-5s / ≥5s 五档汇总成按 UTC 天的直方图，并记当天可见时长，一天结束后用独立的 RPC 上报一次（不是每帧上报）。可见时长只累计可见区间，超过「tick + 60 秒」的区间（比如休眠）不计。合成一天 300 帧 120ms 的场景现在报 count 300，以前报 5；没长帧的可见日报告一行 none。旧 slow_frame 口径不变。</p>
+<ul>
+<li>499f2b5142|2026-11-20|ghgoodreau|perf(desktop): end a markdown stream without re-parsing the whole message</li>
+<li>816bbf0e36|2026-11-20|ghgoodreau|perf(desktop): stop the block splitter retaining every streamed prefix</li>
+<li>42925f95b2|2026-11-20|ghgoodreau|perf(desktop): batch hidden streams at 4/s and exempt voice consumers</li>
+<li>e147088bda|2026-11-20|ghgoodreau|perf(desktop): raise the visible stream floor from 33 ms to 40 ms</li>
+<li>bf113e8a82|2026-11-20|ghgoodreau|perf(desktop): publish live deltas without re-reconciling the transcript</li>
+<li>49c95c7987|2026-11-20|ghgoodreau|perf(desktop): patch only the streamed tail row per delta</li>
+<li>951efa9c39|2026-11-20|ghgoodreau|feat(desktop): uncapped long-frame histogram under the shared-metrics opt-in</li>
+</ul>
+<p>桌面端 profile 切换（feat 1 条 + fix 5 条）</p>
+<p>新功能：分阶段切换指示器。原来盖住整个聊天区的 ChatSwapOverlay（absolute inset-0 z-50、aria-hidden）和单独的 ChatSyncBadge，换成一个挂在聊天列顶部的 ChatSwitchIndicator，按流布局，永不覆盖 transcript。0~2 秒什么都不显示，快速切换不会闪一下；2~10 秒是角落胶囊「Switching to &lt;agent&gt;…」，用目标 profile 的颜色（resolveProfileColor / profileColorSoft，默认 profile 走中性色），指针透明；10 秒以上变成聊天上方的条，写明仍在连接、现在发的消息会排队发到这个 agent；paint-first hydration 同步渲染成同一个安静的胶囊。轨道切换被拒时是终止条，带标准错误图标、Retry 和关闭，这个状态下不转 spinner。根节点 aria-live=&quot;polite&quot;，状态永远不是 aria-hidden，并暴露 data-switch-state（idle/pending/slow/stalled/syncing/failed）作为可测的就绪契约。失败状态由一个 feature 自有的 nanostore 记录，selectProfile 和 newSessionInProfile 都走 runRailSwitch，重试只重跑激活、不会再开一份新草稿，另有 generation 守卫防止被取代的尝试清掉新的失败状态。</p>
+<p>路由查询失败不再开第二个 socket。每个本地非主 profile 都骑在主 profile 的那一个多路复用网关上，Electron 用主描述（sharedPrimary: true）回答它，而这条查询恰恰在主网关启动时最慢（gateway ensure 硬上限 60 秒、75 秒强杀）。sharedPrimaryRoute 以前把包括自己 20 秒超时在内的所有失败都转成 false（「不是共享」），ensureGatewayForProfile 于是创建一个 secondary，openSecondary 又在另一个 20 秒预算里重跑同一个查询——用户看到约 40 秒遮罩后报「Timed out connecting to profile」，或者等主网关启动完成后对同一个共享进程开第二个 WebSocket（重复事件那一类）。现在失败或超时直接 reject：20 秒内给出切换失败的提示，不创建 secondary，拨号失败台账记下这次失败，后台轮询继续按既有冷却重试（一次尝试一次拨号，不是两次）。</p>
+<p>配套三条：只有失败的本地 owner 探测才退避，不是每次拨号失败都把整个 scope 冷却掉（远程主 profile 服务同一 scope 时，后台 RPC 以前会在路由解析前就被拒）；切换 UI 的复杂度收敛、重试阶段复位；注册表切换失败会显示出来，但不阻塞启动恢复。</p>
+<ul>
+<li>f125187d6e|2026-11-20|ghgoodreau|feat(desktop): escalating profile-switch indicator with retryable failure</li>
+<li>f624268f4c|2026-11-20|ghgoodreau|fix(desktop): fail a profile switch whose route lookup fails instead of dialing a second socket</li>
+<li>713cab5cee|2026-11-20|ghgoodreau|fix(desktop): back off only failed local owner probes, not every dial failure</li>
+<li>d7bcc74213|2026-11-20|ghgoodreau|fix(desktop): bound switch UI complexity and reset retry stages</li>
+<li>26b862bfde|2026-11-20|ghgoodreau|fix(desktop): surface registry switch failures without blocking launch restore</li>
+<li>bf88d9b1f4|2026-11-20|ghgoodreau|fix(desktop): bind switch retries and send hints to draft ownership</li>
+</ul>
+<p>暂停 / 继续与轮次状态（fix 10 条，作者 emozilla）</p>
+<p>网关已报完成的回复不再显示为失败。桌面端以前会把任何「长得像提供方错误」的最终文本判成失败轮次并显示「Hermes couldn&#x27;t finish this reply」，判定依据是正文开头匹配 HTTP &lt;code&gt;、API call failed after N retries:、Provider error:、Gateway error:，完全不看 message.complete 的状态。模型查完一个网站回一句「HTTP 200 OK」，这一轮明明成功，却得到一张错误卡。网关每个失败轮次都带 status &quot;error&quot;（含 error 与 error_surface），只有无错误的轮次才是 complete，所以文本判断现在只用于没有 status 的帧（子代理镜像、或老网关不发状态）。这一条与暂停无关，是同一批评审里发现的老问题。</p>
+<p>续跑开始后点停止仍然显示已停止。续跑以一个工具调用开始、用户在它写出任何文字之前点 Stop 时，线程里没有「Response stopped」：被停止的调用是一个只有工具的气泡，线程会把它折叠进上一条回复，只保留上面那个气泡的标记，而这个气泡带着暂停留下的 continued 标记，把新的停止盖掉了。现在折叠会把被折叠气泡的停止一起带上去，合并后的回复在该气泡被停止时就是已停止，并继承它的 continued，所以「续跑本身又被暂停并继续」仍然不打标记。</p>
+<p>暂停期间斜杠命令产出的 prompt 不再抢跑。打出来的斜杠命令大多立刻执行，但有一部分会返回一段要发出去的 prompt（技能、技能包、/plan、/learn、/init、/moa、带文本的 /goal、/retry，以及它们的别名）。后端回一个 skill 或 send 派发，桌面端在没有轮次运行时直接发出——而暂停等续跑的时候恰好没有轮次在跑，于是这段 prompt 先起了一轮，暂停把它当成续跑，等它完成才放走排队的东西。现在 queueKickoffIfSessionBusy 把暂停中的聊天也视为轮次进行中，prompt 进本地队列等续跑完成再发，命令本身仍立刻执行（技能照样展开、目标照样设定），照样打「已排队」。</p>
+<p>隐藏请求保持隐藏。别的界面通过 composer 在暂停期间发出的请求会进聊天本地队列，预览组件的请求是隐藏的（给模型的指令，不是你写的消息）。如果你在续跑完成前切到别的聊天，后台排空器发送时不会带上 displayKind，网关于是把这条指令存成普通用户消息，聊天里就显示出来了。这个遗漏比暂停更早存在，暂停只是让它更容易碰到。现在后台排空器和 composer 自己的排空一样传 displayKind。</p>
+<p>迟到的结束报告不再干扰下一轮。running=false 的 session.info 还会结束一个在重连里丢掉 compacted 边沿的压缩阶段，而且这一步以前排在 runningEdge 判断之前，于是一个已完成轮次的报告如果在下一轮的 message.start 之后到达，会把正在压缩的下一轮的指示关掉。现在这个修正与提示清空、结算放在同一个判断之后：被认定为已完成轮次报告的，不结束当前活着的轮次的任何东西。</p>
+<p>结束报告改成按轮次记账。以前一个布尔标记代表任意数量的欠账；核心会在每个轮次自己的 cwd 和 git 探测之后才发报告，所以很短的第二轮可能先完成，第一份报告就清掉了标记，第二份报告去结算还在干活的第三轮。现在每个 message.complete 各记一笔（turnEndReportsOwed 取代 turnEndReportOwed），每份 running=false 报告只结一笔；本机停止的轮次保持 interrupted，它的完成会记一笔欠账即使报告已经来过，而重连里丢掉的报告永远不会被结算——30 秒没结算的欠账作废，避免之后的轮次捡到别人的报告。</p>
+<ul>
+<li>6ecadd70e4|2026-11-19|emozilla|fix(desktop): a reply the gateway reports complete is not shown as a failure</li>
+<li>9ad5429257|2026-11-19|emozilla|fix(desktop): a Stop during the continuation still reads as stopped</li>
+<li>0fc29d1f2f|2026-11-19|emozilla|fix(desktop): a paused reply holds the prompt a slash command produces</li>
+<li>e97748b4d8|2026-11-19|emozilla|fix(desktop): a held hidden request stays hidden when another chat is open</li>
+<li>f63784867c|2026-11-17|emozilla|fix(desktop): a late end-of-turn report leaves the next turn compacting</li>
+<li>8edf21f7be|2026-11-16|emozilla|fix(desktop): each completed turn owes its own end-of-turn report</li>
+<li>6d50abc580|2026-11-17|emozilla|fix(desktop): a paused reply holds requests sent through the composer</li>
+<li>3285ac3abf|2026-11-16|emozilla|fix(desktop): a paused reply holds through queue buttons and compression</li>
+<li>b26170d898|2026-11-16|emozilla|fix(desktop): a reply paused to be continued is not shown as stopped</li>
+<li>a925591daf|2026-11-16|emozilla|fix(desktop): a turn&#x27;s end-of-turn report does not settle the next turn</li>
+</ul>
+<p>模型：Gemini 4 进目录与 Vertex 选择器（feat 3 条 + fix 1 条）</p>
+<p>gemini-4-neon 进 Gemini 提供方目录，带官方定价快照（输入 3 美元、输出 15 美元、缓存读 0.15 美元，每百万 token），xhigh 思考档与 Hydrogen 一样在 xhigh/max/ultra 三档可用，继承 1M 上下文、单请求 64K 上限、长解码续写与 Interactions API 路由。默认模型没动，仍是 gemini-3.8-flash。</p>
+<p>Vertex 侧：Vertex 没有 /models 路由，选择器只认精选清单 _PROVIDER_MODELS[&quot;vertex&quot;]。Hydrogen 和 Carbon 早就在直连 gemini 的清单、定价表和思考档配置里，只是没写进这张表，Vertex 用户根本选不到。这次把 Hydrogen、Carbon、Neon 一起补上（Neon 在 Vertex 全局端点已 GA），两个 id 都在真实 Vertex 项目上以 google/ 前缀通过 OpenAI 兼容端点调通；顺序跟直连 gemini 清单一致，gemini-3.8-flash 保持第一位，旗舰模型不会被静默当成默认。另加一条测试：直连路由上每个 gemini-4-* 都要出现在 Vertex 清单里。</p>
+<p>xhigh 在 Vertex 上不再失效。vertex 配置从来没应用 gemini 插件那一步，xhigh/max/ultra 发到 google/gemini-4-hydrogen 和 google/gemini-4-neon 时被当成 thinking_level &quot;high&quot;。模型集合与这一步现在挪到 agent.reasoning_effort（挨着 GEMINI4_THINKING_LEVELS），两套配置都调用它，Argon 和 Carbon 仍然封顶 high。</p>
+<ul>
+<li>845acdd9e9|2026-11-20|Gabby Ong|feat(gemini): add Gemini 4 Neon and its xhigh thinking level</li>
+<li>7fa511e403|2026-11-20|Josh Holt|feat(vertex): list Gemini 4 Hydrogen and Carbon in the Vertex model picker</li>
+<li>5b3cb3059f|2026-11-20|kshitijk4poor|feat(vertex): list Gemini 4 Neon in the Vertex picker; document the Gemini 4 models</li>
+<li>0eeb0f4adf|2026-11-20|kshitijk4poor|fix(vertex): send xhigh to Gemini 4 Hydrogen and Neon on Vertex too</li>
+</ul>
+<p>插件配置（feat 2 条 + fix 2 条）</p>
+<p>hermes plugins config 在终端编辑插件设置。插件用 config_schema 和 requires_env 声明设置，桌面端把它渲成表单，CLI 以前除了手敲 plugins.entries.&lt;id&gt;.settings.&lt;key&gt; 没有办法。现在 hermes plugins config &lt;name&gt; 列出每个声明过的设置和当前值，一次改一个：choices 和 bool 是选择器，数字与 JSON 做类型校验，密钥打码；保存走和桌面端同一套写入路径（config.yaml 用 save_plugin_settings，.env 走 PUT /api/env 凭据路由）。没有 TTY 时只打印设置。plugins show 和 install 都指向它。</p>
+<p>终端安装插件后列出设置并问是否编辑。以前安装结束只有一行提示「用 hermes plugins config」。现在从终端安装会列出声明的设置和值，并问「Edit these now?」，默认否；有必填项为空时默认是并点名是哪几项。脚本、HERMES_NONINTERACTIVE 和简短安装向导仍然只打一行提示、不读 stdin。这个提问放在最后一步，所以在那一步 Ctrl-C 不会留下装了一半的插件。</p>
+<p>配套修复：has_value 以前是「不是 None」，KEY= 这种空白密钥会被读成已设置，安装提示把它从「还需要」里跳过、默认答案也变成否，桌面端和 CLI 都显示已设置；现在共享字段构建器要求值非空。plugins config 的 env 字段改用平台安装自己的分类（password/secret 或 token 形状的名字），Discord 那种 password: true 的 token 只打印「已设置」、编辑时打码；YAML 解析成非 JSON 值的列表输入（比如没加引号的日期）会拒绝并给出可读提示，而不是存一个之后读不回来的值。</p>
+<ul>
+<li>63102706e8|2026-11-19|Teknium|feat(plugins): hermes plugins config edits a plugin&#x27;s settings in the terminal</li>
+<li>595accf662|2026-11-20|Teknium|feat(plugins): a terminal install lists the new plugin&#x27;s settings and offers to edit them</li>
+<li>b1ef9bea69|2026-11-20|Teknium|fix(plugins): a blank secret counts as not set in plugin settings</li>
+<li>65c9b93e0c|2026-11-19|Teknium|fix(plugins): plugins config masks platform tokens and refuses non-JSON list input</li>
+</ul>
+<p>Web Access：webapp.host 可以是一个具体 IP（feat 1 条 + fix 5 条）</p>
+<p>webapp.host 现在也接受这台机器的一个字面 IP（局域网或 Tailscale 地址，IPv4 或 IPv6），跟 hermes dashboard --host 一致。以前开了 Webapp 又写这种 host 会被拒：监听器不起，hermes webapp --status 报错。现在网关在那个地址监听，并在同一端口监听 loopback（127.0.0.1，IPv6 地址则是 ::1），因为桌面端和 CLI 只接受 loopback 来源。两个 socket 服务一个应用、共享一份边界状态，所以登录要求和 0.0.0.0 绑定完全一致：浏览器凭据不是绕过登录的路子，cookie 只从 Webapp 自己的页面写，缺登录提供方时按门禁报错拒绝绑定，webapp.public_url 行为不变。与通配绑定不同的是，Host 检查只接受这个地址、loopback 名字和 Webapp 的公开主机名。地址不在任何网卡上、或 loopback 端口被占时，两个 socket 都不留，网关退回私有监听并记下原因。</p>
+<p>配套修复五条：Web Access 面板的 Start LAN 不再把指定 host 写回 0.0.0.0（以前 Stop 再 Start 一次，选定的单网卡就变成监听所有网卡，面板还显示机器的主局域网地址）；指定 IP 时自动选端口要求在地址和 loopback 两头都空闲（以前会选到 loopback 被占的端口，之后每次启动那个 socket 都绑不上）；绑定前用 psutil 核一遍本机网卡地址（Linux 允许把 /24 的 .255 定向广播地址绑成功，绑定成功不代表地址是本机的）；指定 IP 之后仍注册着 HTTPS 回调的 Nous 客户端，会提示这条保存的注册和出路（改成密码提供方，或恢复 webapp.public_url）；loopback socket 自己的绑定错误不再被改写为「地址不属于任何网卡」。</p>
+<ul>
+<li>f278702887|2026-11-20|unsupportedpastels|feat(gateway): let webapp.host be one IP address of this machine</li>
+<li>8f321cae19|2026-11-20|unsupportedpastels|fix(webapp): keep a specific webapp.host when Web Access starts LAN access</li>
+<li>0342ee18e6|2026-11-20|unsupportedpastels|fix(webapp): choose a port free on loopback too for a specific webapp.host</li>
+<li>96257ebfc5|2026-11-20|BearHuddleston|fix(gateway): refuse a specific webapp.host no interface holds before binding</li>
+<li>79a1f8d2e9|2026-11-20|BearHuddleston|fix(webapp): warn when a specific-IP Webapp&#x27;s Nous client is still registered for an HTTPS URL</li>
+<li>d770aa5f38|2026-11-20|unsupportedpastels|fix(gateway): name the loopback socket&#x27;s own bind error</li>
+</ul>
+<p>桌面端 WSL 路径桥接（fix 6 条）</p>
+<p>Windows 上桌面端要把 /mnt/c/... 这类路径换算成原生路径，这批修了 6 处。接受 /E:/Users 这种拼法：SHELL_DRIVE_RE 以前只认 /e/、/cygdrive/e/、/mnt/e/，这种路径会掉进 WSL 分支变成 \\wsl.localhost\&lt;发行版&gt;\E:/Users，一次永远成功的 stat 都没有，就是 desktop-stderr.log 里那条 File preview failed: UNKNOWN。冒号分支以前和前缀分支挂同一条可选链，所以 /mnt/c:/notes.md 会在 C:/notes.md 存在时被解析到 C 盘那个文件——那本是目录名就叫 c: 的 POSIX 路径，桌面端可能悄悄读到无关的 Windows 文件，远程 profile 一样；现在冒号拼法有自己不含前缀的分支，/mnt/c:/notes.md、/cygdrive/c:/notes.md、/mnt/c: 都留在 WSL 桥上。没注册 WSL 发行版时先探 HKCU 和 HKLM 的 Lxss，再决定是否桥接，不再弹 WSL 安装窗。注册表读取超时或启动失败不再把「没有 WSL」缓存整个进程（一次慢读会让有 WSL 的用户整轮都关掉桥接），确定的答案缓存一轮，不确定的 30 秒后重查。WSL 缺失时文件选择器仍然把 /mnt/c/projects 映射成 C:\projects（这个转换本来就不碰 WSL），只有远程 profile 才提前返回。冒号相对路径被拒绝，重复分隔符折叠。</p>
+<ul>
+<li>6238418fb7|2026-11-20|Hsiaopan|fix(desktop): accept the /E:/ drive spelling in WSL path bridging</li>
+<li>488aaefb1b|2026-11-20|Hsiaopan|fix(desktop): keep a colon after /mnt/ or /cygdrive/ on the POSIX side</li>
+<li>7790bb77ab|2026-11-20|Hsiaopan|fix(desktop): reject colon-relative shell paths, collapse repeated separators</li>
+<li>a6dfbafbf7|2026-11-20|Yuan Li|fix(desktop): skip WSL bridging when no distribution is registered</li>
+<li>ac09512999|2026-11-20|yoniebans|fix(desktop): check WSL again after a registry read times out</li>
+<li>9fa02fcff2|2026-11-20|yoniebans|fix(desktop): keep the picker&#x27;s drive-alias mapping when WSL is missing</li>
+</ul>
+<p>发布流水线 canary 轨道（feat 4 条 + fix 19 条 + refactor 4 条 + CI fix 8 条）</p>
+<p>这一天最大的单块提交量在发布基础设施。canary 标签改成 canary.&lt;UTC 戳&gt;-v&lt;稳定版&gt;，和稳定版 rc.N-v&lt;稳定版&gt; 是同一种声明形状，永不匹配 v*；它同时是 canary 的身份：GitHub prerelease、归档、打标镜像和 Docker 标签都用它，发布的版本号仍是 &lt;稳定版&gt;+canary.&lt;戳&gt;。标签内容现在就是 canary 的声明：跑哪些通道、红套件是否阻止发布。</p>
+<p>canary 直接调度稳定版流水线。canary-release.yml 现在派发 stable-release.yml，跑的是稳定版完整的作业图（CI、Docker、Nix、PM 包、Termux、Windows live、安装/更新 E2E、bootstrap 身份、每个签名候选的冒烟、签名包升级验收），通道全开，包括 macOS Intel 和 Termux，不用再维护两份。差别只在策略：只跑 publish-canary，推 feeds、Termux APT、GitHub prerelease、受保护的 R2 head、canary 升级基线和 canary Docker 别名；publish-bundles、Store 提交和稳定版定序器在 canary 上永不运行。canary 还跳过签名包升级臂（install-e2e 覆盖旧稳定版），Linux AppImage 在 canary 上是非门控构建。</p>
+<p>配套修的都是指针与状态边界：稳定版别名指针按 alias 归属修复，读不到 owner 的别名不移动；未完成的稳定版 head 名下 Docker 步骤要跑完并在更新的 head 下修复；候选保留指针只在 head 提升之后写；通道或绿测策略不一致的 canary 声明不能续跑；新 canary head 没有保留指针时拒绝剪枝；仍被 canary APT 索引引用的包要留着；canary 的 Store 身份与 R2 剪枝指针校验加严；canary 的 E2E 不重复跑。CI 侧另有两个新功能：合成 PR 之前就点名它会让哪些已 pin 的目录插件失效（只警告不失败）。</p>
+<ul>
+<li>e0bcf12dcc|2026-11-20|ethernet|feat(release): canary tags are canary.&lt;stamp&gt;-vX.Y.Z claims with lanes and green policy</li>
+<li>667081be8e|2026-11-20|ethernet|feat(release): canary runs the Stable Release pipeline with every lane</li>
+<li>5e5591bac1|2026-11-20|ethernet|feat(release): canary skips signed-package upgrade arms; install-e2e covers old stable</li>
+<li>10491efa92|2026-11-20|BearHuddleston|feat(release): keep non-gating Linux AppImage builds on canary Stable Release runs</li>
+<li>2513231c44|2026-11-20|BearHuddleston|fix(release): harden canary Store identity and R2 pruner pointer validation</li>
+<li>477f1bd187|2026-11-20|BearHuddleston|fix(release): pick a stale stable pointer&#x27;s repair by alias ownership too</li>
+<li>41d337f084|2026-11-20|BearHuddleston|fix(release): finish an unfinished stable head&#x27;s Docker step and repair it under a newer head</li>
+<li>e685402c5d|2026-11-20|BearHuddleston|fix(release): refuse resuming a canary claim with mismatched lanes or green policy</li>
+<li>4e99fdec97|2026-11-20|BearHuddleston|fix(release): refuse to prune when a new canary head has no retention pointer</li>
+<li>5d706890cd|2026-11-20|BearHuddleston|fix(release): write candidate retention pointers only after head promotion</li>
+<li>7064fc46a1|2026-11-20|ethernet|fix(release): retain packages referenced by live canary APT indices</li>
+<li>d45aac385e|2026-11-20|Teknium|feat(ci): name the pinned catalog plugins a core PR breaks, before it merges</li>
+</ul>
+<p>其他值得记的修复</p>
+<p>profile 重命名中途被打断。多路复用器在线时，rename_profile 先给旧名字打 tombstone 并取消路由，再等网关释放 home（最多 60 秒），然后移动目录；撤销只挂在 Exception 上，而 tombstone 写入和 rescan 请求又在守卫块外面。在等 owner 或 rescan（最多等网关 8 秒）时按 Ctrl-C，就会留下一个完好但被 tombstone 挡住的 profile：profile list 里没有，-p &lt;name&gt; 和 profile show 说它不存在，多路复用器也不再服务它，只能手删 profiles/.deleted/&lt;name&gt; 恢复。现在撤销覆盖了这两处。另一个修复是目录 ID 变化时正常的重命名返回也会提交，早期中断的修复会恢复服务。</p>
+<p>memory 面板与 parked provider。一个 provider 被放进 plugins.disabled 之后，它自己的配置面板（storage=provider）以前回答「无法加载，看日志」，现在返回和 CLI、doctor、agent 一致的 parked_provider_notice；提示只在被挂起的正是选中的 memory.provider 时才说「外部记忆已关闭」，因为面板可以检查任意 provider。启用命令带 -p &lt;profile&gt;，?profile=work 的面板会点名它读的那个 profile，并通过 HERMES_HOME 指向打印它的那个 home。</p>
+<p>vault 与 url-safety。vault 的 save_login 电话正则以前只允许 + 出现在第一位，「(+48) 600 100 200」会被存成用户名；现在允许它出现在一个左括号之后，别处不允许，tel 回读本来就接受这种位置。带分隔符的电话号同样存成电话，自动填充改读 autocomplete 属性而不是归一化后的属性。url-safety 的 managed 作用域：managed 的 security.allow_private_urls 现在优先于 HERMES_ALLOW_PRIVATE_URLS 环境变量和 profile 的旧键 browser.allow_private_urls（以前是环境变量和旧键压过 managed pin），managed 的 null 值不钉任何东西、也不会清掉 profile 自己的设置，security.* 统一通过 managed 作用域读。</p>
+<p>/learn 深链与 Kanban 唤醒。两条无 scope 前缀的 fix 给 /learn 深链剥离 ANSI 序列、净化输入；配套三条 web 修复把技能交接改走 router state、normalize 终端序列、启动粘贴时取消、在 /learn 交接时保留 profile 和状态。Kanban 唤醒投递到本地聊天时，以前空闲的经典 CLI 不显示（它只打开带 card 消息的已准入轮次，而唤醒没带），现在 notifier 给唤醒一行自己的收据并作为 internal_notification card 发送，存储行仍是 machinery 类型，TUI 和桌面端不变。</p>
+<ul>
+<li>2ab7480e87|2026-11-20|kshitijk4poor|fix(profiles): an interrupted rename never leaves the profile hidden or doubled</li>
+<li>231e559581|2026-11-20|kshitijk4poor|fix(profiles): a normal rename return commits even when the directory ID changes</li>
+<li>f3f3b86ac5|2026-11-20|Kevin Rajan|fix(profiles): restore service on early interrupted rename</li>
+<li>ac15954199|2026-11-20|kshitijk4poor|fix(memory): the panel says plugins.disabled parks a provider instead of a bare load failure</li>
+<li>ac646d1f59|2026-11-20|kshitijk4poor|fix(memory): the parked-provider enable command names the inspected home through HERMES_HOME</li>
+<li>d494004173|2026-11-20|kshitijk4poor|fix(memory): the parked-provider enable command targets the home that printed it</li>
+<li>3379a8b8b8|2026-11-19|Maciej Lisiewski|fix(vault): save a phone with its country code in parentheses as a phone</li>
+<li>619e0c81da|2026-11-19|Maciej Lisiewski|fix(vault): store a phone number typed with separators as a phone</li>
+<li>a060df8154|2026-11-19|Maciej Lisiewski|fix(vault): read the autocomplete attribute, not the normalised property</li>
+<li>b04799a90d|2026-11-20|emozilla|fix(url-safety): a managed allow_private_urls pin decides first</li>
+<li>2a68a3a94e|2026-11-20|emozilla|fix(url-safety): a managed null does not erase the profile&#x27;s allow_private_urls</li>
+<li>a3501a8b4a|2026-11-20|Vyacheslav Scherbinin|fix(url-safety): read security.* through managed scope</li>
+<li>cf81de51f7|2026-11-19|Ketan-Kapse|fix: strip ANSI sequences from learn deep links</li>
+<li>e1a2870dc4|2026-11-19|Vidhivk99|fix: sanitize learn deep link input</li>
+<li>3c59a0f7c3|2026-11-19|unsupportedpastels|fix(web): pass /learn skill handoff via router state and normalize terminal sequences</li>
+<li>6488af101a|2026-11-21|Gille|fix(gateway): a Kanban wake shows in an idle classic CLI chat</li>
+<li>290aac743e|2026-11-21|kshitijk4poor|fix(gateway): each Kanban wake of a split batch names its own receipt</li>
+<li>f998a982cb|2026-11-20|Teknium|feat(ci): warn, never fail, naming each lost core name and the plugins&#x27; catalog records</li>
+</ul>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-20：桌面端 Bot Chat 新增「等待队友」状态条，安装收敛成一问</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-20</link>
