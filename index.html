@@ -22,9 +22,148 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 116 期 · 54097 个提交 · 每日自动更新 ·
+<p class="meta">共 117 期 · 54396 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-22" class="day">
+      <h2>Hermes 日报 2026-11-22：旧 dashboard/serve 后端可一键迁移到 gateway，桌面端新增 hermes://launch</h2>
+      <p><strong>本期覆盖 11 月 21 日 06:30 ~ 11 月 22 日 06:30 合入 main 的提交，共 299 个 commit（不含 merge），另有 12 个 merge。新增 13 个功能、219 个修复、1 个性能优化。行内 commit date 跨 11-11 ~ 11-22（部分 gateway 修复是 rebase 保留的原作者时间），按合入 main 的时间都落在这个窗口内。另有 37 个 test、14 个 docs、10 个 refactor、2 个 chore、1 个 ci、1 个 revert（`e39c86af8e`，让 Windows 上「任意大小写的 .env 覆盖」那条修复回退）和 1 条无类型前缀的 plugin-catalog 更新，未计入上面的功能/修复数字。</strong></p>
+<p>📌 今日要点：</p>
+<p>一条主线：旧的 hermes dashboard / hermes serve 后端可以整个搬到 gateway 的 Webapp 上，地址不变，带备份、回滚和健康检查。</p>
+<p>桌面端新增 hermes://launch 链接，只负责把应用打开、恢复、聚焦，不导航不预填。</p>
+<p>gateway 可以主动向托管部署上报存活状态，间隔由接收方指定。</p>
+<p>profile 删除删不干净时不再丢数据，状态统一显示为「delete incomplete」。</p>
+<p>dashboard 登录态可以完全从命令行设置，不需要交互式终端。</p>
+<p>重点条目：</p>
+<p>后台服务迁移：把旧后端搬到 gateway（本期最大一块，8 个 feat + 116 个 gateway 修复 + 29 个 dashboard 修复）</p>
+<p>命令入口 `hermes gateway migrate --backends`（`7eb1a618f7`）</p>
+<p>问题：dashboard 和 gateway 长期是两套后端，用户如果还挂着旧的 `hermes dashboard` / `hermes serve`，就有一个多余的常驻进程占着地址，登录设置、Webapp 内容也分散在两处。</p>
+<p>修复：新增迁移命令，`--apply` 记录一份清单（备份和清单都 fsync，从创建起就是 0600），把只存在于旧 unit 环境里的登录设置复制进 `.env`，安装并启动 gateway，退掉旧后端（systemd unit 用 `RestartPreventExitStatus=78` 的 drop-in 禁掉；launchd 作业 bootout 并禁用、plist 收起来；手动启动的进程按记录的 pid 停掉），90 秒内验证每个地址。`--restore` 撤销一次已完成的迁移，`--status [--json]` 报告最后一次运行，`--detach` 跑到调用方 systemd unit 之外，`--expect TOKEN` 在锁下发现的后端已经不是原来那个时以退出码 8 拒绝。一个 home 同一时间只允许一次运行，第二次退出 3 且不改动任何东西。</p>
+<p>效果：迁移是全自动的，中途失败只回滚这一次真正进入过的步骤（清单里有 journal），旧后端只有在 gateway 被证明已经离开该地址之后才会被重新拉起，否则退出 5 并打印编号的、带 profile 限定的手动步骤。</p>
+<p>先看计划再动手（`1ecfc85460`）</p>
+<p>问题：这种会改机器状态的命令，用户需要先知道它会做什么、以及为什么现在不能做。</p>
+<p>修复：`--apply --dry-run [--json]` 打印完整计划和所有拦路条件——旧后端上有任务在跑（除非 `--force-interrupt`）、地址对不上任何后端、gateway 会拒绝的绑定、Webapp 已经在别处开着、从旧 unit 内部发起、unit 的环境读不出来或 `EnvironmentFile=` 是通配模式、config.yaml 读不出来。计划阶段只读主机：新的 SystemHost 上没有任何启动、停止、安装或写入的方法。计划里的 argv 会打码内联环境变量、凭据参数和 URL 密码。</p>
+<p>效果：这一步不改变任何东西，可以先跑一遍再决定。</p>
+<p>报告里有指向计划的入口（`9749f70e69`）</p>
+<p>问题：`hermes gateway migrate --backends` 的报告只说有哪些后端，不说怎么搬。</p>
+<p>修复：当一个不属于 Desktop 自己的后端在服务这个 home 时，报告末尾多一行，给出显示迁移计划的命令（`--apply --dry-run`，不改变任何东西），并写明它是为哪个 profile 跑的（`-p PROFILE`，默认 home 写 `-p default`，避免粘住的 `hermes profile use` 把命令导到别处）；报告其余内容和 JSON 不变。</p>
+<p>效果：从报告到计划只有一步，且可以直接复制。</p>
+<p>改机器状态的那一层操作（`607fdbbf54`）</p>
+<p>问题：apply / 回滚 / restore 引擎需要一组会真正改机器的方法，而它们必须是可精确还原的。</p>
+<p>修复：新增 SystemHost 的这批方法——写 config.yaml/.env 的键（`.env` 在写入第一个密钥之前就是 0600）、构建 Webapp 包、安装/启动/停止 gateway 的用户服务（macOS 上写 agent 但先不加载，避免它和旧作业并排启动）、设置 lingering、停止/禁用/启用/启动旧后端（systemd unit、launchd 作业或手动启动的进程，含 restart-guard 的 drop-in），以及 spawn 一个 detached 运行。systemd unit 会精确拿回它原来的启用状态（enabled / enabled-runtime / static / disabled，用 is-enabled 核对）；手动启动的进程只在 pid 和记录的启动时间都匹配时才发信号（Linux 上走 pidfd），没有启动时间就永不发信号；detached 运行不会回落到调用方自己 systemd unit 里的新会话（从 `/proc/self/cgroup` 读）；gateway 是否仍在监听端口回答「是/否/未知」（探测失败或读不到 gateway 身份永远不算「不在」）。</p>
+<p>效果：迁移在三种后端形态上都能停对、启对、还原对。</p>
+<p>不驱动的环境给手动步骤（`1ecfc85460`）</p>
+<p>问题：Nix、s6/容器、systemd 系统级 unit、没有服务管理器的机器，自动迁移没法安全执行。</p>
+<p>修复：这些情况退出 6 并打印贴合本机的手动步骤——每条 hermes 命令都写清 home（`-p PROFILE`，默认 home 写 `-p default`，避免粘住的 `hermes profile use` 把命令导到别处），先停旧后端，再按 `hermes gateway status` 的说法安装/启动/重启 gateway，最后用 `hermes webapp --status` 验收；Nix 和容器各自说明要在自己的配置里改什么。</p>
+<p>效果：Windows、Docker、Nix 的用户也有明确路径，不用猜。</p>
+<p>dashboard 与 Webapp 的四个路由（`4689290639`）</p>
+<p>问题：迁移只在终端可用，面板里没有入口。</p>
+<p>修复：`/api/gateway/migrate/backends` 下新增 plan、apply、restore、status 四个路由。apply 和 restore 启动一个 detached 运行，所以它能活过被自己停掉的服务；运行启动中再点一次返回 409。只有后台运行确认自己拿到 home 的运行锁时才回 200，启动器超时或没确认则回 202 且 `confirmed: false`。apply 接收用户在计划里确认过的 `expect_token`，如果实际要搬的东西变了就回 409 `plan_changed` 并附上新计划。</p>
+<p>效果：面板和 gateway 自己的监听、Webapp 都能发起迁移，且不会因为两个窗口重复点击而搬两遍。</p>
+<p>System 页的迁移卡片（`1942ac7911`）</p>
+<p>问题：网页端只显示状态，不告诉用户「你还有一台旧服务器在跑」。</p>
+<p>修复：当一个更老的 Hermes 服务器（`hermes dashboard` / `hermes serve`）正在服务受管 profile 的 home，或者上一次迁移需要汇报结果时，System 页显示「Move to a single Hermes」卡片：说明发现了什么、迁移会改什么、列出拦路条件，确认后开始搬，并跟着状态走完切换。没什么可搬时卡片不渲染。双击或第二次确认只会发一次 apply；计划变了就展示新计划并重新询问；409「已经在跑」则跟随已经开始的运行而不是再发一次。</p>
+<p>效果：迁移入口在网页端可见，且每次确认都绑定到用户看到的那台后端和那个地址。</p>
+<p>update 后的提示（`cca2e6b074`）</p>
+<p>问题：用户跑完 `hermes update`，并不知道自己还挂着一台可迁移的旧后端。</p>
+<p>修复：在 fleet 检查之后，如果这个 profile 还在跑旧的 `hermes dashboard` / `hermes serve`，`hermes update` 打印一段话点名它，并给出只读的 `hermes -p &lt;profile&gt; gateway migrate --backends --apply --dry-run`。root 不在平台默认位置的 profile 还会钉上 `HERMES_HOME`。如果那台后端跑的 Hermes 比 v2026.7.30 还老，dry run 会先提示用新版重启它。这段提示永远不停服务、不迁移、不交互；整个通知跑在 update 的 `_best_effort` 里，失败只记 debug 日志。</p>
+<p>效果：更新完就能看到下一步该做什么。</p>
+<p>迁移过的旧后端不会被 update 复活（`53adea7eaf`）</p>
+<p>问题：`hermes update` 会重启处于 inactive 但看起来该启用的 `hermes-dashboard.service`，刚被迁移停掉的旧后端就这样被拉回来了。</p>
+<p>修复：home 里的 `backend_migration.json` 说旧后端应当保持停止（running、done、failed 或读不出来都算）时，这次重启跳过它；没有这个文件则行为不变。</p>
+<p>效果：迁移结果在后续更新中保持稳定。</p>
+<p>大量边界条件（116 个 gateway 修复，这里只列几类）</p>
+<p>问题：会改机器状态的命令，异常路径本身就是风险点。</p>
+<p>修复：覆盖的路径包括——分阶段写 config.yaml/.env 且只覆盖自己备份过的字节，`.env` 从创建到改名保持 0600，备份在回滚中丢失报「缺失」而不是报「被编辑」，被 kill 在改名瞬间的运行不会误判成已回滚，迁移记录状态无法识别时拒绝而不是替换，symlink 的 `backend_migration/` 目录或记录直接拒绝，legacy `hermes.service` 存在时拒绝迁移，不会去驱动另一个 home 的同名 unit 或 LaunchAgent，`--restore` 在 config.yaml/.env 于迁移后被编辑过时拒绝覆盖，restore 和回滚只认真实的 `/api/health` 结果，旧后端上的任务活动读不出来时按「未知」而不是「空闲」处理（未知也会阻塞 `--apply`），status 只探测自己命名的地址、并在本机可监听的范围内判断端口占用，Windows 上启动文件夹里的快捷方式是真的移出 Startup 而不是在里面改名。</p>
+<p>效果：这套命令在异常、并发、跨平台路径上都有明确行为，不会出现「一半搬完」后无人收拾的状态。</p>
+<p>桌面端</p>
+<p>hermes://launch 新链接（`cb99aaa173`）</p>
+<p>问题：只想把 Hermes Desktop 拉起来的页面或快捷方式没有对应的链接——每个 `hermes://` 链接都带着路由或动作，裸协议名仍会被送到渲染进程的深链处理器。</p>
+<p>修复：`hermes://launch` 在 Electron 主进程里处理：恢复、显示并用 `activateWindow` 聚焦窗口，然后返回。它永远不进渲染进程队列，`launch` 之后的路径和查询参数一概不读。</p>
+<p>效果：它不能预填内容、不能导航、不会打开对话框；已有链接行为不变。</p>
+<p>launch 链接的三处收尾（`2665dca7d1`、`81b193e757`、`263fbb9765`）</p>
+<p>问题：这个链接最初要等渲染进程的深链监听器起来才恢复窗口，而首次加载落在修复页时那个监听器起不来，于是最小化的修复页拉不回来；另外 `hermes://launch/%` 这种尾巴会在 `decodeURIComponent` 抛错，冷启动时窗口还没首绘就被激活会显示白屏。</p>
+<p>修复：判定条件改成「主窗口已经显示过一次」（由 `wireWindowReveal` 的 onRevealed 记录），修好的页面也算；launch 的判定提前到解析路径之前，直接看原始 URL；渲染进程没准备好、还在启动的窗口留给它自己的显示流程。日志里「已处理」不再写成「带到了前台」。</p>
+<p>效果：链接在修复页、冷启动、畸形尾巴三种情况下都表现正确。</p>
+<p>长对话中途刷新不再重复绘制（`63b0f55d07`）</p>
+<p>问题：一轮对话在开始时存下提问、每次工具返回时存下那一步，而把实时行与存储行绑起来的回执要等 `message.complete` 才到。对话超过一页时，最新一页是从更早的某轮中间开始的，中途刷新（重开对话、后台读一次）会走「按存储 id 合并」的路径，把没有存储 id 的实时行全部留在末尾，于是你的提问和流式气泡在存储的提问下面又画了一遍，之后的待处理轮次对账因为 id 都在而不会配对，重复一直留到重新加载。</p>
+<p>修复：owner 把 admission 的 `submission_id` 盖在轮次存储的用户行上（`display_metadata.submission_id`），实时提问的 id 就是 `user-&lt;submission_id&gt;`；水合时把这个 id 带到存储的提问上，按 id 合并时把「这一页自己存下的那次发送」及其后面的流交给待处理轮次对账。</p>
+<p>效果：刷新落在轮次中间也只画一次。</p>
+<p>存储提问之后的流不再断开（`7c34e2dbb4`）</p>
+<p>问题：`withoutLiveTurnsThePageStores` 剥掉某轮已存储的实时提问和待处理流时，保留了更后面的未存储行（排队的后续提问、临时气泡），对账逻辑看到这些残留行就跳过了正在跑的那轮的流式回复。</p>
+<p>修复：从已存储的实时提问开始，把整段尾巴一起丢掉，让待处理轮次的重建看到和短对话路径相同的边界，按顺序重新接上实时流和排队的后续提问；`preserveLocalPendingTurnMessages` 改为按 `submissionId` 匹配，存储文本与乐观文本不一致的提问不会被重复追加。</p>
+<p>效果：长对话刷新后流式回复继续接在原处。</p>
+<p>gateway 状态上报</p>
+<p>上报到部署地址（`fb885484b9`）</p>
+<p>问题：需要知道网关是否活着的托管部署，今天只能自己去轮询。</p>
+<p>修复：启动环境里带 `GATEWAY_STATUS_REPORT_URL` 时，gateway 每约两分钟向该地址 POST 一份状态报告，机器自挂起前再补一份。这个 key 只在启动环境生效——profile 的 .env、密钥源、.env 写入器都无法打开它或改指向。URL 用 `t` 查询参数携带凭据（与 `GATEWAY_RELAY_SLEEP_URL` 同形），凭据被挪进 `Authorization: Bearer`，凭据和 URL 都不落日志。报告体是 contract v1：`v`、`kind`、`seq`、`boot_id`，加上被裁到白名单的状态（未验证的 `/api/status` 调用方能看到的那个形态）。只有默认 profile 的 gateway 发送，在机器本地锁下进行。</p>
+<p>效果：托管方不用轮询即可判断存活；429/503 按 Retry-After 最多等 10 分钟，401/403 从 2 分钟退到 60 分钟，网络错误或其他 5xx 快速重试一次；挂起前的那次告别是 fire-and-forget，不会把挂起动作堵在后面。</p>
+<p>接收方指定上报间隔（`c31f28544a`）</p>
+<p>问题：两分钟的固定间隔不一定适合所有部署。</p>
+<p>修复：存储的回复里可以带 `Report-Interval: &lt;秒&gt;`，上报器按这个间隔发送并保持原有的 10% 抖动，范围夹在 60~600 秒之间；回复里没有合法的值就把间隔恢复成 120 秒，其他回复上的该头忽略。</p>
+<p>效果：被拒绝的回复、没有可用 Retry-After 的限流、快速重试后仍失败、轮询抛错、待命，这些等待全部使用当前生效的间隔；间隔只存在上报器内存里，每个进程都从 120 秒开始并立刻发一次。</p>
+<p>状态上报按需加载（`a258138160`）</p>
+<p>问题：`run_startup` 在模块顶层 import 上报器，于是每次 import `gateway.run` 都会把它、以及 dashboard 的路由一起加载，即使上报是关的。</p>
+<p>修复：watcher 启动前先看 stamp，设置了才 import。</p>
+<p>效果：上报关闭时不付这份加载代价。</p>
+<p>profile 删除不再留残局（6 个修复，均由删除写墓碑与 rmtree 之间的窗口引起）</p>
+<p>删不掉的删除显示为「delete incomplete」（`0ed0cb6f07`）</p>
+<p>问题：`hermes profile delete` 在 rmtree 之前写删除墓碑。rmtree 被拒（运行中的 gateway 还拿着 `gateway.lock`）或失败（Windows WinError 32）时，墓碑留在一个还有内容的目录上：profile 从 `profile list` 里消失，`-p`/`use` 说它不存在，`create` 让用户去 `profile use`，而 `use` 又拒绝。</p>
+<p>修复：保留墓碑（不改数据），把这个状态在所有地方说清楚——`hermes_constants.named_profile_delete_incomplete` 是唯一的判定，`profiles_remove.delete_incomplete_message` 是唯一的话术。`profile list` 增一行「delete incomplete」，`-p`、`profile use`、`create`、`import`、rename 到该名字、webapp 的 `HERMES_HOME` 检查都给同一句提示，删除失败的错误说明留下了什么、怎么删完。</p>
+<p>效果：状态不再自相矛盾；重试删除仍然能删干净。</p>
+<p>删除在 rmtree 成功之前一直算「未完成」（`2ce0143f0d`）</p>
+<p>问题：墓碑一开始写的是「完成」，只在 except-Exception 分支里改标「未完成」。rmtree 里被 Ctrl-C 或 kill 打断（此时身份文件已经删掉了）会跳过那个分支，残留于是读起来像一次完成的删除，同名 create 可以把它抹掉。</p>
+<p>修复：墓碑从一开始就写「未完成」，rmtree 成功之后才变成普通墓碑。</p>
+<p>效果：任何中断点都不会被误判为删除成功。</p>
+<p>残留不被同名 create 抹掉（`b09639b805`）</p>
+<p>问题：rmtree 在删掉全部身份文件后失败（例如某个文件被打开导致 EBUSY），目录就处在「有墓碑、没有身份」的状态。所有入口都把它当成「一次成功删除之后被旧写入者重建的空壳」：`profile list` 隐藏它，`profile create &lt;同名&gt;` 走空壳替换分支，不再二次确认就把剩下的文件删了。</p>
+<p>修复：删除失败时在既有墓碑里记上 `incomplete`，于是 `named_profile_delete_incomplete()` 对这份没有身份文件的残留仍然报「delete incomplete」：list 显示它，create 用「删完或保留」的消息拒绝它，rename 保留它。重试删除会重新写一份普通墓碑再 rmtree，所以重试完成之后被重建的空壳还是照旧可替换。</p>
+<p>效果：数据不会因为「看起来像空壳」被静默删除。</p>
+<p>rename、Ctrl-C、残缺记录都不再让删除记录丢失（`3b1ce49ad3`）</p>
+<p>问题：还有几条路径会把未完成的记录弄丢——rename 在 owner 等待期间或拒绝之后没有保住这条记录，kill 在那里或 rename 被拒之后 create 就能抹掉残留；delete 没有及时复位粘住的 `active_profile`，Ctrl-C 之后两条建议的命令都被拒；空记录、残缺记录、读不出来的记录都会被当成「完成的删除」。</p>
+<p>修复：rename 在 owner 等待期间和拒绝之后原样保留未完成记录（仍然通知 multiplexer）；delete 在写完墓碑后立刻复位 `active_profile`；只有读起来确实是「完成的删除」的记录才允许 create 替换空壳；记录字节只有一个归属（`TOMBSTONE_INCOMPLETE` / `TOMBSTONE_DELETED`），完成的删除若记录无法重写会说明怎么收尾。</p>
+<p>效果：打断、拒绝、竞争三种情况都不会让残留变成「无主」。</p>
+<p>完成的删除不会重建已被清掉的墓碑（`be5f7c0cfd`）</p>
+<p>问题：rmtree 之后、`record_delete_finished` 重写墓碑之前，另一个进程里的同名 create 可能已经把墓碑清掉；用 `O_CREAT` 写回去，等于把刚建好的新 profile 重新标成「已删除」（`-p` 拒绝它，gateway 跳过它）。</p>
+<p>修复：记录改为原地重写（`O_WRONLY|O_TRUNC`，不带 `O_CREAT`）：被清掉的就保持清掉，unlink 与 open 竞争只留下一个孤儿 inode。</p>
+<p>效果：并发创建与删除不会再互相打标。</p>
+<p>先看墓碑再探身份（`b3348ac6a3`）</p>
+<p>问题：`named_profile_delete_incomplete` 现在对任何已存在的目标都跑（import、rename 到该名字），而先探身份会 stat 目录里的文件，Python 3.11~3.13 的 `Path.is_file()` 会把不可读文件上的 PermissionError 抛出来，把调用方原本的「已存在」替换掉。</p>
+<p>修复：先查墓碑，非删除冲突就地短路。</p>
+<p>效果：错误信息正确，且从最多六次 stat 降到一次。</p>
+<p>dashboard 登录与技能索引</p>
+<p>dashboard 登录态可从命令行设置（`e1e1a55c05`）</p>
+<p>问题：给 `hermes dashboard` 设登录态只能走 `hermes dashboard --host 0.0.0.0` 的交互式提示，服务器、容器、脚本里没有 TTY 就设不了。</p>
+<p>修复：`hermes dashboard password [--username U] [--password-stdin]` 把 dashboard 登录态存给 `hermes dashboard` / `hermes serve` 和 gateway 的 Webapp：`dashboard.basic_auth` 下的用户名和 scrypt 哈希（由 `save_config` 以 0600 写 config.yaml），节里没有签名密钥时一并生成，所以登录态能活过重启。密码不从 argv 取、永不打印；`--password-stdin` 拒绝在终端上读（会回显），读第一行 UTF-8、去掉 `\n` 或 `\r\n`（单独的 `\r` 属于密码），空值、非 UTF-8、超过 1024 字节都以退出码 2 拒绝且什么都不写；不带它时在终端上问两次，没有终端就退出 2。</p>
+<p>效果：管理员 pin 在受管 .env 里的覆盖值会在碰 config.yaml 之前被拒绝（退出 1）；home 自己 .env 里的覆盖值在保存后被移除（点名不显示值），移除失败则退出 1 并说明 config.yaml 已改、哪个 key 留在哪个文件；命令还会提示哪个运行中的 gateway 或后端需要重启，`-p &lt;profile&gt;` 设的是那个 profile 的登录态。</p>
+<p>技能索引描述长度可配（`1bcad483e1`、`ee57e22d18`、`6cec6842a9`）</p>
+<p>问题：技能索引里的描述截断长度写死，想让索引多显示一点细节只能改代码。</p>
+<p>修复：新增 `skills.index_desc_limit`。后续两处补丁把它收进 config.yaml（去掉 `HERMES_SKILLS_INDEX_DESC_LIMIT` 环境变量），夹在 60~1024（frontmatter 自身的上限），并让它进入磁盘快照与进程内 LRU 的 key，改了宽度不会继续发旧的截断结果；`skill_manage` 的 schema、`/learn` 和 curator 的提示都引用配置宽度。解析改用 `int()` 并在失败时回退 60，避免 `str.isdigit()` 接受「²」而 `int()` 抛错导致提示构建 ValueError。</p>
+<p>效果：描述长度可配，填坏了回退 60 不报错。</p>
+<p>其他修复</p>
+<p>Nous 模型的视觉能力从 Portal 目录读（`c5331de238`）</p>
+<p>问题：自动图片路由判断某个 Nous 模型能不能直接收图时，能力信息不是以 Portal 目录为准。</p>
+<p>修复：改成从 Portal 目录读视觉能力，而不是另用一份本地判断。</p>
+<p>效果：目录里标为纯文本的 Nous 模型不会再被当作能直接收图。</p>
+<p>切换 Portal 端点会丢掉另一端的缓存目录（`4d52889994`）</p>
+<p>问题：Nous 目录的槽位是按 profile 存的，不是按 URL 存的。运行中改了 profile 的 Portal URL（重新登录到另一个端点、编辑 `NOUS_INFERENCE_BASE_URL`）之后，视觉查询仍然从第一个端点的目录里回答，于是新端点只提供文本的模型照样被塞图片。</p>
+<p>修复：视觉查询记录自己读的是哪个 URL，URL 一变就重置缓存、失败标记、磁盘水合和视觉读取的守卫再读一次。</p>
+<p>效果：切换端点后图片路由按新端点的能力走。</p>
+<p>profile 创建钩子改用一次性插件宿主（`859d90e90f`）</p>
+<p>问题：`plugins.isolation: host` 时，`notify_memory_provider` 通过新 profile 的共享插件管理器和宿主加载它的 memory provider，退出时把 provider key 上新增的注册全部 dispose、并停掉在块内启动的宿主。如果钩子里真的发生了同一 profile 的 provider 加载（例如 dashboard 正在服务这个新 profile），那些注册会丢，正在进行的调用抛 `PluginHostUnavailable`。</p>
+<p>修复：`transient_plugin_host()` 现在给出该 profile home 的一次性 `PluginManager`，用独立的 scope key（`&lt;home&gt;#transient`），所以不会被合并进共享管理器；退出时只卸载这个管理器、停自己的宿主，共享的管理器和宿主从不被触碰。</p>
+<p>效果：创建 profile 不会影响同一 profile 上正在跑的插件调用。</p>
+<p>Telegram 草稿流第一次运行就可用（`aa0400f06d`）</p>
+<p>问题：`send_draft` 从 `plugins.platforms.telegram.adapter` 读 `ParseMode`，而 gateway 跑的是 `hermes_plugins.platforms__telegram.adapter` 那份拷贝。插件加载时缺 python-telegram-bot，两份拷贝都把 `ParseMode` 绑成 None，注册表的安装器只重绑运行中的那份，于是第一帧草稿抛 AttributeError，流式消费方按 DEBUG 记一笔就把草稿关了，这个 gateway 的所有私聊轮次都要靠改消息直到重启。</p>
+<p>修复：`ParseMode` 改为调用时从 `telegram.constants` 取（standalone.py 早已这么做）。</p>
+<p>效果：按需装完依赖后的第一次 gateway 运行就能流式草稿。由 AliZakaee 报告（#152827）。</p>
+<p>终端持久化预览保留输出尾部（`5b397ead15`）</p>
+<p>问题：`generate_preview` 是头部截断，即使元数据块把 exit_code/error 提到最前面，一次失败的构建的报错行仍在长输出的末尾，还得 read_file 去捞。</p>
+<p>修复：持久化的终端信封在「元数据 + 头部窗口 + 省略标记 + 尾部窗口」的同一预算内组合预览，溢出文件仍然保留完整输出（省略只发生在预览里），尾部从正文取而不是元数据块之后取。</p>
+<p>效果：失败输出的错误行直接出现在预览里。</p>
+<p>以上为 11-22 期 RSS 内容，口径与视频一致：按「合入 main 的时间」统计，不是 commit 作者时间。</p>
+    </section>
+    
     <section id="2026-11-21" class="day">
       <h2>Hermes 日报 2026-11-21：桌面端流式渲染 19 项优化，回复结束不再重解析整条消息</h2>
       <p><strong>本期覆盖 11 月 20 日 06:30 ~ 11 月 21 日 06:30 合入 main 的提交，共 192 个 commit（不含 merge），另有 6 个 merge。新增 14 个功能、105 个修复、19 个性能优化。行内 commit date 跨 11-16 ~ 11-21（多数是 rebase 保留的原作者时间），按合入 main 的时间都落在这个窗口内。另有 2 条无 scope 前缀的 fix（/learn 深链安全）未计入上面的分类统计。</strong></p>
