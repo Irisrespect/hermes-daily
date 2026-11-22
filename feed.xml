@@ -5,8 +5,68 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Sun, 22 Nov 2026 06:49:18 +0800</lastBuildDate>
+    <lastBuildDate>Mon, 23 Nov 2026 06:51:28 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-23：插件目录一天新增 68 条，桌面端群聊记录与 profile 克隆一并修复</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-23</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-23</guid>
+      <pubDate>Mon, 23 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 22 日 06:30 ~ 11 月 23 日 06:30 合入 main 的提交，共 399 个 commit（不含 merge），另有 1 个 merge。新增 64 个功能、63 个修复、0 个性能优化。行内 commit date 分 11-21（198 条）和 11-22（201 条）两天，部分是 rebase 保留的原作者时间，按合入 main 的时间都落在这个窗口内。另有 11 个 test、126 个 chore、39 个 catalog 类提交未计入上面的功能/修复数字。这一天的新功能绝大部分是社区插件目录的新增条目（68 次新增类提交，去重后 60 余个新条目；口径为 subject 含 add 的目录提交，另有 PipoPapo、Dead Drop 等少数新条目没用 add 字样，未计入），代码侧的改动集中在桌面端群聊存储、profile 克隆与导入、Kanban 派发预检三条线。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端群聊记录收敛为一份写入投影：同步之后重启窗口不再放出已停掉的 bot。</p>
+<p>插件目录新增 68 次提交，rollstack 被重新固定并显式声明 MCP 服务器不受信任。</p>
+<p>Profile 克隆改为复制来源的 auth.json，不再让来源的键配上默认 profile 的账号。</p>
+<p>Kanban 派发前的模型预检与运行时解析对齐，19 个修复集中在自托管路由和配置故障。</p>
+<p>cron/webhook 的静默标记做了一轮加固，方括号被截断或拼错时不再把标记发进聊天。</p>
+<p>重点条目：</p>
+<p>桌面端：群聊记录的三个写入函数合成一个（`49a2bdcab9`，测试 `0f602c5f6f`）</p>
+<p>问题：存下来的群聊映射有三个写入函数，各自按字段重建房间对象，版本之间已经漂移过四次（roomId、sectionId、heldMessages、engine 各补过一次）。其中 durableGroupChatRooms——每次 gateway 同步拉取和发布都走它——漏写 holds 和 sessionOwners，于是任何一次同步之后重启窗口，都会把你已经停掉的 bot 重新放出来（#93129）。disbandGroupChat 的重写漏了 holds、heldMessages、holdDetection、stranded、externalCursors、pinned、rosterOrder、sectionId 八个字段；读取侧的还原又漏了 holdDetection 和 heldMessages，所以一个关掉停止检测的房间重新打开后会变回开启。</p>
+<p>修复：group-chat-record.ts 里只保留一份写入投影和一份读取还原，三个写入全部走 persistGroupChatRooms。类型上要求除运行时的 epoch/running/tombstone 外，GroupChat 的每个键都必须在投影里，新增字段或从任一侧漏掉字段都会让 tsc 报错。配套测试覆盖解散重写不带另一个房间的墓碑。</p>
+<p>效果：字段遗漏从「靠 review 逐个抓」变成编译期拦截，同步后重启不再改回用户已经关掉的状态。</p>
+<p>桌面端：分享密钥提示按真实行为改写（`5e2124dc82`、`ad6d519ace`）</p>
+<p>问题：创建对话框里「分享密钥与账号」的提示，四个语言版本（英、日、简、繁）都写着登录信息永远不会被复制。但从 #158211 起，克隆一个命名 bot 会复制该 bot 的登录（_logins_home），默认 profile 的登录保持共享。</p>
+<p>修复：提示和 share_auth 的注释一起改，说明克隆会复制来源 bot 的登录，并补上「只有全新的 bot 才用当前启动 profile 的登录」——克隆的登录来自它的来源或默认 profile，从不来自创建它的那个 profile。</p>
+<p>效果：提示和实际行为一致，用户在创建和克隆时能分清哪个 profile 的账号会被用到。</p>
+<p>插件目录：一天新增 68 条，rollstack 标为不受信任</p>
+<p>新增样例：`0ec05b45a3`、`6efe2eb8ee`、`d56d4c868b`、`94e38dca7c`、`c9dda27fd6`、`6d3c0f16fc`、`8b886f1fd9`、`0ea564b6ac`、`c0f60ad0ac`、`556c5181d7`、`22e22e7d82`、`b761a30cda`、`80220103a4`、`693e57ff4a`、`e66897bc93`、`bfcef20735`、`ec907affcc`、`13ec778911`、`8e95e9616e`、`f047c507fd`；信任修正：`8c489ea763`、`4a3595e8e7`</p>
+<p>问题与改动：这一天有 68 次目录新增提交，覆盖笔记（Obsidian）、智能家居（valetudo）、多平台消息（beeper-platform）、终端监控（tmux-watch）、仪表盘（stats、Session Progress）、快捷提示（quick-prompts）、Slack 历史、便利店/充电桩一类的小工具（instabox、chinadrivetest、chinavisacalc）、社区记忆 provider（katara、re-call）、本地模型 provider（abliteratedllm）、路由插件（polytropos-router、utcp-bridge）、Lot Map、pstack-hermes、dsh 等。</p>
+<p>目录侧同时处理了一次信任披露：rollstack 重新固定到 1.3.6，这个版本的 skills 声明 extensions.com.nousresearch.hermes.servers.rollstack.trust 为 untrusted，条目现在披露这一点；登录说明里补了 hermes config set mcp_servers.rollstack.trust untrusted——因为原生 hermes mcp add 写入的条目会替换包里的声明、只把费用相关的键带过去，不做这一步，已登录用户会丢掉包里的这条声明。</p>
+<p>效果：目录条目数量和覆盖面明显扩大，同时新增插件里的服务器信任状态对用户可见、可保。</p>
+<p>Profile：克隆、导入和重命名的边界修复（`332d83b143`、`ef6f51f909`、`a26e2a10ea`、`35693976e3`、`427b87092c`、`cbfc05acd8`、`da8e7d71ab`、`9b70b9b331`）</p>
+<p>问题一（克隆拿到错账号的登录）：--clone-from 一个命名 profile 时只复制来源的 .env 键，没复制 auth.json，克隆出来的 profile 通过 auth 回落到默认 profile 的登录，结果是来源的键配上另一个账号。另外来源没有自己的 auth.json（从 root 创建的 profile 默认如此）时，--isolated-auth 关掉了共享却没有东西可复制，最后还是共享 root 的登录。创建完成后的回执也写错了来源：它说 key 和模型来自克隆来源，实际上 .env 镜像和模型填充读的是启动 profile，只有 auth.json 跟随来源。来源在登录步骤之前被删掉时，_logins_home 拿到 None，回落到启动 profile，克隆可能被登成那个 profile 的账号。</p>
+<p>修复一：命名来源的 auth.json 随克隆一起复制（一次性授权被剥离），root 来源的克隆继续共享；登录目录按「来源自己的 auth.json，否则 root」解析，共享判定、复制和一次性登录警告都用同一套；回执拆开写，key 和模型列启动 profile，登录列克隆来源；登录步骤读来源失败时干脆不复制 auth.json，profile 像其他没有自己 auth 的 profile 一样读 root，并把失败保留成警告。</p>
+<p>问题二（导入/重命名竞态）：从检查名字不存在到真正移动之间，如果另一个进程（create/import/rename）发布了同名 profile，导入会用 shutil.move 把归档移进赢家目录（profiles/racer/racer/…）却报告成功；重命名会抛裸 OSError [Errno 39] Directory not empty。另外同名的 create 和 import 会共用并删掉彼此的 .&lt;name&gt;.staging-&lt;pid&gt; 目录。</p>
+<p>修复二：两者都改走 create 用的 publish_staging（一次 rename 完成发布），导入在同级 clone_staging_dir 里解压并在 _create_lock 下发布，输的一方拿到常规的「已存在」。</p>
+<p>问题三（Windows 残留）：导入失败时用普通 rmtree(ignore_errors=True) 清理，删不掉只读文件（比如克隆技能里的 git object），竞态失败或被拒的归档成员会留下一个 profiles/.&lt;name&gt;.staging-&lt;pid&gt; 半成品。</p>
+<p>修复三：改成在目标旁边开一个 0700 的 TemporaryDirectory 解压（同一文件系统），清理时把只读位一起清掉；测试也改成设真实 umask 并断言导入成功后不留暂存根目录。</p>
+<p>效果：克隆登录来源可预期，并发发布不再互相写成嵌套目录，Windows 上失败的导入不留垃圾。</p>
+<p>Kanban：派发前的模型预检与运行时对齐（19 个修复：`fbd2c43235`、`5c0cd0cee0`、`44af047a88`、`964d381722`、`88a1c1f4b1`、`568a8f6301`、`2c449287e7`、`9cdc4c7ade`、`698d32b842`、`8f085c3372`、`a97e50c80d`、`60b05fdd8a`、`5ea0b99cad`、`4763d6eae6`、`6d276fd35f`、`917c381806`、`c649ed887b`、`eda7fde9c0`、`4c5e5bc5a5`）</p>
+<p>问题：派发器的模型预检和真正跑这一轮时的解析路径不一致，于是「自托管还是公网」的判断在两个地方给出不同答案。具体表现：provider 写 qwen 时，目录别名把 qwen 解析成 alibaba，没指定模型的卡片冻住阿里的默认模型（qwen3.8-max），而运行时 auth.resolve_provider 把 qwen 跑成 qwen-oauth——274 种 provider 拼写里只有 qwen 这一处两者不同；HERMES_CODEX_BASE_URL（openai-codex）、NOUS_INFERENCE_BASE_URL（nous）、HERMES_QWEN_BASE_URL（qwen-oauth）由各家 provider 自己的解析器读，不走注册表的 base_url_env_var，所以那里的自托管覆盖不会让卡片推迟；预检还想预判 built-in 的 scoped *_BASE_URL、model.base_url 和注册表默认值哪个会被取用，而运行时分支顺序并不一样（lm-studio 别名、Azure Foundry、Anthropic relay）；配置后端不可用（ConfigBackendUnavailable，一个 SystemExit）会逃出派发、把认领卡死；respawn 守卫按 ended_at DESC LIMIT 1 取最近一次结束的运行，但结束时间只到整秒，同一秒里「认领被回收」和「派发被 403 推迟」并列时按扫描顺序读到了更早的 reclaimed 记录，错过基础设施推迟，还被推迟文本里的 403 判成 blocker_auth 永久停派。</p>
+<p>修复：预检直接用运行时的 auth.resolve_provider 取 built-in provider；三个自托管 base URL 环境变量加入候选；只要这一轮可能用到的 URL 有一个是自托管的就推迟（loopback 路由在目录默认值之前就判掉；Tailscale MagicDNS 的 *.ts.net 只在 Kanban 判定里算自托管，因为 is_local_endpoint 同时驱动请求超时）；派发器不再 import gateway.run、不再建两遍发布策略，改为读 assignee 的有效配置并共用一个 task_model()，--provider 指向另一个命名端点时按 CLI 取该条目的模型，--model 仍然最优先；配置后端不可用改为 ProfileConfigUnavailable，记为基础设施 spawn_failed、不消耗重试预算，修复提示直接给出 HERMES_HOME=&lt;root&gt; hermes -p &lt;name&gt; model 这条命令；respawn 守卫按 id 打破并列、基础设施失败跳过 blocker_auth 匹配，被拒绝时给出的 unblock 命令也会指明是哪个看板。</p>
+<p>效果：卡片不会因为一个「看起来是公网」的 URL 被派到本地或自托管端点上，配置平面故障不再永久停派卡片，重试预算也不再被基础设施失败吃掉。</p>
+<p>后台：静默标记加固（4 个修复：`7c2020a87c`、`c1a4df060e`、`483d2f139d`、`6bf9269903`）</p>
+<p>问题：自动通道（cron、webhook）的回复就是它投递的消息，想安静就返回 [SILENT]。回放 265 条真实 cron 回复发现六条整条被当成正文发了出去：方括号被 provider 截断成单个 [、[SLENT]、[SLIENT]、[ SILENT ]、以及中间夹一个零宽字符的 [&lt;U+200B&gt;SILENT]。另外模型常常用代码格式包住标记（行内反引号、双反引号、围栏代码块），而旧的判断只认裸 token。gateway 一侧还有拼写漂移：U+200B 属于 Cf 类不是空白，split() 不会在它上面断开；[审核] 这种直接换掉标签的；[ SILENT ] 这类方括号内带空格的；以及以标记开头、其实是围栏代码块的正文。历史上有一例：配置为 [SILENT] 的 cron 任务把 [ SILENT ] 投递到了 Telegram 和桌面端。</p>
+<p>修复：只判整条回复——去掉不可见字符（Cf 类）、NFKC 归一化、去大小写、剥掉代码包装和首尾强调之后，如果它是一个方括号 token 且与 silent 只差一个字母（闭括号可缺），或者是标记的未闭合截断（[、[S、[SIL），就算静默；有第二个字的、或者差两个字母的方括号词（[URGENT]、[SILVER]、[SILENCE]）照常投递。剥代码包装只剥整个值或独占一行的包装（任意 info string 的围栏、任意长度的反引号串）以及「[SILENT] 说明」这种开头行内 span；正文中间的行内代码提及和真正的代码块仍然投递。以标记开头但跨行的行内 span 视为围栏代码块，不再按前缀剥离；先删不可见字符再裁空白，避免只有不可见字符和换行的回复抛 IndexError。交互式会话的精确规则不变。</p>
+<p>效果：模型写歪一个字母或包一层代码格式时不再把标记发到用户面前，而真正带内容的回复不会被误吞。</p>
+<p>终端：CLI 和 Ink TUI 用 OSC 7501 上报程序状态（`42569a6c9f`、`2564867594`、`08e86c59fd`、`87d0950c66`、`643f140371`、`c7a3fe245d`、`b149403a24`）</p>
+<p>问题与改动：按 Program Status 规范通过 OSC 7501 上报程序状态（从 block/goose#12928 移植）。规范里 idle/done/error 都活得比进程久，不发 clear 的话，/exit 之后后台面板还把你列成一个 agent（在 herdr-core 0.1.18 里实测 `hc get` 仍返回 {app: hermes, state: idle}，而前台已经回到 bash）。经典 CLI 在 _tui_shutdown 里先发 state=clear，再拒绝后续上报，避免一个被打断的轮次在退出过程中把记录又写回去；Ink TUI 用 process &#x27;exit&#x27; 兜底、和 resetTerminalModes 一样走 writeSync。同时统一了轮次结果口径：一次性运行结束会清掉终端状态，TUI 被阻塞的报告会说明原因，斜杠命令和计费确认在 CLI 上像 TUI 的确认浮层一样报 blocked。OSC 7501 的状态收敛到一个所有者（review 意见落地）。</p>
+<p>效果：退出后终端面板不再留着一条「还在跑」的记录，阻塞和失败在 CLI 与 TUI 里给出同一套说明。</p>
+<p>升级：N-1 网关在热更新期间不再 ImportError（`14a763c758`、`21ec322b33`、`c9adedc024`）</p>
+<p>问题：一个 restart_pending 的旧版网关会继续活着，把在飞的轮次跑完，而 `hermes update` 已经把磁盘上的文件换掉了。它启动时缓存的是旧的 agent.file_safety、agent.skill_utils、tools.skills_tool_dedup，之后懒加载新符号就 ImportError：dashboard 首次请求挂载时缺 hermes_credential_homes（v0.23.3 网关的路径）、技能描述上限缺 get_skill_desc_limit、首次工具调用缺 release_replaced_skill_view*。</p>
+<p>修复：三处都改成 importlib.import_module + getattr 取，缺了就回落到旧版已有的等价物——_credential_store_dirs（v0.23.3 语义相同，保留 backend_migration 守卫）、SKILL_PROMPT_DESC_LIMIT（60）、空操作的 release 函数。真正的模块缺失或损坏仍然抛 ModuleNotFoundError / ImportError。</p>
+<p>效果：`hermes update` 时正在收尾的轮次不会因为模块对不上而崩掉。</p>
+<p>CI：macOS 公证的前置校验（`b7f087e99f`、`06ecdea621`、`120b5301d2`、`5a93368019`、`33ca244682`、`290ad0bb1f`、`43728a8d23`）</p>
+<p>问题与改动：构建前先校验 App Store Connect 密钥，只接受 EC P-256 的 PKCS#8；截断的、畸形的（包括 DER 只剩一个 tag 字节的 PEM）在调 notarytool 之前就拒掉，并有专门的测试盯这条。notarytool 自己的输出会被分类但保持在前置日志之外，密钥正文行在诊断里脱敏；release candidate 构建拿到控制器的 checkout，渠道控制器助手按工作流自己的 checkout 门控放置。</p>
+<p>效果：凭据有问题时在构建开始前失败，不再等十分钟到公证阶段才发现，也不会把密钥内容写进日志。</p>
+<p>其他顺手修的（`ed9b42ff42`、`13141ee4ef`、`62595296a9`、`d421683cb6`、`ff19b196ba`、`83b889e7d4`）</p>
+<p>prompt-cache：零价格的缓存写入不再插标记——两个在用的 Nous 模型价格字符串带小数位（用 0.000 这种写法），整数 0 和浮点 0 以前都被当成收费写入，只有正的有限费率才算；学习到的路由规则原来只留最近 8 个缺失样本，一次噪声聊天就能把另一个会话的样本挤掉，现在裁剪先丢同一会话里更早的样本；未插标记的 keep-alive 决策原来要解析三遍 prompt_cache_routes.json，现在只读一次；search_files 的文档改成按 offset 翻页（它返回前 50 条，不是最新的 50 条）。</p>
+<p>bundles：离线沙箱检查允许 down 且无地址的内核隧道接口，不再误判。</p>
+<p>pm：固定的编译器默认值应用到 PM Python 的暂存副本，避免污染宿主解释器。</p>
+<p>review：把 search_files 的命中往前翻页取最新日志。</p>
+<p>dev：pre-commit 的 desktop/TUI lint 在 linked worktree 里又能跑（相对路径改成从工作树根解析）。</p>
+<p>refactor：简化 warming_rule，把相关的跟进测试并回各自主题的测试文件（`83b889e7d4`），属于这一批 prompt-cache 修复的收尾。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-22：旧 dashboard/serve 后端可一键迁移到 gateway，桌面端新增 hermes://launch</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-22</link>
