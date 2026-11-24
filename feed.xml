@@ -5,8 +5,107 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Tue, 24 Nov 2026 06:53:37 +0800</lastBuildDate>
+    <lastBuildDate>Wed, 25 Nov 2026 06:45:22 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-25：插件目录新增 53 个条目，Gemini 推理搬到无状态接口</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-25</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-25</guid>
+      <pubDate>Wed, 25 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 24 日 06:30 ~ 11 月 25 日 06:30（北京时间）合入 main 的提交，共 360 个 commit（不含 merge），另有 3 个 merge。新增 68 个功能、48 个修复、0 个性能优化。commit 日期跨度为 11 月 20 日 ~ 11 月 24 日（按 tip 增量采集，口径是「合入 main 的时间」，不是 commit 作者时间）。</strong></p>
+<p>📌 今日要点：</p>
+<p>插件目录一次新增 53 个条目，目录总数到 2633 个。</p>
+<p>Gemini 接入（solstice）换成无状态 Interactions API，带来思考摘要和每模型的思考档位。</p>
+<p>插件 API 开放会话来源、静默规则和 cron 调度接口。</p>
+<p>内置早晨简报不再要求先做 Google OAuth。</p>
+<p>dashboard password 删除 .env 覆盖时不再弄坏多行证书。</p>
+<p>重点条目：</p>
+<p>插件目录：一次新增 53 个条目</p>
+<p>本期 360 个提交里有 272 条只改动了插件目录文件（另有 2 条同时改了目录和其他文件），是本期最大的一块工作量。按 yaml 文件新增数（git diff --diff-filter=A）统计，本期新增 53 个条目、修改 97 个条目，目录总数达到 2633 个。</p>
+<ul>
+<li>hermes-scout（a5c2289f02 新增、09138609a9 改名定版 v0.1.0）：把本地笔记、文档、代码、PDF 和 Word 文件建成本地索引，scout_search 按语义和精确词检索，scout_similar 找相关文件；问题按语义排序，ERR_4291 这类代码式查询把精确匹配排在前面（SQLite 全文 BM25）。嵌入走任何 OpenAI 兼容的 /embeddings 端点，默认是本地 Ollama；增量 SQLite 索引只重算改过的文件。附带 /scout 命令（doctor、status、index、clear）和技能包，只用标准库。</li>
+<li>Termalin（3c9fd0a5b2）：hosted MCP，Streamable HTTP + OAuth 登录，不把 SSH key 交给 agent 就能在自己的 Linux 服务器上跑命令、传文件、查 Postgres/MySQL、读指标和待装安全更新；写操作标记为 untrusted，Hermes 会先问。</li>
+<li>Yandex Alice（2760924368）：把私有的 Yandex Dialogs 技能变成和 Hermes 的连续语音会话而不只是一次性命令；会话保持打开，追问接着同一个 gateway 会话的历史，慢回答等 3.5 秒后给出等待/稍后问/发到 Telegram 的选项，长回答分段念，说&quot;repeat&quot;重读上一条，详情和审批卡片发到 Telegram，网关重启后会话状态还在。</li>
+<li>Bark iOS 推送（df4ea055f0）：作为一等投递平台，cron 可用 --deliver bark、hermes send 可发 --to bark[:device]，另有 bark_notify 工具和轮次结束/子任务结束钩子；支持多设备别名、逐条 level/sound/group/TTL/badge。</li>
+<li>vaultwarden-secret-source（339141dbdc）：无人值守部署的只读密钥源，用专用账号的 API key 和主密码自举，自己续 bw 会话，启动时把指定条目的隐藏字段读进环境变量；登录态放在系统临时目录的 0700 目录，不落 HERMES_HOME 或日志。</li>
+<li>gws-workspace v0.9.1（d8a1dffb98）：多账号 Gmail、Drive、Calendar 的原生 gws 工具，斜杠命令可在当前会话或新会话里开启变更通知。</li>
+<li>Turn timings（0a91f1c2ad）：桌面端显示实时轮次计时并把完成的耗时保存成面板（macOS）。</li>
+<li>Linux Notify（e494c5398d）：approval、clarify、sudo 提示出现时长轮次结束或中断时发 Linux 原生通知，走本地 D-Bus，不联网、不读文件。</li>
+<li>Run receipts（afa5c99123）：每次 agent 参与的 cron 运行写一条回执（job id、session id、起止时间、工具调用与错误数、结局），能区分&quot;silent 但真的检查过&quot;和&quot;从没调工具&quot;，用 /receipts 或 run_receipts_query 读回。</li>
+<li>其他新增：Palisade 邮件认证审计（df6b535521）、offline-zim 本地 ZIM 离线库检索（a5d0c5d16a）、gpu-monitor（02c5734d6f）、SolverForge Workbench（a08c689a4e）、AirPrompter 存档提示词（ea45834c0e）、senpi 便携包（bbb2173c92）、hermes-declines（7131e35b74）、hermes-scout 之外的 semantic-search 别名、phone-bud、taskaid、allscale、olostep、venice、0g-provider、oci-provider、bf16-provider、deapi-provider、memory-fit、delegation-gate、ficelle-compression、repeat-pause、right-suite、trismegistus、wigoo 等。</li>
+</ul>
+<p>Gemini 接入换代：推理搬到无状态 Interactions API（35ee312df8）</p>
+<p>问题：solstice 之前调的是 v1alpha 的 generateContentPerUserQuota 方法，拿不到思考摘要，也发不了每次请求的思考档位。</p>
+<p>修复：每个请求改发到 v1beta 的 interactions:createPerUserQuota，带 store: false。长解码关掉——单请求上限 65536 输出 token，不存、不续，因为这个方法拒绝已存储的 interaction；不再发 temperature 和 top_p；请求头只有 bearer token、content-type 和 hermes-agent 的 User-Agent，不再带 API key、user-project、DPoP；流在 interaction.completed 之前结束会直接抛错而不是返回半截（没有东西可续）。</p>
+<p>效果：拿到思考摘要、每次请求的思考等级、签名思考步回放。SolsticeClient 改成继承 gemini 插件的 GeminiClient，通过新钩子走它的 Interactions wire，gemini provider 本身行为不变。</p>
+<p>模型列表收窄，思考档位按模型走（a45d3b87df）</p>
+<p>问题：per-user-quota 端点只服务固定一组模型 ID，每个 ID 有自己的 thinking_level 集合，其他 ID 或档位会拿到 HTTP 400（或零限额 429）。solstice 还在提供端点已不服务的 ID，而且把 effort 交给共享的 Gemini 4 助手——它不知道每模型的档位集合，没设 effort 时什么都不发，于是从没请求过思考摘要。</p>
+<p>修复：模型列表只留端点服务的 ID，第一个仍是默认；每个模型带自己允许的档位和默认值——没设 effort 就发该模型默认档位并开思考，设了就夹到该模型的档位内，关思考则在该模型最低档位隐藏思考；setup 的档位选择器只列该模型的档位；基址升到 v1beta。列表外的 ID 仍走共享 Gemini 映射。</p>
+<p>标题被思考吃满，空标题（dbb3088d82 / 8abe5a0c50 / 179c24c082）</p>
+<p>问题：solstice profile 没有 build_extra_body，reasoning 落到通用的 extra_body.reasoning，被原生 Gemini 客户端丢掉，thinkingConfig 从没上过线：标题那趟的&quot;关思考&quot;没生效，Gemini 4 Neon 按默认档位思考，把 512 token 的标题上限在约三分之二的调用里吃光，回复为空、首条消息的标题被截断；主轮次的思考档位同样被忽略。</p>
+<p>修复：用共享 Gemini 助手把 reasoning 翻成原生 thinking_config（gemini 和 vertex profile 也是这么做的）；标题回复在输出上限处为空时打警告（以前静默）。另外两条：警告改为检查清理后的标题，被截断且清理后无内容时也会记录；措辞改成 finish reason，不再说没验证过的 512 token 上限（不转发 max_tokens 的路由从来没有这个上限）。</p>
+<p>效果：Gemini 路线上的标题不再因为思考耗尽上限而空着或截断，主轮次的思考档位真正生效。</p>
+<p>已下线模型自动回落（73123e8263）</p>
+<p>问题：模型列表去掉了 gemini-4-argon、gemini-3.1-pro、gemini-3.8-flash，端点不再服务；但用户配置里选过其中一个的话会一直留在配置里，那条路线的每一轮都拿被拒的 ID 发出去。</p>
+<p>修复：就这三个 ID（各种前缀写法、大小写都认）映射到 FALLBACK_MODELS[0]，映射放在一个助手里，被 normalize_model_id 钩子、build_extra_body、setup 选择器和客户端共用；每进程每个已下线 ID 只记一次日志，其他 ID 原样保留。</p>
+<p>版本太旧的 gemini wire 直接拒绝（24b148198e）</p>
+<p>问题：发现逻辑接受任何带 interactions 模块的 gemini 插件包，于是更旧的 profile 本地副本（http_error 没有 key_guidance 参数）也能通过查找，然后在第一个错误响应上 TypeError。</p>
+<p>修复：解析 wire 时检查这个传输会调的这些名字、以及 http_error 是否接 key_guidance；不兼容的副本在任何请求之前就报 gemini_wire_unavailable，并列出缺了哪些名字。</p>
+<p>cron 插件 API：调度命名任务、读投递平台（80d6bba3dc）</p>
+<p>问题：插件想建一个命名后续任务、或想知道某个 cron 任务的输出会投到哪些平台，只能 import cron.jobs、cron.scheduler、cron.scheduler_provider 或 cron.scheduler_delivery 的私有助手。</p>
+<p>修复：发布 cron.plugin_api，两个函数 ensure_named_job 和 delivery_platforms 转发到 cron 已在跑的代码（带调度器注册的建任务、provider 的 register_job、cron 自己的投递目标解析器），自己不添加规则。home 参数把另一个 profile 整体绑定（它的 Hermes home、密钥、终端策略加 cron 存储），按 multiplex 语义运行，用那个 profile 自己的时区和渠道凭据；调用后状态复原，抛异常也复原；不存在的 home 不会被创建。</p>
+<p>效果：插件可以安全地替某个 profile 建一次性命名任务、查投递平台，且不能越权跑到别的 profile。</p>
+<p>插件能读会话来源、委派子任务和分叉（f261cd2d41）</p>
+<p>问题：通知类插件想只对用户自己的轮次发提醒，只能 import gateway、agent 或 tools 的内部实现。</p>
+<p>修复：session_source() 返回该会话创建时带的标签（cli、tui、gui、acp、tool、oneshot 表示人发起的聊天，其他非空值表示 Hermes 自己起的会话，空串表示没有绑定启动策略：会话外、人的消息轮次和 cron 运行）；in_delegated_child() 判断是否跑在 delegate_task 子任务里（可选包含子进程）；fork_origin() 在分离分叉里返回 background_review、side_question 或 plugin_fork:&lt;id&gt;，普通 agent 返回空串。只读当前轮次的策略，不看环境变量。</p>
+<p>平台插件可以复用 gateway 的静默规则（c8bb9645e6）</p>
+<p>问题：平台插件要判断&quot;这轮回复值不值得发&quot;，只能 import 私有的 gateway.response_filters。</p>
+<p>修复：公开三个名字：is_intentional_silence_response（整条回复就是 [SILENT]、NO_REPLY 这类静默标记时为真）、strip_trailing_silence_marker（去掉独占一行收尾的标记）、is_autonomous_silence_response（没有用户等待的运行，比如 cron、webhook，用的更宽松规则）。gateway/response_filters.py 一行没改，模块的其他名字依然私有。</p>
+<p>插件能知道 gateway 会话在等哪条提示（06296e269e）</p>
+<p>问题：插件看不出某个 gateway 会话正在等 approval、clarify、sudo、secret 或 vault 之类的回答。</p>
+<p>修复：新增两个观察钩子 on_session_prompt 和 on_session_prompt_settled，由 gateway 会话所有者对每个&quot;人替会话观众回答&quot;的提示触发，带回答它的 id：approval/clarify 在 approval.request/clarify.request 事件发布时触发、提示离开待处理集合时 settled；request 帧在 sudo、secret、clarify（批量）、vault.unlock_prompt、vault.code、vault.save_login 帧打开时触发、在 request.cancel 之后按该事件的原因 settled。参数是观众所见的深拷贝，所有字符串都经 force-redact，永远不含答案。调用排到单线程 FIFO，插件代码不会在事件流锁或请求登记锁下、不会在 agent 线程或事件循环上跑。插件异常按 debug 记录后吞掉。</p>
+<p>Gemini thinking 助手公开给 provider 插件（16fd059ad8）</p>
+<p>问题：走原生 generateContent wire 的 provider 插件没有公开办法把 Hermes 的 reasoning 配置映射到 thinkingConfig——映射在私有核心里，插件要么自己重写每模型规则，要么 import 内部实现被边界 lint 拒绝。</p>
+<p>修复：在 agent.reasoning_effort 的新 plugin_api.json 组里公开 gemini_thinking_config(model, reasoning_config)、bare_gemini_model_id(model) 和 clamp_effort，写进 provider 指南并重新生成 public-api.md。gemini 和 vertex profile 不变，测试对照它们的实际输出。</p>
+<p>内置早晨简报不再要求 Google 配置（7ff4a059ec）</p>
+<p>问题：morning-brief blueprint 附挂了 google-workspace 技能，该技能声明必需凭据文件（google_token.json、google_client_secret.json），cron 预检对每个没做过 Google OAuth 的人直接拒跑（&quot;attached skill &#x27;google-workspace&#x27; is not ready&quot;）。prompt 自带的回退（&quot;没有数据源就给一句早安&quot;）永远走不到；用托管连接应用接了 Gmail/Calendar 的人也被这个没用到的技能挡住。</p>
+<p>修复：去掉附挂技能，prompt 改成与来源无关——从任何已连接来源读日历和邮件（托管连接应用或配好的技能），简报规则（当天窗口、冲突、会议准备、需要回复的邮件）内联进 prompt。另加一条不变量测试：内置 blueprint 不得附挂声明了必需凭据文件或环境变量的捆绑技能。</p>
+<p>对话式 /blueprint 保留 blueprint 的技能（8fc0374447）</p>
+<p>问题：`/blueprint &lt;name&gt;` 不带槽值时给 agent 一个种子轮次，逐个问槽位再调 cronjob(action=&#x27;create&#x27;)；种子只写了 schedule 和 prompt，没写 blueprint 的技能，于是建出来的任务丢了直接路径和面板路径都会附上的流程技能（例如 Important-mail monitor 没有 email-inbox-triage）。</p>
+<p>修复：种子要求 agent 在 create 调用里传 skills=[...]。</p>
+<p>cron 的一批一致性修复（feceed663e / a5a7a0784d / 5159f3be0d）</p>
+<ul>
+<li>插件查找限定在单个 profile 内（feceed663e），不会串到别的 profile。</li>
+<li>delivery_platforms 在 job_id=None 时答&quot;正在跑的这一轮&quot;的设置：在 cron.execution_identity.enter_cron_execution 里抓一份与投递相关的快照，任务中途被编辑或删除也不会答错；显式传 job_id 仍是对已存任务的预览。同时给 PluginContext 加了 cron_delivery_platforms，host 隔离模式下在调用钩子的上下文里就能读；CronSchedulerRegistrationError 从 cron.plugin_api 再导出，插件不用私有 import 也能捕获。</li>
+<li>ensure_named_job 以前用 list_jobs 查名字，会顺带读每个任务的最新与在飞执行记录，已有任务因此带回两个新任务没有的键，还白付一次账本读取；现在直接读 job store，两种路径返回同一种记录形状。文档改成用 ctx.current_cron_execution().job_id 指代正在跑的任务（插件宿主里也能答）。</li>
+</ul>
+<p>dashboard password 不再弄坏 .env（783d58e564 / f44f7bf41b）</p>
+<p>问题：`hermes dashboard password` 要删掉会覆盖 config.yaml 的 HERMES_DASHBOARD_BASIC_AUTH_{USERNAME,PASSWORD,PASSWORD_HASH} 行，用的是逐行删除。但加载器是 python-dotenv，它把双引号或单引号跨多行的值读成一个值。实测：一个含四行 PEM 式 TLS_KEY=&quot;...&quot; 的 .env（其中一行是形似的 HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=look-alike...）被删掉了证书值里的相似行，TLS_KEY 静默损坏；两行的密码只删了第一行，留下无法解析的 `second&quot;` 残行，文件从 300 字节变成 174 字节。</p>
+<p>修复：.env 里有任何跨多行引号值时，按 python-dotenv 的解析整段删除赋值，在原有 .env 写锁下进行，其他字节原样写回（BOM、注释、被删赋值前的空行、换行符、文件权限）；另一个值里的形似行属于那个值，保留。有覆盖要删的非 UTF-8 文件在写 config.yaml 之前直接拒绝、什么都不改。</p>
+<p>另外（f44f7bf41b）：python-dotenv 读 &#x27;HERMES_DASHBOARD_BASIC_AUTH_PASSWORD&#x27;=old 这种引号名赋值为密码，但逐行读取器把引号留在名字里，于是命令报成功、旧密码继续覆盖新哈希。现在也认 python-dotenv 认的那批名字，remove_env_value 整段删掉这种赋值。</p>
+<p>效果：改密码不再破坏同文件里的证书和其他配置，也不再出现&quot;报成功但旧密码还在&quot;。</p>
+<p>gateway 读 systemd 环境时应用 UnsetEnvironment=（d95b398a58）</p>
+<p>问题：SystemHost.unit_environment 从管理器环境、Environment= 和每个 EnvironmentFile= 拼出 unit 环境，但忽略了 systemd 最后应用的 UnsetEnvironment=。三个检查因此判错（在 systemd 255 的私有 systemd --user 上实测）：.env 登录模板检查的 gateway 一侧、旧后端一侧，以及归属判断——一个停了但 Environment=HERMES_HOME=&lt;这个 home&gt; 加 UnsetEnvironment=HERMES_HOME 的 unit 实际跑的是账号默认 home，dry run 却计划停掉并禁用它。</p>
+<p>修复：planner 也向 systemctl show 要 UnsetEnvironment，并最后应用（规则移到 gateway_runtime_service_identity.apply_unset_environment，两处共用）；NAME 丢掉该变量，NAME=VALUE 只丢该值。</p>
+<p>打包：WhatsApp bridge 回到 sealed payload（79c00f3aa2 / 1b39ecabee）</p>
+<p>问题：排除 scripts/ 时把 scripts/whatsapp-bridge 一起排掉了，Store 和桌面构建里 WhatsApp 被停用。</p>
+<p>修复：排除之后把这个运行时目录归档回去；另一条修好 revision 里没有该路径的 fixture 仓库（git archive 会失败），并给新的归档助手加了超时。</p>
+<p>profile 被插件跑在别处时主机不再重复跑（fe9a4b58ec）</p>
+<p>问题：一个 host gateway 默认服务每个 profile，并跑每个 profile 的 cron、消息平台、Kanban 派发和 Webapp；CLI、TUI 和桌面端也在这台主机上跑 agent。插件把某个 profile 的整个后端跑在别处（比如沙箱、自己的 host launcher）时，没有办法阻止主机也在外面跑这个 profile、去读沙箱能写的配置。</p>
+<p>修复：主机侧插件在 host-only 存储里标记这个 profile：&lt;hermes root&gt;/profiles_run_elsewhere/&lt;profile&gt;.json，内容是 {&quot;plugin&quot;: ..., &quot;since&quot;: ISO 8601 UTC}；文件存在即标记，读不出来也算标记，写入用点前缀临时文件后 rename。标记后 profiles_to_serve() 默认不包括它（连默认 profile 也是，除非调用方显式 include_run_elsewhere=True），host gateway 下次重扫就不再服务它，桌面端 cron ticker、/p/&lt;profile&gt;/ 路由和面板的 cron/会话扇出也跳过。</p>
+<p>well-known 技能索引不在默认路径时也能检查更新（2fc4b42256）</p>
+<p>问题：从 `well-known:&lt;index URL&gt;#&lt;skill&gt;` 安装时会记成短形式 `well-known:&lt;base&gt;/&lt;skill&gt;`，但 _parse_identifier 只在 URL 位于 /.well-known/skills/ 下才读回短形式。索引放在别处（如 /.well-known/agent-skills/，discovery 0.2.0 的布局）时，`skills check` 永远报该技能不可用，`skills update` 也刷不了。</p>
+<p>修复：`well-known:` 前缀本身已说明是哪个适配器，BASE_PATH 要求现在只对裸 URL 生效；读回记录形式而不是改安装时的写法，已经写坏的 lock 条目也一起修好。</p>
+<p>shared-metrics 快照新增托管来源与群聊计数（5bfa6f442c / 29cfe1d201）</p>
+<ul>
+<li>hosting 字段：托管平台在容器环境里设 HERMES_HOSTING=nous_cloud 时记 nous_cloud，否则 self_hosted。用环境变量而不是配置键，因为 config.yaml 会跟着 profile 换主机搬家；原始值不记录，不增加账号、agent 或机器标识。</li>
+<li>群聊四类计数：存在的（未解散）、7 天内有消息的、7 天内新建的、成员由另一台网关服务的。各 profile 的 state.db 里数自己托管的群聊，根 profile 还会数还没被 gateway 接管的根 shared-state.db 里独立后端的群聊（已交接的房间有围栏并跳过，同一条在两处都有的只算一次）。存储只读：缺失读 0 且不会创建，没有进程打开的按不可变方式读（不会多出 -wal/-shm），读不出来的留空而不是报假 0，房间存储读不出来时也不会丢掉整份快照（00522b8a96）。只有分桶计数离开机器。</li>
+</ul>
+<p>pm：launcher 可以给自己的进程指定 install-state 目录（4f676af2cf）</p>
+<p>问题：在主机文件上跑 Hermes 的沙箱只给选中的依赖环境只读权限，不给 installs/&lt;key&gt; 任何东西。Windows 上进程里仍然看得见那个目录（它是一条授权的祖先），但读 facts.json 和拿安装锁会被拒；启动把它当成必须用的 install state，最后以 &quot;install state is not writable by this user&quot; 结束——在 Windows 上用安装版 Hermes 的沙箱起不来。</p>
+<p>修复：HERMES_INSTALL_STATE_DIR 指定进程和子进程保留 install state 的目录；带它启动的进程就用给它的解释器（不选环境、不被重启到别的解释器、不往安装自己的 state 里写）。另一个补丁让这类启动不去读 launcher 指定的目录和 checkout 的标记（半途中断留下的 .update-incomplete 以前会被这个进程的修复流程清掉，而安装自己下次启动需要它；named 目录里的 publication.json 以前会被重放，可能把 config.yaml 写回去）。</p>
+<p>数据说明</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-24：桌面端把「人在不在」报给后端，通知插件终于能静音手机</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-24</link>
