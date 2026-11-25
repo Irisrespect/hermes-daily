@@ -5,8 +5,97 @@
     <link>https://irisrespect.github.io/hermes-daily/</link>
     <description>Hermes Agent 官方仓库每日合入 main 的更新整理（自动生成）</description>
     <language>zh-CN</language>
-    <lastBuildDate>Wed, 25 Nov 2026 06:45:22 +0800</lastBuildDate>
+    <lastBuildDate>Thu, 26 Nov 2026 07:25:00 +0800</lastBuildDate>
     <atom:link href="https://irisrespect.github.io/hermes-daily/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Hermes 日报 2026-11-26：macOS 安装包会主动请你去「应用程序」</title>
+      <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-26</link>
+      <guid isPermaLink="false">hermes-daily-2026-11-26</guid>
+      <pubDate>Thu, 26 Nov 2026 06:30:00 +0800</pubDate>
+      <description><![CDATA[<p><strong>本期覆盖 11 月 25 日 06:30 ~ 11 月 26 日 06:30（北京时间）合入 main 的提交，共 213 个 commit（不含 merge），另有 9 个 merge。新增 3 个功能、130 个修复、0 个性能优化。commit 日期列跨度为 11 月 19 日 ~ 11 月 26 日（提交时区多为 UTC / 西五区，所以日期列比北京时间早一天）。按 tip 差集采集，并用 committer 时间戳核对：141 条落在上面这个窗口内，另外 72 条是分支上的提交，提交时间早于窗口起点、经合并才进入 main——口径是「这批提交进入 main 的时间」，不是 commit 作者时间。</strong></p>
+<p>📌 今日要点：</p>
+<p>桌面端 macOS 安装包加了一层启动守卫：不在「应用程序」里就请你搬过去。</p>
+<p>用户能直接看到的新功能只有仪表盘换了字体、加了云仪表盘「正在搬到 Web 应用」的提示；另外稳定版 macOS DMG 有了固定的下载入口。</p>
+<p>hermes doctor 的 PATH 判断重写了 29 条，从逐行正则换成按 shell 语义解析。</p>
+<p>网关 /restart 与停止流程 22 条：失败的停止不再把网关挂到 SIGKILL。</p>
+<p>定时任务暂停或禁用之后，控制台和工具都不能再把它手动跑起来。</p>
+<p>重点条目：</p>
+<p>macOS 安装包：搬去「应用程序」的启动守卫（桌面端 29 条 fix 的主线）</p>
+<p>问题：从 DMG 挂载盘（EROFS）、App Translocation 或者直接在 ~/Downloads、~/Desktop 里启动的 macOS 包，装不了 Squirrel.Mac 的自动更新；安装器留下的命令行链接也指向临时位置，重启一次就悬空。</p>
+<p>修复：新增 apps/desktop/electron/mac-applications-guard.ts，在 app.whenReady() 里、窗口和后端启动之前拦一道（bf66da08f2）：提示「移到应用程序」或「继续在这里运行」，可以勾「不再询问」，偏好持久化在 userData。非 macOS、dev 运行、source checkout 构建、已经在 /Applications、CI/smoke 启动（CI、GITHUB_ACTIONS、HERMES_DESKTOP_SKIP_QUIT_CONFIRM、HERMES_DESKTOP_USER_DATA_DIR、--remote-debugging-port）、以及可写的 runner/自定义目录全部保持静默。</p>
+<p>后续 20 多条都在收紧这个守卫，防止它把别人的安装删掉：</p>
+<ul>
+<li>版本比较只按 SemVer 来，两个版本都合法才比较（63fbaca55f）；v0.24.0 这种 v 前缀的、超过 2^53 的巨型版本号一律拒绝（eeed30ddac）；读不出来的安装副本（二进制、缺 Info.plist、版本不是 semver）不能被当成「可以替换」（49151b6b29）；canary 包按自己的 stamp 排序（5e4ef5275b）。</li>
+<li>已经在 /Applications 里、或者 Electron 自己认为已安装时，不再弹提示（df06448d85）；只检查 Electron 真正会替换的那一份副本（25014cd03a、2e283e52ff）；只把 Electron 自己的 mover 报错当成搬移失败（8154948e57）。</li>
+<li>/Applications 不可写、需要管理员密码时，不调 Electron 的 mover——它对目标直接 rm -rf 且不经过 conflictHandler，版本检查覆盖不到密码框期间新装的副本；改成引导用户在 Finder 里拖过去（60d3844b33）。用户取消密码框等于拒绝这次搬家（ac7fcfe0e7）。</li>
+<li>提示语不再承诺命令行链接一定失效或一定保活（af3399683c）；搬运提示在 whenReady 里等待期间，第二次启动（另一份副本、open -n、hermes:// 链接）不会在提示后面偷偷开窗（bc5531b240）。</li>
+<li>偏好文件只存「不再询问」这一个事实，不再带 schema 版本、路径、时间戳（4e4f45b097）；写失败时不再谎报已记住（10838366f9）。</li>
+<li>继续从 AppTranslocation 或只读卷运行时，跳过 ~/.local/bin 的命令行链接（04d73a40c2）；CLI 链接改由 payload 自己的位置决定（3ec7cac05c、e07adb2685）。</li>
+</ul>
+<p>效果：macOS 用户第一次从下载目录或挂载盘打开包，会被请去「应用程序」，之后自动更新和命令行链接才正常；搬不动的、版本更新的、读不明白的副本都不会被顶掉。</p>
+<p>macOS DMG：外层容器也签名、公证、staple，稳定版有了固定下载页</p>
+<p>问题：此前只公证内层 .app，外层 .dmg 容器没签名、没 staple，用户下载后 Gatekeeper 会拦；stable 频道的下载链接每次晋升都换。</p>
+<p>修复：在 electron-builder 的 artifactBuildCompleted 钩子里给外层 .dmg 签名、公证、staple 并做 Gatekeeper 校验，同时保留内层 .app 的 afterSign 公证以配合 Squirrel.Mac 的 zip（e68a1d67e2）。签名只用 app 记录的身份，不再回退到本机找到的第一张 Developer ID 证书（1c943f6c30）；公证预算从构建开始算，不被前面的打包时间吃掉（328b1b7f36）；签名前读 app 已记录的签名而不是 DMG 的 opt-out 记录（cafe65c7fd）；记录里外层 DMG 缺失时直接拒绝（0919743d07）。</p>
+<p>同时新增 feat(release)（4d4de7efb9）：stable 晋升时发布固定的 macOS DMG 别名和下载页。晋升流程这一期也补齐了安全边：只覆盖更新的稳定页（f4785e7bee）、已领先的稳定页不再被旧 pending 覆盖（b1469d1641）、没有 ETag 的拷贝源拒绝（a906c2b033）、copy_object 有重试预算（205fdca51b）、head 更新自己的排序检查决定是否推进（dbebd80427）、晋升没动过的稳定页不再回读（12849ad777）、拷贝源在任何 feed 移动之前先校验（274bc33a78）；channel_releases CLI 只列 canary、并拒绝稳定角色（34e19902d0、537e99ed6e），稳定候选在 standalone promote 里被拒（ff616309d5）。</p>
+<p>另外补了一条更新路径的拒绝（69178d7a8e）：从只读位置（App Translocation、挂载盘）发起的 macOS 更新，在 Hermes 已经停掉后端、准备退出之前就拒绝，而不是在 quitAndInstall 里面才发现换不了。</p>
+<p>效果：下载下来的 DMG 双击能过 Gatekeeper；稳定版下载页有一个不随晋升变化的入口。</p>
+<p>仪表盘：Oswald 和 Mona Sans 取代 Collapse 与 Rules（b39dd91f68）</p>
+<p>问题：仪表盘沿用的是 Collapse 和 Rules 两套字体，登录页和提示弹窗的标题没有体现设计语言。</p>
+<p>修复：仪表盘、登录页和弹窗改用 Google Fonts 的 Oswald（标题）和 Mona Sans（正文）；弹窗标题按设计稿的 Oswald Light 加载。</p>
+<p>同一批还加了 Hermes Cloud 的搬迁提示：一个阻塞式弹窗（不能点背景或按 Esc 关掉），在 /api/status 带上 webapp_url 时出现；「Open in web app」跳到该 agent 的 Webapp，「Later」在本次浏览器会话内隐藏。</p>
+<p>只有当调用方是已登录的、且配置里开了 Webapp 的 Cloud agent 仪表盘、并且网关确认 Webapp 监听在配置的端口上服务时，webapp_url 才会出现——loopback 绑定、Webapp 自己、匿名健康探测都不会触发，所以不会把人送到一个正在启动或者没重启上配置的 Webapp。</p>
+<p>效果：仪表盘视觉统一；Cloud 用户的仪表盘会明确告知正在搬到 Web 应用，并且只在 Webapp 真的能用时提示。</p>
+<p>群组房间：审批模式改成只读的「按 profile」（aa7ee99cc2 等 4 条）</p>
+<p>问题：bot 群组房间没有单一 profile 主人，每个成员按自己 profile 的审批策略走。但状态栏的审批芯片显示的是环境 profile 的模式（比如 Off），看起来像整个房间关掉了审批；从房间菜单选一个模式，还会写到一个毫不相关的 profile 的 approvals.mode 上。</p>
+<p>修复：可见内容面板是插件 workspace、且该 workspace 声明了 approvalScope: &#x27;per-profile&#x27;（群组房间这么声明）时，显示只读的「Per profile」提示，普通会话保留可编辑菜单（aa7ee99cc2、e993550e14）。提示文案补了阿拉伯语并重新生成桌面端语言键（ace0a8d3e1）；房间导航时审批芯片不再重读模式，返回普通会话时才读一次（978221f8e1）。</p>
+<p>效果：群组房间不会再给出「审批关着但提示还在弹」的错觉，也不会把模式写到别的 profile 上；审批执行逻辑没变。</p>
+<p>定时任务：暂停或禁用的任务不能再被手动跑起来（6 条）</p>
+<p>问题：控制台手动 run 一个暂停的任务时，trigger_job 会顺手 resume 并擦掉 paused_reason；cronjob(action=&#x27;run&#x27;) 走 relay 转发到 /api/jobs/{id}/run 同样会静默恢复暂停的任务——暂停形同虚设，审计字段也被抹掉。</p>
+<p>修复：控制台拒绝并翻译成命令错误，保留暂停状态、审计字段和 disabled 标记（69b049bc4a）；控制台和 cronjob 工具共用同一个 NOT_RUNNABLE_ERROR 文本（cron/constants.py，由 is_job_runnable 判定），relay 转发路径也跳过暂停任务（c1ff06b8e1、ed76807f09）；控制台的终端状态改从规范化后的 job 记录读、cron run 以存档的 job 记录为准、并保留已有的暂停设置（b7ee21c14e、69f4da5f24、9e9a401a6a）。</p>
+<p>效果：说暂停就真暂停，手动触发和定时触发两条路都会被拒。</p>
+<p>工具链：todo 的父子环、profile 导入的符号链接、ComfyUI 的重复提交</p>
+<p>todo（00acb4923a、e2302007ed、6c5a053ee4）</p>
+<p>问题：_sanitize_parents 从每个条目往上走父链，发现环时断开的是「正在遍历的那个条目」的父链接，而不是闭合环的那个祖先——挂在环下面的无辜子树被摘掉，环本身还在；by_id 只保留同 id 的最后一条，遇到两个被规范化成 id &#x27;?&#x27; 的条目时会落到循环外的占位条目上，环没断，format_for_injection 直接递归到死。</p>
+<p>修复：断在闭合环的那个祖先上，子树保留自己的父链接（00acb4923a 用 by_id[node[&quot;parent&quot;]] 取那个祖先）；但 by_id 只保留同 id 的最后一条，两个被规范化成 &#x27;?&#x27; 的条目会让闭合祖先落到循环外的占位条目上，于是 e2302007ed 改成从遍历本身解析这个祖先；write() 和 restore() 共享一个 _settle()（先 trim 再 sanitize），恢复时也清洗一遍（6c5a053ee4）。</p>
+<p>效果：todo 列表出现人为或异常的父子环时，不会摘掉整棵子树，也不会把注入格式化卡死。</p>
+<p>profile 导入导出（5e5d137e7f 等 6 条）</p>
+<p>问题：export_profile 用 copytree(symlinks=True) 暂存、make_targz 把链接写成 tar symlink，所以带链接的 profile（典型是 LSP 的 lsp/bin/&lt;server&gt;）能导出但导不回来：safe_extract_targz 对每个符号链接成员抛 Unsupported archive member type，整个导入中止。</p>
+<p>修复：归档内的链接被物化成真实链接而不是拒绝——目标按链接自己的目录解析、先折叠 ..，所以「看起来在内部」的链接（link -&gt; ../../outside）仍然被拒；绝对 POSIX/Windows 目标（含盘符）被拒；指向同一归档内其他成员的链接用 os.symlink 重建；硬链接和设备节点仍然报错，被改过的包还是整体失败而不是留半棵树（5e5d137e7f）。导出时把指向 profile 内部的绝对链接改写成等价相对链接（276469fc5d）、直接在 tar header 里改写而不动暂存副本（2b68fbc04c）。后续两轮把逃逸口也堵上：链接目标只能通过另一个链接离开根目录的情况（y -&gt; ../..，z -&gt; y/../../..）改为解压后按真实路径判定（9c0a33ee20）；最终包含性检查改用随机名跑的根，防止 ../p/x 之类按名字走回来（52eaaa857c）；符号链接的 .env 换成 0600 的普通副本，运行时根上的链接改成 unlink 而不是 rmtree，链接文本归一化成宿主分隔符、Windows 上先建目录链接再建经过它的链接时按目录标记重建（52eaaa857c）；符号链接的 .env 通过一个新的临时文件转成 0600 的普通副本（b26de73581）。</p>
+<p>效果：带 LSP 链接的 profile 能导出再导入；越界链接、绝对链接、被篡改的包仍然被拒绝。</p>
+<p>ComfyUI：不再重复提交工作流（6 条）</p>
+<p>问题：一次提交跟随过 303 重定向（服务端已接受 POST）之后，receipt GET 的 408/429 仍会触发最多 3 次重放，同一份工作流被提交多遍；代理返回的 503/522 也可能已经把请求转出去了，却被当成「没发出去」重试。</p>
+<p>修复：自动重试只留给无 body 的 GET、HEAD、OPTIONS（9b9cf1419b）；每次尝试记录是否跟随过重定向，跟随过就不重放（948b7de5c8）；只有连接失败（一个字节都没发）和明确的 408/429/503/522 才重试，超时、连接中断、500/502/504/524（任务可能已排队）保持单次（01cf67e77c、d5b4268433）；multipart 上传因为文件流已消费，一律单次；代理拒绝（urllib3 ProxyError 包 NewConnectionError）算作没发出去（d5b4268433、2c756eae54）；跟随过重定向的会话在没有 trace 的情况下也能构造（1679816e06）。</p>
+<p>效果：网络抖动不会再让同一份工作流被提交多次，同时真正没发出去的请求还能恢复。</p>
+<p>下载与 PM（5 条）</p>
+<p>问题：uv 自己的 HTTP 重试先耗尽时，用户只看到一句干巴巴的超时；PM 隔离会把用户设的下载并发和重试设置覆盖掉。</p>
+<p>修复：classify_uv_failure 在 uv 耗尽重试时也附上 UV_CONCURRENT_DOWNLOADS / UV_HTTP_TIMEOUT 提示（04fd896073），提示只在真的网络超时时给（本地网络挂载上的写超时不算，bac94e9ddb），文档写明 PM 隔离后哪些 UV_* 网络设置仍然生效（d727864483）；下载并发和重试设置不再被覆盖（c4710c3001）；pm.install.activate 写 PATH 之前先保存进程继承的 PATH，避免 doctor 读到一个被改过的 PATH（793483bacb）。</p>
+<p>效果：慢网装依赖时能把并发数和超时往后调；doctor 看到的是真实的继承 PATH。</p>
+<p>hermes doctor：PATH 判断从逐行正则改成按 shell 语义解析（29 条 fix）</p>
+<p>问题：doctor 判断「~/.local/bin 有没有进 PATH」的方式是逐行扫 shell rc，误判密集：把 PYTHONPATH= 当成 PATH 行（ecb47c89b7）、把 ~/.local/bin-tools 或 ~/.local/bin/&lt;dir&gt; 当成那一行（cfe71d3226、0300313a3f）、把只对单条命令生效的 PATH=x cmd 算进来（d1b7906ddf）、PATH+= 追加行先被整类排除（9d6b3a5830），再只把真正开启新条目的追加算进来（ba63796c04）、漏掉 fish 的 XDG_CONFIG_HOME（d42dd05aa5）、认错 bash 真正读的那个登录文件（e728e6f9ce、66e141b408、60e6eb350b）、把命令替换和重定向当成命令分隔（c1663fc925、6437d4c832、724078905d、5e96427f2c），以及赋值词在被去引号之前就要按原样判断（3ddd1ee002）、把被 shell 排除的家目录写法当成有效条目（5ecab798dd）。</p>
+<p>修复：改成按 shell 自己的词法解析 PATH 赋值——双引号里除转义 $ ` &quot; \ 之外的反斜杠保留（570d6d148a）、export 前面的前缀赋值要看过去（2f9363bc1b）、PATH= 之后的重定向读成没有命令（724078905d）、只按冒号切 PATH 值而不切目录参数（c783e89b10）、rc 注释只在词首的 # 开始（5e96427f2c）；判断基准改成「进程继承的 PATH」，并把启动时自己加的前缀和 .env 覆盖分开（68eade8dfe、4134fe929a、48bcfb5ba8）；~/.local/bin 要作为整条目匹配、任何家目录写法都认（0b4960d25f）；解析不了的条目不再中断整个检查（55335a28a3）。</p>
+<p>另外（51b93b31d5）：_check_command_installation 能识别桌面端 bundle 的 sealed payload（is_bundled_payload），期望的是 bundle 自己的 &lt;payload&gt;/bin/&lt;cli&gt;（含 hermes-canary、Linux AppImage 稳定副本这些带频道名的），修悬空/被顶掉的链接时链到 bundle trampoline 而不是搭一套源码式的 PM 包装；并且链接已存在时也检查它所在的目录在不在 PATH 上（尊重 ZDOTDIR，如果 rc 里已经配置过、或者已有 PATH 条目解析到同一目标，只给 info 提示）。创建链接时不会覆盖同时冒出来的同名命令（38e7dafa8f）。</p>
+<p>效果：doctor 只在命令真的跑不了时报警，避免「打开新终端还是跑不了」和「明明能跑却退出码 1」两种假报警。</p>
+<p>网关：/restart 与停止流程（22 条 fix）</p>
+<p>问题：restart-when-idle 任务只在 runner 上挂着、没人 await，等待空闲或者 stop() 早期抛异常时既不记日志，_restart_task_started 又一直置位——之后每次 SIGUSR1、/restart、更新暂停都失效，直到从外面把进程停掉；更严重的是 _stop_impl 在 finally 里解除看门狗，某一步抛错而不是挂起时，看门狗被提前关掉，release 阶段没跑、wait_for_shutdown 永不返回、后续每次 stop 都重新 await 那个失败的任务再抛一次，进程一直占着 host-gateway 槽位直到 SIGKILL。</p>
+<p>修复：重启失败时记日志并清掉 restart 请求、恢复 admission 和 drain 预算、把被替换的 serving 状态还原，下一次重启能正常跑（4d25d2ee80）；失败的 /restart 立刻移除自己的重启通知、不再把下一次重启认成自己那一轮的（fb6d160edc、4d8ebf8c5c、34e3c2d104）；分离助手的警告说清第二次 /restart 会发生什么（811cf83209）。停止路径：看门狗只在 teardown 跑完之后才解除（ab3df98eec），某一步抛错立刻带堆栈记日志，取消的停止记成 interrupted，仍然武装的看门狗照旧把它强制退出（退出码 1 不变）；停止在 shutdown 开始之后失败时立刻跑完尾部并退出（3c5229f83e）；失败的停止不再让后面的停止变成 exit 75（210aee12b0）；没完成的停止不再解除 shutdown 看门狗（ab3df98eec）；计划内 SIGTERM 停止和分离重启要 import 的模块从内存读，不再从升级替换过的文件读（bf4dc354b0、4d88ed9b82）；不能 import 的 ACP sweep 不再中止停止（0c284946fb）。</p>
+<p>另外：liveness 诊断被堵住时能正常退出（c9edaedbad）；看门狗杀网关时记录主机内存压力（64e8f5bdde）；Python stderr 堆栈转储加上限、杀进程路径不再读源码（0852ba112b）；拒绝 bool/NaN 的 claim 开始时间并在文档里限定 5 秒退出（f681186ea3）；完成事件的尾部按进程预算裁剪、先掩码再裁（19754b62c1、e5552e14dc）；FooteredReply 在 copy/deepcopy/pickle 之后保住文本和属性（dc4eefd722、4408860f78）；dashboard bot relay 的投递契约对齐（8764441dd9）；两个 bot_relay 投递门统一成一个 receipt 模型（001ec55d78），接着补上 docstring 里两种 never-admitted 拒绝的说明并给校验器加保护（216e902226）。</p>
+<p>效果：/restart 失败后不会把网关卡到必须 SIGKILL，也不会让后续重启、停止、更新全部失效。</p>
+<p>其他值得一看</p>
+<p>插件能分辨这一轮是谁发起的（e8b16ba90c，feat(plugins)）</p>
+<p>turn_client() 为 None 时，既可能是 Hermes 自己起的一轮（后台进程通知、委派结果、自动化唤醒），也可能是「人发的但连接没声明 client」——插件分不出来。新增 hermes_cli.plugin_session.turn_internal()（也有 ctx.turn_internal()，在 plugins.isolation: host 下经网关回答）读运行中这一轮自己的事件：Hermes 产生了输入为 True，人发的消息为 False（不管是客户端输入还是消息平台、API 请求），不在轮次里、在委派子任务里、在托管 worker 里、在插件自己的斜杠命令里、以及 Hermes 没标成 internal 的合成轮次（goal 续跑）为 None。它只在钩子时刻读上下文，不改系统提示、工具列表、消息和模型请求。</p>
+<p>同期有 6 条配套提交：人的输入并入运行中的那一轮时清掉 turn_origin（130133d66d）；turn_origin 不带到 fork 和升级前重试（5481fd77ff）；旧 Bot Chat 行按 unknown 读（4d40dcc0d0）；对端消息和已排空的 steer 保持 turn_internal=false（f4e3dd213d）；依赖它的事件改成命名生产者而不是布尔值（1a93e5aeb3、6d18eb30a2）。</p>
+<p>效果：通知类插件可以只对人发的轮次发提醒，不再靠猜。</p>
+<p>压缩摘要的归档列表（3 条）</p>
+<p>问题：每次压缩都会把被替换行指向的 cache/pruned 文件追加成一段「Archived tool output」列表，但它从所有行收集指针——包括上一次的交接摘要，那份摘要自己的列表被当成「被替换行命名的」又追加一遍。于是每压缩一次摘要就多一轮路径，实测摘要里堆到 1297~9737 条路径。</p>
+<p>修复：每条总结只列自己那次压缩产生的归档（b80068d42d）；没被存储过的总结是它那份列表的唯一副本，路径要继续带下去，只有已存储的交接（born-durable 标记或行 id）才把自己的列表从扫描里丢掉（457c308c9a）；「仍然被命名」的判断改用真正组装时用的那两个 assembler（cf0eb13cc8）；strip_archive_list 只剥掉形状完全对得上的生成块，正文里引用到的标题不会被误删。</p>
+<p>效果：摘要体积不再随压缩次数线性膨胀，被替换行的归档也不会丢。</p>
+<p>CI：Pages 部署等待（4 条）</p>
+<p>问题：deploy-pages 失败可能发生在部署已经存在之后，直接重试会重复发布。</p>
+<p>修复：改成轮询 deploy-pages 自己读的那个 artifact 列表（results 服务的 ListArtifacts，本 job 的 runtime token），每 3 秒一次、最多 120 秒，列出来了才 deploy 一次（202e5604bd）；这个等待只能延迟部署、不能阻断部署（eab32e1c12）；artifact 查找失败改为重试而不是让 job 失败（4b2e5b2bb9）；列表接口返回 HTTP 429 时也在 120 秒预算内像 5xx 一样重试，其他 4xx 仍然立即退出（f85f33bf53）。</p>
+<p>效果：站点发布不再因为 GitHub API 的临时故障或限流而失败，也不会重复发布。</p>
+<p>str 子类在 copy / pickle 之后不丢字段（fcf9b0fa55）</p>
+<p>带额外构造字段的 str 子类，此前的 copy、deepcopy、pickle 会丢掉那些字段（网关的 FooteredReply 依赖这个行为）。现在三个路径都能保住额外字段。</p>]]></description>
+    </item>
     <item>
       <title>Hermes 日报 2026-11-25：插件目录新增 53 个条目，Gemini 推理搬到无状态接口</title>
       <link>https://irisrespect.github.io/hermes-daily/index.html#2026-11-25</link>
