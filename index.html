@@ -22,9 +22,98 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 121 期 · 55513 个提交 · 每日自动更新 ·
+<p class="meta">共 122 期 · 55986 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-27" class="day">
+      <h2>Hermes 日报 2026-11-27：网关配置改动即时生效，消息页可直接装平台插件</h2>
+      <p><strong>本期覆盖 11 月 26 日 06:30 ~ 11 月 27 日 06:30 合入 main 的提交，共 473 个 commit（不含 merge），另有 3 个 merge。新增 57 个功能、127 个修复、0 个性能优化。其中 52 条是插件目录条目（46 条 plugin-catalog + 5 条 catalog + 1 条裸 feat），真正的主体是网关与插件安装链路的一轮集中加固。</strong></p>
+<p>📌 今日要点：</p>
+<p>平台配置即时生效：启用平台、填凭据、停用平台都在运行中的网关上直接生效，不再重启整个网关。</p>
+<p>消息页直接装平台：桌面端 Messaging 页和仪表盘 Channels 页列出未安装的官方/已验证目录平台，选中即装即启用。</p>
+<p>文件工具重做：read_file 支持负 offset 读尾部并可直接列目录，search_files 对未截断的搜索给出完整性结论。</p>
+<p>插件安装串行化：一个 home 只装一次、失败按退避重试、平台插件的新依赖免重启加载。</p>
+<p>会话路由不再丢：平台插件尚未注册的 gateway_routing 行会先保留，不再被下一次全量保存删掉。</p>
+<p>重点条目（桌面端 / 仪表盘）：</p>
+<p>平台配置改动即时生效（e4cc403c1a、99a66e59b6、c4407f43f9、6ca2277ed5）</p>
+<p>问题：运行中的网关只在启动时构建平台适配器。平台在启动之后才被启用或才拿到凭据（来自 .env 修改、hermes config set、桌面端或仪表盘的保存、运行中安装的插件），就一直停着等重启，主 profile 和单 profile 模式都一样。更糟的是启用一个插件会强制重载插件，先把所有插件平台反注册再逐个重新注册，期间做 reconcile 的代码会把活着的平台判成「已不再注册」并重启它——实测启用元宝时日志打印 restart=[&#x27;qqbot&#x27;, &#x27;feishu&#x27;]。</p>
+<p>修复：GatewayPlatformReconcileMixin 按「一个被服务 profile 想要的平台集合」和「活的或排队重连的适配器」做差集，只对变化的那几个执行启动、重启（构建材料变了）或停止，走的是启动时同一套 create/wire/connect 路径；退役适配器先让在飞回合跑完（受 agent.restart_drain_timeout 约束）。触发源包括 reconcile 监听器（启动 profile 签名）、插件加载事件，以及新增的 reconcile-platforms 控制动词——它会回报每个平台的实时状态。platform_build_print 改为在插件发现锁内读注册信息，只有该平台自己的输入变化时才变。c4407f43f9 接着让 reconcile 按每个构建实际读到的配置比对、丢弃已被取代的重连；6ca2277ed5 让被取消的次级重连在重建前先释放。</p>
+<p>效果：改一条平台配置，只有那一个适配器跟着动；hermes config set 和消息保存都会报告「已应用」还是「没能应用」。</p>
+<p>桌面端与仪表盘的重启横幅只在真正需要时出现（52590eccd0、4a3f1f9bf1）</p>
+<p>问题：一个在凭据存在之前就被启用的平台，保存时答 applied:false，两个界面就挂上黏住的「Restart the messaging gateway」横幅；之后补上凭据的那次保存已经生效了，横幅也不消失。</p>
+<p>修复：消息保存现在对每个 profile 返回 live: {applied, state, detail}（单 profile 和多 profile 主 profile 都覆盖）。桌面端的 settleAfterUpdate 和仪表盘 Channels 页读这个字段（旧后端回退到 hot_served）：已生效的保存显示卡片正在连接并重新读状态，只有网关建不出适配器（或没有/旧版网关）才亮重启横幅，并在提示里带上网关给的原因。凭据缺失答 applied:false、state=not_configured（「需要 &lt;env&gt;」），因为重启也不会让它起来，界面渲染成「需要设置」。两个界面各自维护按平台的重启集合，后续一次成功保存就把它清掉。</p>
+<p>效果：横幅只在网关真的没应用成功时出现，补完凭据后不会再留一个假的待重启提示。</p>
+<p>hermes config set 只对平台相关键去碰网关（54e942ee1a）</p>
+<p>问题：hermes config set model x 这种没有任何平台读的键，以前也会去查网关控制口，带 15 秒超时。连接时间超过动词窗口时返回 {applied, pending}，而 config set 什么都不打印，看起来像没反应。</p>
+<p>修复：只有 platforms.* / gateway.* 路径，或某个消息平台自己声明的 env 设置（适配器声明，或在平台 env 前缀下、也就是它的 build print 会读的）才去联系网关。pending 应答现在会点名在途计划（starting / restarting / stopping），config set 打一行说明（例如 &quot;Running gateway is starting telegram (still connecting)&quot;）。</p>
+<p>重点条目（平台安装入口）：</p>
+<p>消息页直接安装目录平台（1bcd117164、5fed674263）</p>
+<p>问题：hermes gateway setup / hermes setup gateway、仪表盘 Channels 页、桌面端 Messaging 页只列已经在本 home 里的平台，想装新平台得自己去命令行。</p>
+<p>修复：这几处现在会列出本 home 还没提供的策划目录平台，选中即安装并启用。这个 squash 里带了配套修复：桌面端安装结束在离开 Messaging 页之后不再把用户导航回去；仪表盘目录安装不再顶掉同时打开的表单；Channels 页能看到后台装好的平台；安装进行中目录行保持展开；页面打开之后装好的平台也能被看到。</p>
+<p>效果：桌面端和仪表盘上不离开当前页面就能把平台补齐。同时 5fed674263 收紧了范围——Labs 平台不保证支持、可能过期，不再出现在默认选项里，列表只给官方和已验证两档，安装路由拒绝其他名字；已安装的 Labs 平台保留原有频道卡片。Labs 徽章、确认弹窗和各语言文案一并删除，Labs 与社区平台仍可从 hermes plugins browse 和插件页进入。</p>
+<p>重点条目（文件工具与工具引导）：</p>
+<p>read_file 读尾部、列目录，execute_code 单元格返回可解析结果（5acb2859ae、463638af46）</p>
+<p>问题：read_file 不能从文件末尾读，也不能直接列目录。实测里 Opus 从没试过对文件夹用 read_file（列目录任务 0/4 全靠 find -printf）。</p>
+<p>修复：read_file 支持负 offset 读文件尾部，也能对一个目录列出条目（带类型与大小）；path 参数描述里写明「目录会列出其条目」。目录条目现在给 lstat 大小，和 ls -la 一样，不再显示 &quot;-&quot; 逼模型回头再 stat 一次去凑「每个条目的大小」。execute_code 的单元格结果改成可直接解析的形状。</p>
+<p>效果：读日志尾部、看目录内容都不用绕到终端命令；代价是 tools 列表多了约 10 个 cl100k token。</p>
+<p>search_files 会说清「这次搜索就是全部答案」（d64519b131）</p>
+<p>问题：在线路由实测里，Opus 用 search_files 正确回答了计数、忽略大小写和重命名搜索，然后又用 grep 把同一个搜索再跑一遍「去确认隐藏文件和 gitignore 的文件」——因为搜索结果没告诉它是否完整。</p>
+<p>修复：未被截断的内容搜索现在带一行 complete：多少条命中、分布在多少个文件里，外加一次限定范围的 count-only rg 探测结果（没有额外命中 / 这些 N 个文件也命中）。count 模式按文件命中数从高到低列。带警告（有跳过的或出错的路径）或省略了密钥文件的搜索不做任何声明。为了让这个声明站得住，files_only 和 count 分页以前从不标记截断的问题也一起修了：管线现在多取一行再据此判截断，和内容模式一致。</p>
+<p>效果：只改了工具结果、schema token 为 0。</p>
+<p>fix(search_files)：几个诚实性问题（013e1ec823、e8d80bf0ba、29702e446f、6079024d6b）</p>
+<p>问题：只搜一个文件的搜索会声称有隐藏文件命中；以空格结尾的 files_only 名字会被吃掉；分页、上下文、失败和怪路径下的「完整性」那一行会说谎；搜索描述与实际跑的那次不符。</p>
+<p>修复：这四条分别修掉了上面四种情况——单文件搜索不再声明隐藏文件命中，空格结尾的名字保留，完整性行在各种边界下如实描述，结果里写清真正跑的是哪个搜索。</p>
+<p>fix(file-tools)：评审修正（23957d0f29、7be6d73cd2、9be021dd1a）</p>
+<p>完整性说明收回读策略之内；单元格搜索键和目录列表回到各自预算；重试期间又被改动过的 tail 要报告；未命中时单元格给 files: []；整体是对 tail、目录列表和单元格结果形状的评审反馈。</p>
+<p>terminal 工具明确把文件操作指向专用工具（cabde73302、def154f421、592a826bb4、ec7734bcf0）</p>
+<p>问题：模型经常在 terminal 里用 cat/grep/sed 做文件读取、搜索和编辑，绕过了 read_file / search_files / patch / write_file 的策略与预算。</p>
+<p>修复：把 redirect 挪到 terminal 描述末尾，写成一句明确的「不要用它读、搜索或编辑文件」，其余部分收紧，tools[] 的 token 净变化为 -4。配套三条：批量读取和计数指向并行调用或 execute_code；只在会话真的具备这些工具时才点名 file tools 和 execute_code；head/tail 规则里保留「只是为了缩短输出」的说法。</p>
+<p>重点条目（插件安装）：</p>
+<p>插件安装不再互相打架（612a188b10、73b14e79d9、75ccc2eaaf、21efb46053）</p>
+<p>问题一：默认插件的无人值守安装会和网关启动时的 left-core 迁移在同一个 home 里抢——启动时正在装，另一个安装器已经落地了目录树，前者把「Plugin already exists」当成自己的失败记下来（打上失败戳，后续启动跳过该行，还给出一条误导的「无法安装」提示）。一个持续失败的安装会被每个启动的 CLI 进程反复请求：实测在一次每秒写一次配置的情况下，76 秒内同一个插件克隆了 13 次。</p>
+<p>修复一：install_and_record 整个循环持安装器锁，释放前记下退避或定版修订，失败的一趟不会在循环里重跑；spawn_install 先看是否有在途安装（锁持有者的 pid 戳），有就不再请求也不再派生。left-core 安装持 default_plugins.installer_lock 并在拿到锁后重新检查 home，别的安装器期间放进去的插件记录为已装而不是重装；锁超过等待时间仍在持有就如实报告，绝不戳成失败。自动安装对每个插件和 home 只做一次。网关启动会重试仍在失败退避里的安装（用户在网络恢复后重启网关，以前只能静静地等退避结束），agent 启动保持原样。</p>
+<p>问题二：运行中安装的平台插件带来了新的 Python 依赖（飞书 lark-oapi）时，这些依赖落在新的 PM 依赖 generation，而网关（启动时装的、或运行中看到装好的）一直导入启动时的 generation：发现阶段日志写 &quot;restart Hermes&quot;，适配器报 &quot;lark-oapi is not installed&quot;，必须重启。</p>
+<p>修复二：插件发现和平台依赖探测（PlatformRegistry.ensure_deps）统一走 pm.environments_adopt.adopt_published，PM 在不会改变已加载包时就地采纳已发布的 generation；PM 拒绝（已加载的包会变）时才保留重启方案。同时 catalog_platforms.pending_entries 不再点名一个本 home 已有的平台插件也需要的条目（社区版 hermes-tag 用同样的 FEISHU_* 覆盖飞书），正常使用飞书的用户不会再每次启动都被提示缺一个并不需要的插件。</p>
+<p>问题三：发布守卫以前比对每个 home 的整份 config.yaml，依赖构建期间写入的插件选择之外的键（例如默认 qqbot 安装时回答的面板 metrics 提示）会让启用被拒，插件装上了但保持禁用。</p>
+<p>修复三：守卫只比对插件选择段和 memory.provider，并在发布时把改动重新应用到当时的文件上，其他键得以保留；选择段本身变了仍然拒绝。拒绝改成有类型（SelectionChanged -&gt; SelectionRaced），安装并启用的路径会在重读选择后做有界重试；被竞态打断的默认安装不再欠一小时退避；left-core 安装的启用被拒后算作欠账（其目录树不再算已装），下次启动会补启用。</p>
+<p>网关启动等插件安装改为一个 30 秒预算（73b14e79d9）</p>
+<p>问题：网关启动时如果 profile 欠着平台插件，以前要等另一个安装器的整趟结束（每行最多五分钟）才开始服务——Docker 环境里 api_server 约 70 秒才应答。</p>
+<p>修复：所有行和 home 共享一个 30 秒预算，到点先让已就绪的平台开始服务；插件装好后在运行中的网关上立即生效，否则下次启动生效。</p>
+<p>重点条目（会话路由与项目）：</p>
+<p>平台插件没注册时会话路由不再被删（2cc3906522、4b6d36dcab、5d3c913320、c33d2da147、22bd3f50b2、3110876020、fd312a3682、452e852443）</p>
+<p>问题：gateway_routing 里一行数据的平台插件在读取存储时还没注册（从属 profile 的插件平台、启动之后装的插件、还没装的插件），解析失败就整行丢弃，下一次全量保存会把它从 state.db 删掉，聊天就此失去会话路由。</p>
+<p>修复：这类行先保留（hold 住），在下一次全量保存时写回，同 key 的活条目优先；对所有插件平台通用。5d3c913320 让会话删除或过期时把它持有的路由一起清掉；c33d2da147 让保留行在平台注册后并入活索引；3110876020 只保留「唯一未解析的东西就是平台」的那些行；22bd3f50b2 防止保留行被旧的 sessions.json 副本取代；4b6d36dcab 补上全量写入路径（turn-marker / prompt-pin 单行 upsert 失败回退的全量重写以前只用活条目构建，会删掉所有保留行）、state.db 启动读不出后来恢复的加载，以及整个索引层面的判定立刻作用到保留行；fd312a3682 让恢复的加载对「现在能解析」的行也比对保留行；452e852443 让恢复的加载保留启动时的判定。</p>
+<p>效果：插件平台晚注册不再意味着丢路由。</p>
+<p>desktop_project 的移动真正落地；创建只创建、子代理不动父会话（4cc14d7d46、ee2f2c2238、ada3add859、979fb4c36f、c4ca23b810、77dd07d0e9、7c3cb4345b、b727012339、4b16c18799、c7765cf753、61c84cd772、ea82284243、49567ba1b8）</p>
+<p>问题：桌面聊天现在跑在网关会话权威上（gateway.run，platform=local），但 set_project_workspace_callback 的唯一注册在 tui_gateway/agent_callbacks.py。网关路径上 project_tools 找不到回调，退回 profile 全局 projects.db 指针，还照样返回成功——聊天留在原文件夹，下一条命令的 pwd 就能证明。</p>
+<p>修复：gateway/local_desktop_ui.py 按本地查看者回合包一层回调（和连接钩子一样，把 TUI sidecar 的也再包一层）：工具线程改本回合的终端 cwd 记录，让同一回合的下一条命令就在项目里跑，并把文件夹挂在活会话上；回合边界的 drain 按用户的「移动到项目」提交（policy cwd、TERMINAL_CWD、terminal drop、session.info）。project_tools 返回 moved: true/false 并带 not_moved_reason（没有回调、没有任务、回调抛错或没找到会话），只有真移动才切全局指针；回调可以返回布尔判定，None 保持旧的「已移动」语义。ee2f2c2238 让网关聊天的移动在回合结束时落地，工具先答 moved: pending：回合期间保持原文件夹，被拒的提交没有任何要回滚的东西。</p>
+<p>这一批还修了语义：create 只创建、switch 才移动、子代理绝不移动父会话（ada3add859）；被委派的子代理调用 desktop_project 会移动它的父聊天（979fb4c36f）；用户手动的「移动到项目」覆盖代理的待定移动（c4ca23b810）；移动到不存在的文件夹会明说（77dd07d0e9）；同文件夹检查读回合的策略并解析软链（7c3cb4345b）；移到聊天自己的文件夹什么都不改（b727012339）；list 会命名桌面或 TUI 聊天自己的项目（4b16c18799）；CLI 聊天在 gateway 上跑 desktop_project 时保留它的文件夹（c7765cf753）；后台子进程的项目移动检查聊天当前文件夹（ea82284243）；工作区回调抛错时记录 traceback（49567ba1b8）；仪表盘里看到的 messaging 聊天答 moved: false，而不是一次永远落不了地的移动（61c84cd772）。</p>
+<p>hermes sessions 列出你能 resume 的线程并可直接选（b3bd07bda0、76b55a4679）</p>
+<p>问题：裸跑 hermes sessions 只打印 argparse 帮助。列表还按 started_at 排根行，而 cron 每次 tic 都写一行 local-&lt;sha&gt;（大多为空、无标题显示「—」），最新开始的几行全被 cron 占满，早就开始、后来被压缩过的人类线程全被挤掉。</p>
+<p>修复：终端里打开已有的 browse 选择器（方向键 + Enter 走 hermes --resume &lt;id&gt;），非终端环境打列表。列表和 browse 改用桌面端 recents 的形状：按 lineage 的 tip 最后一条消息排序、丢掉零消息行、排除自动化来源（cron、webhook、push、kanban、tool、oneshot），--all 或显式 --source 才带回来；子代理子行不出现。76b55a4679 让消息下限按整条 lineage 计数、tip 标题分块、--all 真的是全部。</p>
+<p>重点条目（网关稳定性与安全）：</p>
+<p>多 profile 的 MCP 发现不再无声卡住启动看门狗（77643b4805）</p>
+<p>问题：multiplex_profiles=true 时，_discover_gateway_mcp_tools() 为每个被服务 profile 串行跑 discover_mcp_tools()，而 300 秒启动看门狗已经上膛。单趟最多可阻塞「发现锁等待预算 + 发现上限」= 610 秒，几个 profile 就超窗，而且从 control socket 绑定到 runner.start() 之间网关日志一片空白，看起来像卡死。</p>
+<p>修复：每个 multiplex profile 发现前用各自的界报 startup progress（phase=mcp_discovery:&lt;profile_name&gt;），并打一行简明的 INFO 开始/结束（带耗时；失败时是带耗时的 WARNING）。单 profile 模式不变。修复 issue #160479。</p>
+<p>回环 Webapp 改为只认启动链接、拒绝浏览器 cookie 登录（3e33ec2a9d）</p>
+<p>问题（安全）：RFC 6265 §8.5 不按端口隔离 cookie。回环 Webapp 一旦接受浏览器登录 cookie，浏览器访问过的任何其他本地端口都能抓取并重放这些 cookie，去打 REST 和 /api/webapp/socket-ticket?socket=host-terminal，绕过 withhold_session_token（issue #159500，PR #160226 的安全阻塞项）。</p>
+<p>说明：同一天更早的 723aed4042、ffb217b79c 曾让回环监听器认可验证过的登录 cookie（并在过期 401 时给出 login_url），随后被这一条按安全结论回退——最终状态是只认启动链接。</p>
+<p>端口声明按每个 home 的 .env 作用域展开（d3ecbeeb09、ec725af63d）</p>
+<p>兄弟 profile 的端口声明现在按各自 home 的 .env 作用域展开；也接受环境变量展开之后的端口号。</p>
+<p>systemd / legacy unit 迁移加固（4fda3e13e7、15036db422、221078d630、73276cdd09、c22fd6769b、c46b08b206、d109d286e6、10282b6ab3、f3a8c6bc08、f914fcb51e、fc9f9d9fa8、13e5c82616）</p>
+<p>后端迁移在重启落地之后要验证；systemd_install 在 legacy unit 删除失败时中止；stop 或 disable 失败时保留 legacy unit；能恢复 systemctl 的 SubprocessError 和 SystemExit；重启前 PID 缺失时硬化重启交接；UI 轮询超时要覆盖最坏情况的顺序回滚；systemd gateway_verb 超时与交接、验证预算对齐；迁移计划的验证文案从 VERIFY_SECONDS 推导。</p>
+<p>重点条目（macOS 与其他）：</p>
+<p>macOS CLT git stub 守卫（63f2f535c0、658c65ff19、ccca269f46、615bcf77b2、bd0e72fae1、ea8b164d62、f76016e840、5e3b39ec6b、824eebbb5e、1c0815efd0、a4055f7d2e、aec6c59563、20b1843f34、5cc14e2eec）</p>
+<p>问题：macOS 上装了 Xcode 命令行工具但没接受许可时，/usr/bin/git 是个 stub，一跑就弹「需要安装命令行工具」的窗口，把本来只是探测版本或列工作区的操作变成一次糟糕的交互。</p>
+<p>修复：把守卫铺到运行时和 doctor 的每个调用者——bare git 启动时只拒 CLT stub，web_git 的每个 launch 在 _run 处拦（不只 _git_in），version_info 的 git 探测、resume 的工作区探测、冷启动路径的延迟导入都加保护，并接受 Xcode.app 的 DEVELOPER_DIR。cron 侧：没有可用 git 时跳过整趟 worktree sweep（20b1843f34）和工作区发现（aec6c59563）；CLI 侧把插件的 git 解析移开桩（1c0815efd0），也不再做会触发 git 的 gh 查询（5e3b39ec6b、824eebbb5e）。5cc14e2eec 把守卫挪到真正跑 git 的 _prune_stale_worktree_trees 顶部：sweep 本身不再提前返回，所以孤儿依赖状态（每个约 200 MB）在没有 git 的情况下照旧回收——这是对 1a0b0d5a35 的修正。</p>
+<p>影响范围：仅 macOS；Linux 和 Windows 无变化。</p>
+<p>providers / profiles / delegation 小修（1fb43bc121、6e447b2c2f、dcf528edcf、02afb7489e、8cccef5dea）</p>
+<p>Google left-core 迁移的判定提前就位（切之前的准备）；辅助 helper 强制 strict_client，把 AST 测试换成行为测试，修 eval 发现与归一化；静态目录 provider 的顺序保留、google_in_use 与自动路由对齐；带标记的 profile 的容器模式文件不在宿主上使用（#160087）；修正 delegate_task 给模型读的文本（#160256）。</p>
+<p>插件目录新增与更新（52 条）</p>
+<p>本期 46 条 feat(plugin-catalog) + 5 条 feat(catalog) + 1 条裸 feat 都是目录条目：squeezevid、edenai-provider（钉在一个固定修订以带上 subagent threads）、order-cards、mergeable、ttoken-provider 1.0.0、Coretica 私有记忆伴生插件、social-media-ad-research、membase-ai 0.5.0（由 unibaseio-membase 更名）、z0live、Aggregate（财务账本，托管 MCP）、lavish-status、logbuch、handsoff-handoff 0.1.0、front-desk 0.2.0、LinkBunny Placement Checker、fulcra、originveil、onomeo（附审核记录披露，并钉在固定修订）、ilang、chroma、fastpath（钉到 docs/assets 提交）、decider v1.2.0、AgentRouter 0.2.0 等；另有 12 条目录修复/版本 bump（lavish-status 0.1.4、hermes-ui-cards 0.1.1、web-search-plus 5.1.10、onomeo 的审核记录披露等）。此外 1 条 chore(catalog) 在 effort router 上披露每回合的缓存损失。</p>
+<p>以上统计按「合入 main 的时间」口径，不是 commit 作者时间；tip 差集包含作者时间较早但晚合入的提交，raw 里 commit date 跨 11-23 ~ 11-26 属正常现象。</p>
+    </section>
+    
     <section id="2026-11-26" class="day">
       <h2>Hermes 日报 2026-11-26：macOS 安装包会主动请你去「应用程序」</h2>
       <p><strong>本期覆盖 11 月 25 日 06:30 ~ 11 月 26 日 06:30（北京时间）合入 main 的提交，共 213 个 commit（不含 merge），另有 9 个 merge。新增 3 个功能、130 个修复、0 个性能优化。commit 日期列跨度为 11 月 19 日 ~ 11 月 26 日（提交时区多为 UTC / 西五区，所以日期列比北京时间早一天）。按 tip 差集采集，并用 committer 时间戳核对：141 条落在上面这个窗口内，另外 72 条是分支上的提交，提交时间早于窗口起点、经合并才进入 main——口径是「这批提交进入 main 的时间」，不是 commit 作者时间。</strong></p>
