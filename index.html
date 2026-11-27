@@ -22,9 +22,101 @@
 </head>
 <body>
 <h1>Hermes 每日更新日报</h1>
-<p class="meta">共 122 期 · 55986 个提交 · 每日自动更新 ·
+<p class="meta">共 123 期 · 56114 个提交 · 每日自动更新 ·
 <a href="https://irisrespect.github.io/hermes-daily/feed.xml">RSS 订阅</a></p>
 
+    <section id="2026-11-28" class="day">
+      <h2>Hermes 日报 2026-11-28：空闲会话后台压缩，桌面端不再误报找不到 git</h2>
+      <p><strong>本期覆盖 11 月 27 日 06:30 ~ 11 月 28 日 06:30 合入 main 的提交，共 128 个 commit（不含 merge），另有 0 个 merge。新增 9 个功能、79 个修复、0 个性能优化。另有 23 条测试与 17 条其他改动（文档、重构、CI 与一条目录条目更新），主体是插件、网关与会话链路上的一轮加固，外加提示词缓存的一批成本优化。</strong></p>
+<p>📌 今日要点：</p>
+<p>空闲会话后台压缩：空闲策略在每条路由上都会在后台压缩，还能按渠道单独设时长，并且修掉了这个开关此前从不触发的问题。</p>
+<p>桌面端 git 检测：macOS 没装命令行工具时不再误报找不到 git，审查面板和 PR 列表恢复正常，「没有 git」这个结论也传遍所有调用方。</p>
+<p>默认插件预检：桌面端启动本地后端前跑一次最多 120 秒的有上限预检，失败一律放行，不再因为装插件卡住启动。</p>
+<p>终端程序恢复：CLI 和 TUI 支持 OSC 7577 程序恢复协议，终端或服务重启后可以自动接回当前会话。</p>
+<p>提示词缓存保温：5 分钟缓存也开始保活，回复生成期间同样保温，真实会话回测成本降低 4.1%。</p>
+<p>重点条目（桌面端）：</p>
+<p>桌面端不再在有 Homebrew git 的 Mac 上误报「找不到 git」（1765267a26、b09f6f5174）</p>
+<p>问题：从 Finder 或 Dock 启动的桌面端，如果合并登录 shell 的 PATH 失败，只继承 /usr/bin:/bin:/usr/sbin:/sbin。解析 git 的 resolveGitBinary() 只走这条 PATH，在没有 Command Line Tools 的 Mac 上只会看到系统那个被拦的 /usr/bin/git 桩，于是返回 null，Review 面板报 ghReady: false 并跳过 PR 读取——可 Homebrew 的 git 和 gh 都装着，gh 自己的环境（ghEnv）以及后端的 PATH 都能到 /opt/homebrew/bin 和 /usr/local/bin，gh 本该跑得起来。</p>
+<p>修复：新增 resolvePosixGitBinary()，接受一组备用目录，在 PATH 候选之后尝试并与它们去重，resolveGitBinary() 传入后端自己追加到 PATH 的那份 POSIX_SANE_PATH_ENTRIES；同时在探测候选之前先识别 macOS 的 CLT 桩（读 DEVELOPER_DIR 或 2 秒超时的 xcode-select -p，正结果永久缓存、负结果 5 秒 TTL），跳过不可用的 /usr/bin/git 桩。PATH 上有能用的 git 仍然优先，返回 null 现在明确表示两处都没有可用 git，gh 自己的查找也会落到那个桩上。</p>
+<p>效果：缺 CLT 但装了 Homebrew git 的 Mac 上，评审列表、PR 读取、worktree 都恢复；装完 CLT 后最多 5 秒自愈（负缓存过期）。</p>
+<p>「没有 git」这个结论传到所有调用方，读操作降级、写操作明说（8d0db4c39f）</p>
+<p>问题：此前只有后端 Python 侧知道「这台机器没有可用的 git」，Electron 侧的审查、插件安装、更新器各走各的，缺 git 时会尝试启动 git 或 gh，报底层错误。</p>
+<p>修复：把 resolvePosixGitBinary 接进 Electron 的 resolveGitBinary（返回 string | null，null 不缓存但走 5 秒负 TTL），并在每个调用方处理 null：git-review-ops 与 git-ipc 的读操作（仓库状态、评审列表、评审 diff、文件 diff、rev-parse、提交上下文、ship 信息、PR 列表）降级返回，写操作（stage、unstage、revert、commit、push、createPr）拒绝并回「git is not available」；git-worktree-ops 的读降级、worktree 增删拒绝；插件从 git 安装、probePluginRepo、runGitVersion 返回失败；启动器与更新器的源码检查跳过探测并传 --git &#x27;&#x27;，不会再裸调 git。</p>
+<p>效果：缺 git 的机器上界面给出明确原因，不再是一片空或者底层报错。</p>
+<p>桌面端启动前先跑一次有上限的默认插件预检（2c5b8d4db4、3fb8035715、8537fa24bc）</p>
+<p>问题：桌面端启动本地后端时，默认插件的安装/补齐没有边界——插件多或网络慢时，用户盯着启动画面等，渲染进程的启动计时也把安装时间一起算进去。</p>
+<p>修复：启动本地后端之前，用和后端完全相同的运行时与环境跑一次 `hermes_cli.default_plugins ensure --json --timeout &lt;秒&gt;`（PM 托管的命令行启动器走 `--run-module`），桌面端首次启动的上限默认 120 秒，pooled 本地拨号另限 5 秒以内；同批的 2545c71b90 移除了 HERMES_DEFAULT_PLUGINS_TIMEOUT 环境变量，覆盖改走命令行的 --timeout 与程序内选项（ensure 自身默认 300 秒，创建 profile 路径 120 秒）。整条预检严格 fail-open：任何非零退出（2 = 欠装、3 = 超时转后台继续、4 = 策略跳过）、超时被杀、解释器崩溃，都只在 desktop.log 里记一行 `[default-plugins]`，启动继续，远程后端不跑。渲染进程一侧的启动计时在预检期间暂停，预检结束再继续计时，不再把安装耗时算成「启动慢」。核心侧配套加了有界预检、分离式的 ensure 交接（脱离父进程继续装）和非阻塞的命令行复查；Docker 的 stage2-hook 也跑同一套有界预检。</p>
+<p>效果：装插件不再能把桌面端卡在启动画面，最坏情况是等 120 秒然后照常启动，安装转到后台继续。</p>
+<p>重点条目（空闲会话后台压缩）：</p>
+<p>空闲的聊天在后台压缩，所有路由、可按渠道单独设（170d9637ea）</p>
+<p>问题：compression.idle_compact_after_seconds 只在下一次回合开始前跑，用户隔很久回来的第一条消息要等摘要做完才发得出去；而网关的后台压缩只在提示词缓存边缘触发，也就是只有带缓存保活的路由才有——本地模型、自定义的 OpenAI 兼容端点、未定价的路由从来不会后台压缩。</p>
+<p>修复：看门狗的空闲扫描在缓存边缘什么都没认领时，也会认领一个空闲策略已过的缓存聊天（idle 动作），跑的是同一套手动压缩流程：按会话 key 每会话一个任务、共用信号量、聊天自己的 profile 作用域与认领门、租约、围栏、自动门禁、持久冷却，触发器记作 idle，不新建 worker、不新建表、不新建调度器。摘要之前先在存下来的 transcript 上跑回合开始的空闲门禁（高于压缩后的下限、自上次压缩后有增长、不在冷却期）。一个空闲周期只认领一次（认领挂在 agent 最后活动时间上，被拒或失败的聊天要等有新活动才重试），成功就把 agent 驱逐；有回合在跑、适配器有没派发的输入（待处理消息、文本批次、在飞守卫）或运行器队列里有任务时跳过；对聊天本身静默，结果只写网关日志。被空闲 TTL 先驱逐的聊天，在释放时如果到期也会压缩（_compact_then_release 不再要求存在缓存保温器）。平台的某个渠道用 platforms.&lt;p&gt;.channel_overrides.&lt;id&gt;.idle_compact_after_seconds 覆盖全局值，写 0 就是该渠道关闭，和 model/system_prompt/allow_silence 一样走同一个覆盖解析。</p>
+<p>效果：长期不用的会话在后台就被压好，回来第一句话不用再等摘要；本地模型和自定义端点也终于有后台压缩。</p>
+<p>顺手修掉：这个开关以前其实从来不触发（5b1e7de42c）</p>
+<p>问题：空闲间隔从 agent._last_activity_ts 量，可是每个回合进来都会先刷新这个时间戳——回合租约开始前会碰一次活动时间、网关对缓存 agent 会重置它、重建的 agent 构造时就带着当前时间。量出来的间隔永远接近 0，idle_compact_after_seconds 在桌面端、TUI、CLI 和网关上一律不生效。</p>
+<p>修复：改用 transcript 里这条用户消息之前最新的时间戳作为空闲参照。transcript 行在内存和 state.db 里都带时间戳，三种重置都能活；只有没有时间戳的 transcript 才退回 _last_activity_ts。</p>
+<p>效果：这个配置项从今天起才真的按设的时间生效。</p>
+<p>到期的空闲策略不再被缓存边缘的清理认领抢走（ad7e88f0ab）</p>
+<p>问题：在会挂缓存保温的路由上，越过缓存窗口的第一次看门狗把这次扫描标成 offload，而 offload 常常什么也没清；空闲检查只在边缘什么都没认领时才跑，于是后台压缩晚一个约 5 分钟的周期落地，这期间回来的用户就撞上回合开始前的压缩。</p>
+<p>修复：空闲策略先检查（扫描和释放两处都改），被拒的压缩把边缘留给下一个 tick。</p>
+<p>效果：隔一段时间回来的用户不再被「先等摘要」。</p>
+<p>后台空闲压缩的评审修正（7c57dbf405）</p>
+<p>缓冲的文本批次按事件里的会话匹配（适配器各自的 key 规则不同，按 session key 查会漏掉在等的消息）；任务在真正摘要前再查一次缓冲输入，因为它可能在认领之后又排在别的摘要后面等了一阵；Codex app-server 在 native/off 模式下交给它自己压缩，网关管线会像 /compress 那样强压；文档写明某渠道的 idle_compact_after_seconds 改动和别的 channel_overrides 字段一样，网关重启后生效（主 profile 读的是启动时配置）。</p>
+<p>重点条目（终端 · OSC 7577）：</p>
+<p>CLI 和 TUI 向支持的终端上报「可以恢复这个会话」（2053d341e2）</p>
+<p>问题：终端或终端服务重启后，Hermes 会话没有可恢复的落脚点，用户只能自己回忆上次跑到哪、重新 attach。</p>
+<p>修复：打开 display.program_resume 之后，经典 CLI 和 TUI 会向支持 OSC 7577 Program Resume 的终端发送带鉴权的恢复命令——鉴权用 pane 环境里的 OSC7577_TOKEN，终端据此可以在重启后自动把当前 Hermes 会话恢复回来。明确退出（/quit、空闲提示符下的 Ctrl+C / Ctrl+D、SIGINT）时清掉记录；/update 退出（退出码 42）、崩溃、收到信号、输出流断掉则保留，这些情况重启后正需要恢复。这个项和已有的 program_status（OSC 7501 状态上报）是同一家族，默认关闭（配置项注释里写明开启方式），不支持的终端会忽略。</p>
+<p>效果：支持的终端上，重启终端窗口或终端服务后会话可以自动接回。</p>
+<p>只报真能被恢复的会话（0bb0a5b8bb、943bcb22bb）</p>
+<p>修复要点：TUI 的 `--resume ID` 只在网关确认会话已保存时才上报（内联回合的 prompt.submit streaming 应答，或带已存历史的 resume），token 用量、已建好的 agent、排队中的提交都不算；挂在命名网关（HERMES_TUI_GATEWAY_URL）上时什么都不报，因为新启动会打开本机自己的库。启动器带的 --safe-mode / --ignore-user-config 会随恢复前缀一起带上，并只上报已保存的会话。经典 CLI 和网关聊天里两份上报/清除的簿记合并成一个 ProgramResumeReporter，写入加锁，SIGCONT 的重报跑在自己线程上，不会落在用户的清除或会话切换之后。报告的命令只在 profile 解析到本 HERMES_HOME 时带 `-p NAME`（包括真的名叫 custom 的 profile），跑在 profiles 根之外或自定义根下（Docker 的 /opt/data）则不带，因为那里的 `-p default` 意味着新环境里的 ~/.hermes。</p>
+<p>重点条目（性能与成本 · 提示词缓存）：</p>
+<p>5 分钟缓存也开始保温，回测省 4.1%（09599f09a0）</p>
+<p>问题：cache_ttl: auto 的聊天一开始走 5 分钟档，此前它在升级到 1 小时之前没有任何空闲保活，缓存边缘也不会压缩 30 分钟以下的窗口，于是每次停顿超过 5 分钟就得把整个 prompt 重写一遍，缓存白丢。</p>
+<p>修复：5 分钟窗口也跑空闲保活（最多 3 次读，约 17 分钟覆盖），保活覆盖到的停顿继续用便宜的 5 分钟条目；缓存边缘在这个预算结束时压缩（30 分钟地板去掉），按原来的上下文与增长规则；在 5 分钟上压缩完的 auto 聊天就地升到 1 小时（upgrade_at_compaction），因为压缩后的 prompt 本来就要重写。档位仍然只在 5 分钟条目已经消失时才换。</p>
+<p>效果：用 owner 真实的 34 个人类会话回测（agent.log 加实测的 Portal 费率）：5 分钟保温比现状省 4.1%，0.1 倍读取率下省 1.9%；起步就上 1 小时省 0.9%。</p>
+<p>回复还在生成时也保温，不再写完前缀就没了（112ec9176b、6be2ab575a）</p>
+<p>问题：一次生成比缓存条目寿命还长的回复（子 agent 的单次长生成、慢上游），等它写完前缀已经过期，下一个请求要把整段重写；保活发不出去，因为保活器在请求构建时被取消、要等回复落地才重新挂上。</p>
+<p>修复：请求发出去就挂一个运行，在条目过期前重放这条请求（start_in_flight），只对早先回复证明过会缓存的路由生效，按这次发送的时刻给请求要的档位算时间，并像工具等待一样记账（几次保活合起来不超过它避免的那一次重写，用户回合的空闲预算不受影响）。每次保活把请求的尝试发送时间往后推，回复从最新一次续期折叠回来而不是把窗口退回自己发送的时刻。回复落地后替换这个运行，重试或回退会重建，回合结束取消。另有一条把保活的续期顺序与它请求自己的回复对齐。</p>
+<p>效果：长回复期间缓存不丢，下一轮不用重写整段 prompt。</p>
+<p>插件管理：核心已满足的依赖不再触发 venv 重建（e4e693f95f、5ba14569d4）</p>
+<p>问题：装插件时只要声明里有依赖，就重建整个 venv，即使这些依赖已经被核心工作区满足。</p>
+<p>修复：识别 core-satisfied 依赖并跳过 venv 重建，同时给默认目录条目加 lint（CI 校验默认插件目录条目的字段）；随后的修正在重试时保留 core-satisfied 约束、把评估合并、修 macOS CI 标记。另外 pm 这条线还修了 Windows 上的长格式路径（d0216c5618、c72a8a0d50：深拷贝/删除路径写成长格式；dfba8ce66e：直接读已安装的 git 并给新的 Windows 测试打标记；ab7e0f33d4：把已安装的 git 前置进 managed_environment 的 PATH）。</p>
+<p>效果：插件安装和检查少一次完整 venv 重建，装得更快。</p>
+<p>重点条目（插件）：</p>
+<p>插件的 OAuth 登录能适配只认原样 redirect URI 的服务商（1478d8e174、f4e6034a30）</p>
+<p>问题：有些授权服务器只接受逐字注册的 redirect URI（Linear、QuickBooks），有些要求 scope=read,write 而不是 RFC 的空格分隔（Linear）。插件的 oauth: 条目两样都做不到——永远绑系统分配端口的 /callback、永远用空格拼 scope，于是 `hermes auth add &lt;插件&gt;:&lt;id&gt;` 在这些服务商上登不完，插件只能自己存 token 文件。</p>
+<p>修复：oauth 条目新增可选字段 redirect_port（1024-65535）、redirect_path、scope_separator（空格或逗号），在入库时和别的字段一样校验后传给 PKCE 配置；也可以把 localhost 直接写进 redirect URI。OAuthPKCEConfig 新增 scope_separator，在授权 URL、存下的授权元数据、刷新请求三处拼 scope 都用它；授权后的 scope 校验逗号与空白都认；授权指纹跳过保持默认的字段，所以已声明这些字段的旧授权继续有效，改任何一个都会像别的字段一样要求重新登录。</p>
+<p>效果：Linear、QuickBooks 这类服务商上插件登录能走完，插件不必再自己维护 token。</p>
+<p>插件可以投一张持久卡片，不再花一次模型回合（6404021192、1f596c3e60、88bece27b4、c905e13d0e）</p>
+<p>问题：后台插件想给用户一张可操作的卡片，以前只能注入一个用户回合、让模型用工具调用作答——代价是整个会话一次完整模型调用，还要排在后台评审后面，并指望模型配合。ctx.post_message 也不行：它需要在调用上下文里绑定会话，而且本地会话里它是短暂提示，不是 transcript 里的一行。</p>
+<p>修复：ctx.post_card 把卡片（文本、可选的 transcript 指令、可选 id）放进会话的 FIFO，在回合边界写成一条 note，永远不是回合；有自己的授权能力，只针对插件自己的 profile，按 id 幂等，只给模型看一行事实；桌面端渲染插件注册的 directive，其他界面显示文本，消息平台保留插件自己的原生卡片，跨 profile 的卡片会被所有权检查拒绝。配套修正：卡片显示数据只留在 host（不进模型的记忆）、模型历史里用不透明引用（此前是原始引用）、实时卡片与拉取回来的历史去重。</p>
+<p>效果：插件推卡片不再花一次模型调用，也不会因为后台评审排队而迟到。</p>
+<p>重点条目（搜索、凭证、更新与其他）：</p>
+<p>session_search 的结果是真实历史（40787a60e1、78b47aaa0d、14eb3f3489、0389da0f73）</p>
+<p>问题：问话的会话自己的 prompt 和搜索调用里含了每个查询词，严格搜索「匹配」上了，这些行又作为现场上下文被丢掉，于是一次 any-term 重试都没跑，discover 返回 0 或者自己的搜索回声。</p>
+<p>修复：不再把（自己和其他 agent 的）搜索调用算作内容命中；结果里的工具输出做了截断；按猜的 id 滚动时落到最近的消息并说明如何恢复；scroll 返回请求的那条消息本身而不是残缺片段；被降级的工具输出仍能被任何调用方搜到；恢复出来的工具输出能熬过再次压缩，图片回合也可搜；带 session_id 时仍然尊重 query。</p>
+<p>效果：搜历史能搜到真东西，不再空手而归。</p>
+<p>Claude 订阅的账号级限流窗口：第一个 429 就换号（46627faadf、5c34d42640、338b32484f、2c8c70f370）</p>
+<p>问题：Claude 订阅的 429 会在 Anthropic 的统一限流响应头里点名是哪个窗口在拒。账号级窗口（five_hour、seven_day）拒绝所有模型，可是凭据池只 bench 请求的那个模型，第一个 429 就在已经用完的账号上睡最多 600 秒，辅助路径还把 reset 丢了、一小时后 bench 自动失效。</p>
+<p>修复：解析错误上下文时记下 window 和统一 reset；账号级窗口把凭据 bench 到那个 reset 并在第一个 429 就轮换；family 级窗口和不带响应头的 429 保留 per-model 冷却加单次重试；辅助恢复也走同一套上下文解析。环境变量 token 同样受 bench 约束。所有界面统一按速率限制显示——此前消息网关把冷却写成「请用 /login 重新登录」、API 服务和回退日志写「auth failed」、Kanban 按不可恢复退出，现在都认 model_rate_limited 这个错误码；只有所有活着的 Anthropic 凭据都是 429 bench 时才报池级冷却，被 401/402 bench 的仍然给缺凭据的诊断和登录提示。</p>
+<p>效果：用完的账号不再吞掉 600 秒，换号更快，提示也更准确。</p>
+<p>/update 通知不再被提前删掉（2dedd43e34、fa1a28d277）</p>
+<p>问题：更新重启之后，插件平台的名字可能还没解析成 Platform 对象，Platform() 抛进兜底分支，finally 顺手把待发的通知和输出删了；没有时间戳的 marker 没有年龄，在平台一直不注册的情况下，每次重启都会被保留并重新打一遍日志。</p>
+<p>修复：解析不出来的名字按「适配器还在重连」处理——延后，交给已有的适配器等待上限在新版本彻底失败时大声报错；没有时间戳的 marker 退回用文件 mtime 算年龄（认领时的改名会保留 mtime）。</p>
+<p>效果：/update 的结果通知能等到平台注册再发出来，日志不再每次重启重复刷。</p>
+<p>仪表盘登录：在另一台主机上开始的登录，在配置的公开地址完成（1ff7b19489）</p>
+<p>问题：反向代理在前面转发时，登录可能在公开主机上开始，最后落到另一台主机上收尾，于是失败。</p>
+<p>修复：在任意主机开始的登录，都在配置的 public URL 上完成。</p>
+<p>效果：用代理暴露的仪表盘登录能走完。</p>
+<p>其他值得记的：</p>
+<p>mnemos 重新钉到 0.7.0（b60705b5e6），memtomem 升到 0.1.29（内置 memtomem 0.7.14，337903eeff）。</p>
+<p>备份会排除 host 管理的目录：portal-recovery 和 lost+found 不进备份、keep-host 替换也不碰（7c4f02a717），host-managed 目录只在 Hermes 根下匹配、导入时跳过（b222c8d01c）。</p>
+<p>gateway-migrate 拒绝接管 macOS 系统级 LaunchDaemons，改为给出 sudo 手动步骤（9385cc48e7），未知停止状态会记录（1d15aad1df），恢复命令补了引号并处理边缘状态（39afb63b22）。</p>
+<p>从 `python -m hermes_cli.main` 或 `python cli.py` 启动的会话，恢复命令改用本安装自己的启动器（30bff5e45c），在 checkout 之外的新终端里也能恢复。</p>
+<p>自动安装默认插件永远不会解除 plugins.disabled 里的条目，包括下载期间写进去的那条（7d52580e5b）。</p>
+<p>lifecycle-guard 三条修正：heredoc 的正文归属它挂着的命令、heredoc 后面的列表操作符保持可见、会执行命令的管道过滤器一律丢弃，只认裸名字的过滤器（d0fa1dd0c7、998385d93e、9faeb9a653）。</p>
+    </section>
+    
     <section id="2026-11-27" class="day">
       <h2>Hermes 日报 2026-11-27：网关配置改动即时生效，消息页可直接装平台插件</h2>
       <p><strong>本期覆盖 11 月 26 日 06:30 ~ 11 月 27 日 06:30 合入 main 的提交，共 473 个 commit（不含 merge），另有 3 个 merge。新增 57 个功能、127 个修复、0 个性能优化。其中 52 条是插件目录条目（46 条 plugin-catalog + 5 条 catalog + 1 条裸 feat），真正的主体是网关与插件安装链路的一轮集中加固。</strong></p>
